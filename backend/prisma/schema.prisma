@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  CLIENTA
+  CAJERO
+  ADMIN
+}
+
+enum Canal {
+  online
+  pos
+}
+
+enum EstadoVenta {
+  cobrada
+  anulada
+}
+
+enum MedioPago {
+  efectivo
+  qr
+  contra_entrega
+}
+
+model Usuario {
+  id            String              @id @default(uuid())
+  email         String              @unique
+  rol           Rol
+  turnos        CajaTurno[]
+  ventasClienta Venta[]             @relation("ClientaVentas")
+  reportes      ReporteEjecucion[]
+
+  @@map("usuarios")
+}
+
+model Sucursal {
+  id        String      @id @default(uuid())
+  nombre    String
+  ciudad    String
+  almacenes Almacen[]
+  turnos    CajaTurno[]
+
+  @@map("sucursales")
+}
+
+model Almacen {
+  id         String         @id @default(uuid())
+  nombre     String
+  sucursalId String         @map("sucursal_id")
+  sucursal   Sucursal       @relation(fields: [sucursalId], references: [id])
+  stocks     StockAlmacen[]
+  ventas     Venta[]
+
+  @@map("almacenes")
+}
+
+model Producto {
+  id          String     @id @default(uuid())
+  nombre      String
+  descripcion String     @default("")
+  categoria   String
+  ocasion     String
+  precioBase  Decimal    @map("precio_base") @db.Decimal(12, 2)
+  variantes   Variante[]
+
+  @@map("productos")
+}
+
+model Variante {
+  id         String         @id @default(uuid())
+  productoId String         @map("producto_id")
+  producto   Producto       @relation(fields: [productoId], references: [id])
+  talla      String
+  color      String
+  sku        String         @unique
+  urlFoto    String         @default("") @map("url_foto")
+  urlOverlay String         @default("") @map("url_overlay")
+  stocks     StockAlmacen[]
+  lineas     LineaVenta[]
+
+  @@unique([productoId, talla, color])
+  @@index([productoId])
+  @@map("variantes")
+}
+
+model StockAlmacen {
+  varianteId String   @map("variante_id")
+  almacenId  String   @map("almacen_id")
+  cantidad   Int
+  variante   Variante @relation(fields: [varianteId], references: [id])
+  almacen    Almacen  @relation(fields: [almacenId], references: [id])
+
+  @@id([varianteId, almacenId])
+  @@index([almacenId])
+  @@map("stock_almacen")
+}
+
+model CajaTurno {
+  id             String    @id @default(uuid())
+  sucursalId     String    @map("sucursal_id")
+  sucursal       Sucursal  @relation(fields: [sucursalId], references: [id])
+  cajeroId       String    @map("cajero_id")
+  cajero         Usuario   @relation(fields: [cajeroId], references: [id])
+  fondoInicial   Decimal   @map("fondo_inicial") @db.Decimal(12, 2)
+  abiertoEn      DateTime  @default(now()) @map("abierto_en")
+  cerradoEn      DateTime? @map("cerrado_en")
+  totalSistema   Decimal   @default(0) @map("total_sistema") @db.Decimal(12, 2)
+  totalDeclarado Decimal?  @map("total_declarado") @db.Decimal(12, 2)
+  ventas         Venta[]
+
+  @@map("caja_turnos")
+}
+
+model Venta {
+  id          String       @id @default(uuid())
+  uuid        String       @unique
+  canal       Canal
+  estado      EstadoVenta
+  medioPago   MedioPago    @map("medio_pago")
+  total       Decimal      @db.Decimal(12, 2)
+  creadaEn    DateTime     @default(now()) @map("creada_en")
+  almacenId   String       @map("almacen_id")
+  almacen     Almacen      @relation(fields: [almacenId], references: [id])
+  cajaTurnoId String?      @map("caja_turno_id")
+  cajaTurno   CajaTurno?   @relation(fields: [cajaTurnoId], references: [id])
+  clientaId   String?      @map("clienta_id")
+  clienta     Usuario?     @relation("ClientaVentas", fields: [clientaId], references: [id])
+  lineas      LineaVenta[]
+
+  @@index([creadaEn])
+  @@index([cajaTurnoId])
+  @@map("ventas")
+}
+
+model LineaVenta {
+  id             String   @id @default(uuid())
+  ventaId        String   @map("venta_id")
+  venta          Venta    @relation(fields: [ventaId], references: [id])
+  varianteId     String   @map("variante_id")
+  variante       Variante @relation(fields: [varianteId], references: [id])
+  cantidad       Int
+  precioUnitario Decimal  @map("precio_unitario") @db.Decimal(12, 2)
+
+  @@map("lineas_venta")
+}
+
+model ReporteEjecucion {
+  id       String   @id @default(uuid())
+  pregunta String
+  sql      String
+  filas    Int
+  creadaEn DateTime @default(now()) @map("creada_en")
+  adminId  String   @map("admin_id")
+  admin    Usuario  @relation(fields: [adminId], references: [id])
+
+  @@map("reporte_ejecuciones")
+}

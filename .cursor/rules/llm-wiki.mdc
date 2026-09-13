@@ -1,0 +1,17 @@
+---
+description: Operar el segundo cerebro LLM Wiki de SI2 (ingest, query, lint)
+globs: Examen si2 Memorias/**
+alwaysApply: false
+---
+
+# LLM Wiki SI2
+
+Aplica solo a la bóveda `Examen si2 Memorias/`. El resto del repo (backend, frontend, móvil) es código: no uses estas reglas ahí.
+
+- Esquema: `Examen si2 Memorias/AGENTS.md`
+- `raw/` es inmutable. No editar fuentes.
+- `wiki/` lo escribe el agente. El humano casi nunca.
+- Antes de responder sobre la materia: leer `wiki/index.md` y el final de `wiki/log.md`.
+- Triggers: "ingiere X" → ingest; pregunta de SI2 → query (archivar si aporta); "lint" → salud de la wiki.
+- Una fuente por vez. Actualizar índice y log en cada operación.
+- Español. Wikilinks `[[página]]`. No inventar apuntes que no estén en raw/wiki.

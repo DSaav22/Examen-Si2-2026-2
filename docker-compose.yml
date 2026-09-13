@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ensayar-postgres
+    environment:
+      POSTGRES_USER: ensayar
+      POSTGRES_PASSWORD: ensayar
+      POSTGRES_DB: ensayar
+    ports:
+      - "5432:5432"
+    volumes:
+      - ensayar_pg:/var/lib/postgresql/data
+
+volumes:
+  ensayar_pg:
