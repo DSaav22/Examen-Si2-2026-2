@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
+import { InventarioService } from '../inventario/inventario.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockInsuficienteError } from './errores-venta';
 import { VentasService } from './ventas.service';
@@ -13,7 +14,7 @@ const enabled = process.env.SPIKE_B === '1';
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      providers: [PrismaService, VentasService],
+      providers: [PrismaService, InventarioService, VentasService],
     }).compile();
     prisma = moduleRef.get(PrismaService);
     ventas = moduleRef.get(VentasService);
@@ -25,6 +26,8 @@ const enabled = process.env.SPIKE_B === '1';
   });
 
   beforeEach(async () => {
+    await prisma.pagoSimulado.deleteMany();
+    await prisma.movimientoInventario.deleteMany();
     await prisma.lineaVenta.deleteMany();
     await prisma.venta.deleteMany();
     await prisma.stockAlmacen.update({
@@ -34,7 +37,7 @@ const enabled = process.env.SPIKE_B === '1';
           almacenId: SPIKE_UUIDS.almacen,
         },
       },
-      data: { cantidad: 1 },
+      data: { cantidad: 1, reservado: 0 },
     });
   });
 
@@ -77,9 +80,13 @@ const enabled = process.env.SPIKE_B === '1';
     const cobradas = await prisma.venta.count({ where: { estado: 'cobrada' } });
     expect(cobradas).toBe(1);
 
+    const ganadora = ok[0].status === 'fulfilled' ? ok[0].value : null;
+    expect(ganadora).not.toBeNull();
+    const payloadGanador = ganadora!.uuid === a.uuid ? a : b;
+
     const idem = await Promise.all([
-      ventas.cobrar(a),
-      ventas.cobrar(a),
+      ventas.cobrar(payloadGanador),
+      ventas.cobrar(payloadGanador),
     ]);
     expect(idem[0].id).toBe(idem[1].id);
     expect(await prisma.venta.count()).toBe(1);

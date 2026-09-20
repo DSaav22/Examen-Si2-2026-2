@@ -1,6 +1,6 @@
 ---
 tipo: index
-actualizado: 2026-09-12
+actualizado: 2026-09-19
 tags: [index]
 ---
 
@@ -18,7 +18,8 @@ Portal compilado. En cada query, empezar aquí.
 - [[Decisiones del parcial]] — EnsayAR, 2D+pose, QR simulado
 - [[Fase Inicio]] — artefactos PUDS del 12 sep
 - [[Fase Elaboracion]] — UC03/07/10, dominio, spikes
-- [[Fase Construccion]] — backend + POST /ventas (spike B)
+- [[Fase Construccion]] — A/B/C, pose, IA ficha, cola POS, IaC Azure
+- [[Fase Transicion]] — adopción + criterio de deploy
 
 ## Conceptos
 
@@ -56,6 +57,7 @@ Portal compilado. En cada query, empezar aquí.
 ## Queries archivadas
 
 - [[Factibilidad documentacion y producto]] — Inicio sí; RA 3D no entra
+- [[Huecos locales vs examen]] — UC vs API/UI; Azure aplazado
 
 ## Cómo usar
 

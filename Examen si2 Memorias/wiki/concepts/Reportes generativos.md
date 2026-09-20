@@ -1,7 +1,7 @@
 ---
 tipo: concept
 fuentes: 2
-actualizado: 2026-09-12
+actualizado: 2026-09-19
 tags: [innovacion, ia, sql]
 ---
 
@@ -20,6 +20,10 @@ Garzón lo pone en el actor “Servicio de IA”: reportes generativos bajo dema
 - Reportes estáticos: sí, pero no son lo evaluable.
 - Hay que acotar qué puede preguntar la IA (esquema, permisos, sucursal) para no soltar SQL libre.
 - Encaja en la Parte 1 teórica y en el [[MVP y alcance]] si entra al primer incremento.
+
+## Construcción (19 sep)
+
+Sin clave OpenAI. `compilarPregunta` arma el SELECT; `validarSelect` lo acota a `v_reporte_ventas`. `POST /reportes/generativo` y **`GET /reportes/dia`** (ADMIN). UI en `/reportes` (Consultar + Ventas del día). Spike C. [[UC10 Reporte generativo]]
 
 ## Relacionado
 

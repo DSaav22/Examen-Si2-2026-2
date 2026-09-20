@@ -1,24 +1,23 @@
 ---
 tipo: concept
 fuentes: 2
-actualizado: 2026-09-12
+actualizado: 2026-09-19
 tags: [flujo, garzon]
 ---
 
 # Reservas de prendas
 
-Flujo **fuerte en Garzón**, apenas implícito en el audio (el audio empuja compra digital + [[Probador virtual]]).
+Flujo **fuerte en Garzón** (RF09–RF12). **Implementado** el 19 sep en EnsayAR.
 
-## Flujo Garzón
+## Flujo
 
-1. Cliente reserva varias prendas.
-2. Elige sucursal y horario.
-3. La sucursal recibe aviso y prepara.
-4. Cliente prueba en vestidor físico.
-5. Compra lo que sí quiere (caja) o se va.
+1. Clienta arma ítems (carrito) y crea reserva con sucursal + horario.
+2. Stock pasa a **reservado** (kardex `reserva`); disponible = cantidad − reservado.
+3. Encargado ve bandeja `/reservas/sucursal`, prepara, confirma llegada, completa.
+4. Cancelación libera stock (`liberacion`). Completar descuenta cantidad (compra en tienda).
 
-El stock pasa a *reservado*. RF09–RF12, RF11 notifica a la sucursal. [[examen1-garzon-fashionstore]]
+API: `POST /reservas`, `GET /reservas/mias`, `GET /reservas/sucursal`, `PATCH /reservas/:id/estado`. UI: `/reservas` (clienta), `/encargado`. Móvil: pestaña Reservas.
 
-## Cómo tratarlo aquí
+## Relacionado
 
-**Fuera del parcial.** Decisión cerrada. [[Decisiones del parcial]] · [[MVP y alcance]]
+[[Decisiones del parcial]] · [[examen1-garzon-fashionstore]] · [[Punto de venta]]

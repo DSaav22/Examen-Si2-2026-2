@@ -1,0 +1,339 @@
+:root {
+  --ink: #1c1412;
+  --paper: #f6efe6;
+  --card: #fffaf4;
+  --wine: #7a2430;
+  --wine-deep: #4e141c;
+  --gold: #c4a574;
+  --muted: #6d5c56;
+  --line: #e4d6c8;
+  --ok: #2f6b4f;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  color: var(--ink);
+  background: var(--paper);
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #f3d9c4 0%, transparent 50%),
+    var(--paper);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  background: var(--wine);
+  color: #fff8f2;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.7rem 1.2rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+input,
+select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.eyebrow {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--wine);
+  margin: 0 0 0.3rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.1rem 1.2rem;
+  box-shadow: 0 10px 30px rgba(78, 20, 28, 0.05);
+}
+
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: 2.4rem;
+}
+
+.hint,
+.error,
+.ok {
+  font-size: 0.9rem;
+}
+
+.error {
+  color: var(--wine);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 250, 244, 0.9);
+}
+
+.topbar nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.topbar nav a {
+  color: var(--muted);
+}
+
+.topbar nav a.active {
+  color: var(--wine);
+  border-bottom: 2px solid var(--gold);
+}
+
+.who {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.9rem;
+}
+
+main {
+  padding: 1.5rem;
+}
+
+.page-head {
+  margin-bottom: 1rem;
+}
+
+.row-form,
+.col-form {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+
+.col-form {
+  flex-direction: column;
+  max-width: 420px;
+}
+
+.row-form input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.product h3 {
+  margin: 0 0 0.3rem;
+}
+
+.price {
+  color: var(--wine-deep);
+  font-weight: 700;
+}
+
+.product ul {
+  padding-left: 1.1rem;
+  margin: 0.4rem 0 0;
+}
+
+.pick {
+  text-align: left;
+  color: inherit;
+  border-radius: 16px;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.pos {
+  display: grid;
+  grid-template-columns: 1fr minmax(260px, 320px);
+  gap: 1.2rem;
+}
+
+.ticket ul {
+  padding-left: 1.1rem;
+}
+
+.wide {
+  max-width: 720px;
+}
+
+textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}
+
+.sql {
+  background: #1c1412;
+  color: #f6efe6;
+  padding: 0.8rem;
+  border-radius: 10px;
+  overflow: auto;
+  font-size: 0.8rem;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+}
+
+.tryon {
+  display: grid;
+  grid-template-columns: minmax(240px, 420px) minmax(220px, 280px);
+  gap: 1.2rem;
+  align-items: start;
+}
+
+.stage {
+  position: relative;
+  background: #111;
+  border-radius: 18px;
+  overflow: hidden;
+  min-height: 420px;
+}
+
+.stage video {
+  width: 100%;
+  height: 420px;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.stage .cuerpo {
+  width: 100%;
+  height: 420px;
+  object-fit: cover;
+}
+
+.stage .cloth {
+  position: absolute;
+  pointer-events: none;
+  transform-origin: top center;
+}
+
+.thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  vertical-align: middle;
+  margin-right: 0.4rem;
+}
+
+.inline-file {
+  display: inline-grid;
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+}
+
+@media print {
+  .topbar,
+  .no-print,
+  form,
+  nav,
+  button.ghost,
+  .row-form {
+    display: none !important;
+  }
+  .ticket-print {
+    border: 0;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .pos {
+    grid-template-columns: 1fr;
+  }
+  .who span {
+    display: none;
+  }
+}

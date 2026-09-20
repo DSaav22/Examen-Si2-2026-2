@@ -1,0 +1,2 @@
+ALTER TABLE "usuarios" ADD COLUMN "nombre" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "usuarios" ADD COLUMN "password_hash" TEXT NOT NULL DEFAULT '';

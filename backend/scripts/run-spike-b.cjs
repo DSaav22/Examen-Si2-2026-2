@@ -13,11 +13,17 @@ function run(cmd, args) {
 
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL =
-    'postgresql://ensayar:ensayar@localhost:5432/ensayar?schema=public';
+    'postgresql://postgres:diego@localhost:5432/ensayar?schema=public';
 }
 
 console.log('Spike B — migrate + seed + carrera de última unidad');
 run('npx', ['prisma', 'migrate', 'deploy']);
 run('npx', ['prisma', 'db', 'seed']);
 process.env.SPIKE_B = '1';
-run('npx', ['jest', 'src/ventas/ventas.spike-b.spec.ts', '--runInBand']);
+run('npx', [
+  'jest',
+  'ventas/ventas.spike-b.spec.ts',
+  '--runInBand',
+  '--testPathIgnorePatterns',
+  '/a^/',
+]);

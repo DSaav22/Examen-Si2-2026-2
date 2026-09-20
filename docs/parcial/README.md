@@ -4,8 +4,9 @@ Entrega: **23 de septiembre de 2026**. Metodología: Proceso Unificado (Booch, R
 
 | Parte | Estado | Ruta |
 |-------|--------|------|
-| 1. Fundamentación teórica | Pendiente | `01-fundamentacion/` |
-| 2. Proceso de desarrollo (PUDS) | Inicio + Elaboración + **Construcción (spike B)** | `02-puds/` |
-| 3. Adopción y capacitación | Pendiente | `03-adopcion/` |
+| 1. Fundamentación teórica | **Lista** | `01-fundamentacion/` |
+| 2. Proceso de desarrollo (PUDS) | Inicio + Elaboración + Construcción + Transición | `02-puds/` |
+| 3. Adopción y capacitación | **Lista** | `03-adopcion/` |
 
-Decisiones de alcance: wiki `Examen si2 Memorias/wiki/synthesis/Decisiones del parcial.md`.
+Decisiones: wiki `Examen si2 Memorias/wiki/synthesis/Decisiones del parcial.md`.  
+Deploy: `.azure/deployment-plan.md` (falta `az login` para provisionar).

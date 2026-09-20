@@ -4,13 +4,11 @@ Construcción PUDS — spike B: `POST /ventas` descuenta stock con `FOR UPDATE`,
 
 ## Requisitos
 
-PostgreSQL 16. En la raíz del repo:
+PostgreSQL local (sin Docker). Usuario `postgres`, contraseña `diego`, base `ensayar`.
 
-```bash
-docker compose up -d
-```
+Copia `.env.example` a `.env` si hace falta. La URL es:
 
-Si no hay Docker, crea una base `ensayar` y copia `.env.example` a `.env`.
+`postgresql://postgres:diego@localhost:5432/ensayar?schema=public`
 
 ## Comandos
 
@@ -20,6 +18,14 @@ npx prisma db seed
 npm run start:dev
 npm run spike:b
 ```
+
+## Cuentas seed (clave `diego`)
+
+- `admin@ensayar.bo` — catálogo y ventas
+- `cajero@ensayar.bo` — ventas
+- `clienta@ensayar.bo` — solo lectura
+
+`POST /auth/login` → `{ accessToken, user }`. Escrituras de catálogo: `Authorization: Bearer …`
 
 ## Contrato
 

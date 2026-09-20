@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "EnsayAR",
+    "slug": "ensayar-movil",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "EnsayAR usa la cámara solo para el probador virtual. El video no se sube."
+        }
+      ]
+    ],
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "EnsayAR usa la cámara solo para el probador virtual."
+      }
+    },
+    "android": {
+      "permissions": ["CAMERA"]
+    }
+  }
+}

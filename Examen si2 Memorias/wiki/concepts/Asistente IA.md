@@ -1,7 +1,7 @@
 ---
 tipo: concept
 fuentes: 2
-actualizado: 2026-09-12
+actualizado: 2026-09-19
 tags: [ia, cliente]
 ---
 
@@ -18,3 +18,5 @@ El cliente pregunta detalles de la prenda que está viendo (material, cuidados, 
 Recomendador según preferencias, historial, temporada, categoría, talla y stock. También chatbot. RF25: *al menos una* función de IA. [[examen1-garzon-fashionstore]]
 
 Para el [[MVP y alcance]]: una de las dos caras de IA basta si la otra es el reporte por voz; el audio trata ambas como parte del paquete innovador.
+
+Implementado: `POST /ia/ficha` responde precio, talla, color, ocasión y descripción. UI en Catálogo.

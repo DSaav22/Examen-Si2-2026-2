@@ -1,7 +1,7 @@
 ---
 tipo: concept
 fuentes: 2
-actualizado: 2026-09-12
+actualizado: 2026-09-19
 tags: [informe, entrega]
 ---
 
@@ -11,7 +11,9 @@ tags: [informe, entrega]
 
 1. **Fundamentación teórica** — e-commerce, RA, NestJS, React, etc.
 2. **Proceso de desarrollo** — 100% [[Proceso Unificado]]. [[Fase Inicio]], [[Fase Elaboracion]] y [[Fase Construccion]] en `docs/parcial/02-puds/`. Código en `backend/`.
-3. **Adopción y capacitación** — cómo el usuario aprende el sistema (manuales, guías, onboarding). [[stack-metodologia-parcial]]
+3. **Adopción y capacitación** — `docs/parcial/03-adopcion/`. [[stack-metodologia-parcial]]
+
+La Parte 1 está en `docs/parcial/01-fundamentacion/`. La Parte 2 incluye Transición (`02-puds/04-fase-transicion.md`).
 
 ## Extra útil de Garzón (investigación, no stack)
 

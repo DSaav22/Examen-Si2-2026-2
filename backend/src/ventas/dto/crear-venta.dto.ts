@@ -6,14 +6,13 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { Canal, MedioPago } from '@prisma/client';
 
 export class LineaVentaDto {
-  @IsUUID()
+  @IsString()
   varianteId!: string;
 
   @IsInt()
@@ -22,7 +21,7 @@ export class LineaVentaDto {
 }
 
 export class CrearVentaDto {
-  @IsUUID()
+  @IsString()
   uuid!: string;
 
   @IsEnum(Canal)
@@ -31,15 +30,15 @@ export class CrearVentaDto {
   @IsEnum(MedioPago)
   medioPago!: MedioPago;
 
-  @IsUUID()
+  @IsString()
   almacenId!: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   cajaTurnoId?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   clientaId?: string;
 
   @IsArray()

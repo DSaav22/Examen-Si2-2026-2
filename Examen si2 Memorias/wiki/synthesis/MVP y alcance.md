@@ -1,18 +1,18 @@
 ---
 tipo: synthesis
 fuentes: 5
-actualizado: 2026-09-12
+actualizado: 2026-09-19
 tags: [mvp, parcial]
 ---
 
 # MVP y alcance
 
-Cerrado en [[Decisiones del parcial]] y escrito en [[Fase Inicio]].
+Cerrado en [[Decisiones del parcial]]. El 19 sep el dueño pidió cubrir **RF01–RF25 y RNF** del PDF Garzón (dominio), con stack Nest/React/RN.
 
 ## Entra
 
-Catálogo matricial, compra en línea (contra entrega + QR simulado), POS (abrir / vender / cerrar), [[Probador virtual]] 2D+pose, [[Asistente IA]] de ficha, [[Reportes generativos]] acotados, cola offline del POS, Azure.
+Catálogo matricial multi-sucursal, temporadas/colecciones, proveedores, registro clienta, compra web + **móvil**, POS (abrir/vender/cerrar), reservas + encargado, kardex, pasarela simulada, historial, [[Probador virtual]] 2D+pose, [[Asistente IA]] de ficha, [[Reportes generativos]] + inventario, cola offline POS, Azure (deploy).
 
 ## No entra
 
-[[Reservas de prendas]], pasarela real, VTO 3D, PWA completa, mayorista, módulo de proveedores/temporadas.
+VTO 3D, PWA completa, mayorista, pasarela bancaria real (sí sandbox RF19/RNF09).

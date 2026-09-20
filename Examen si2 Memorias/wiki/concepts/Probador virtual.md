@@ -1,7 +1,7 @@
 ---
 tipo: concept
 fuentes: 2
-actualizado: 2026-09-12
+actualizado: 2026-09-19
 tags: [innovacion, ra, mvp]
 ---
 
@@ -27,6 +27,10 @@ Vive en la app [[React Native]]. Complemento: [[Asistente IA]] para preguntas de
 ## Decisión del parcial
 
 MVP = cámara + pose + overlay **2D** de la variante; fallback foto de cuerpo completo. No hay deformación de tela 3D. [[Decisiones del parcial]] · [[Factibilidad]]
+
+## Construcción (19 sep)
+
+`GET /catalogo/variantes/:id/overlay`. Overlay SVG anclado al torso. Web `/probar/:id` (MediaPipe, toques, **foto de cuerpo** o demo) y Expo `movil/` (toques en hombros). [[UC03 Probador]]
 
 ## Relacionado
 

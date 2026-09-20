@@ -15,4 +15,6 @@ El stack no es PWA-obligatorio: web = [[React]], móvil = [[React Native]]. [[st
 
 Hay que cumplir la **capacidad** (cola local + sync), no el sello “PWA”. En React Native eso es almacenamiento local; en React web puede ser service worker si hace falta.
 
+Implementado en el POS web: `localStorage` (`ensayar_cola_pos`) + botón Sincronizar + evento `online`. El stock se descuenta al llegar al servidor (uuid idempotente).
+
 Garzón pide disponibilidad (RNF03) pero no detalla offline-first. [[examen1-garzon-fashionstore]]

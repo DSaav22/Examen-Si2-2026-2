@@ -1,0 +1,12 @@
+name: ensayar
+metadata:
+  template: ensayar-parcial-2026
+services:
+  api:
+    project: ./backend
+    language: ts
+    host: appservice
+  web:
+    project: ./frontend
+    language: ts
+    host: staticwebapp

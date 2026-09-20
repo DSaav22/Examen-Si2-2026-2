@@ -12,6 +12,13 @@ export class TurnoRequeridoError extends Error {
   }
 }
 
+export class TurnoInvalidoError extends Error {
+  constructor(public readonly codigo = 'TURNO_INVALIDO') {
+    super('El turno de caja no es válido para esta venta');
+    this.name = 'TurnoInvalidoError';
+  }
+}
+
 export class UuidConflictError extends Error {
   constructor() {
     super('El uuid ya existe con otro payload');
