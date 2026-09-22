@@ -10,12 +10,12 @@ import { storefrontHeroImage } from '../shared/vestaAssets'
 import { useStorefront } from '../storefront'
 
 type Sort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'novedades' | 'popularidad' | 'descuento'
-type Filters = { search: string; categoria: string; ocasion: string; talla: string; color: string; precioMin: string; precioMax: string; sucursalId: string; descuento: boolean; ordenar: Sort }
-const initialFilters: Filters = { search: '', categoria: '', ocasion: '', talla: '', color: '', precioMin: '', precioMax: '', sucursalId: '', descuento: false, ordenar: 'relevancia' }
+type Filters = { search: string; categoria: string; ocasion: string; talla: string; color: string; material: string; estilo: string; ajuste: string; precioMin: string; precioMax: string; sucursalId: string; descuento: boolean; ordenar: Sort }
+const initialFilters: Filters = { search: '', categoria: '', ocasion: '', talla: '', color: '', material: '', estilo: '', ajuste: '', precioMin: '', precioMax: '', sucursalId: '', descuento: false, ordenar: 'relevancia' }
 
 function readInitialFilters(): Filters {
   const params = new URLSearchParams(window.location.search)
-  return { ...initialFilters, search: params.get('q') ?? '', categoria: params.get('categoria') ?? '', ocasion: params.get('ocasion') ?? '', talla: params.get('talla') ?? '', color: params.get('color') ?? '', precioMin: params.get('precioMin') ?? '', precioMax: params.get('precioMax') ?? '', sucursalId: params.get('sucursalId') ?? '', descuento: params.get('descuento') === 'true', ordenar: (params.get('ordenar') as Sort) || 'relevancia' }
+  return { ...initialFilters, search: params.get('q') ?? '', categoria: params.get('categoria') ?? '', ocasion: params.get('ocasion') ?? '', talla: params.get('talla') ?? '', color: params.get('color') ?? '', material: params.get('material') ?? '', estilo: params.get('estilo') ?? '', ajuste: params.get('ajuste') ?? '', precioMin: params.get('precioMin') ?? '', precioMax: params.get('precioMax') ?? '', sucursalId: params.get('sucursalId') ?? '', descuento: params.get('descuento') === 'true', ordenar: (params.get('ordenar') as Sort) || 'relevancia' }
 }
 
 function ProductImage({ product }: { product: Producto }) {
@@ -31,9 +31,9 @@ function stockState(product: Producto) {
   return { available, low }
 }
 
-function ProductCard({ product, isClient, selected, compared, onCompare, onQuickView, onAdd, onFavorite }: { product: Producto; isClient: boolean; selected: boolean; compared: boolean; onCompare: () => void; onQuickView: () => void; onAdd: (variant: Variante) => void; onFavorite: () => void }) {
-  const { favorites, toggleFavorite } = useStorefront()
-  void favorites; void toggleFavorite
+function ProductCard({ product, isClient, selected, compared, onCompare, onQuickView, onAdd, onFavorite: onFavoriteMessage }: { product: Producto; isClient: boolean; selected: boolean; compared: boolean; onCompare: () => void; onQuickView: () => void; onAdd: (variant: Variante) => void; onFavorite: () => void }) {
+  const { toggleFavorite } = useStorefront()
+  const onFavorite = () => { toggleFavorite(product.id); onFavoriteMessage() }
   const variant = product.variantes[0]
   const discount = Number(product.descuentoPct ?? 0)
   const stock = stockState(product)
@@ -43,9 +43,22 @@ function ProductCard({ product, isClient, selected, compared, onCompare, onQuick
   </article>
 }
 
+function CatalogEditorialFilters({ filters, updateFilter }: { filters: Filters; updateFilter: (key: keyof Filters, value: string | boolean) => void }) {
+  return <div className="catalog-editorial-filters" aria-label="Filtros editoriales">
+    <label>Material<input value={filters.material} onChange={event => updateFilter('material', event.target.value)} placeholder="Ej. algodón" /></label>
+    <label>Estilo<input value={filters.estilo} onChange={event => updateFilter('estilo', event.target.value)} placeholder="Ej. sastrería" /></label>
+    <label>Ajuste<input value={filters.ajuste} onChange={event => updateFilter('ajuste', event.target.value)} placeholder="Ej. relajado" /></label>
+  </div>
+}
+
+function ComparePanel({ products, onClose }: { products: Producto[]; onClose: () => void }) {
+  if (products.length < 2) return null
+  return <div className="catalog-modal-backdrop" role="presentation" onClick={onClose}><section className="catalog-compare-modal" role="dialog" aria-modal="true" aria-labelledby="compare-title" onClick={event => event.stopPropagation()}><button type="button" className="catalog-modal-close" onClick={onClose} aria-label="Cerrar comparador">×</button><p className="eyebrow">Selección Vesta</p><h2 id="compare-title">Comparar productos</h2><div className="catalog-compare-table"><div className="catalog-compare-labels"><span>Producto</span><span>Precio</span><span>Categoría</span><span>Ocasión</span><span>Material</span><span>Ajuste</span></div>{products.map(product => <div className="catalog-compare-column" key={product.id}><strong>{product.nombre}</strong><span>Bs {precioEfectivo(product).toFixed(2)}</span><span>{product.categoria}</span><span>{product.ocasion}</span><span>{product.material || 'No especificado'}</span><span>{product.ajuste || 'No especificado'}</span><Link className="ui-button ui-button--secondary" to={`/ficha/${product.id}`}>Ver detalle</Link></div>)}</div></section></div>
+}
+
 export function Catalogo() {
   const { user } = useAuth(); const isClient = user?.rol === 'CLIENTA'
-  const [filters, setFilters] = useState<Filters>(readInitialFilters); const [products, setProducts] = useState<Producto[]>([]); const [page, setPage] = useState<CatalogPage | null>(null); const [branches, setBranches] = useState<Sucursal[]>([]); const [loading, setLoading] = useState(true); const [loadingMore, setLoadingMore] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [mobileFilters, setMobileFilters] = useState(false); const [density, setDensity] = useState<'regular' | 'compact'>('regular'); const [compare, setCompare] = useState<Producto[]>([]); const [quickView, setQuickView] = useState<Producto | null>(null); const [searchHistory, setSearchHistory] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ensayar_busquedas') ?? '[]') as string[] } catch { return [] } })
+  const [filters, setFilters] = useState<Filters>(readInitialFilters); const [products, setProducts] = useState<Producto[]>([]); const [page, setPage] = useState<CatalogPage | null>(null); const [branches, setBranches] = useState<Sucursal[]>([]); const [loading, setLoading] = useState(true); const [loadingMore, setLoadingMore] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [mobileFilters, setMobileFilters] = useState(false); const [density, setDensity] = useState<'regular' | 'compact'>('regular'); const [compare, setCompare] = useState<Producto[]>([]); const [compareOpen, setCompareOpen] = useState(false); const [quickView, setQuickView] = useState<Producto | null>(null); const [searchHistory, setSearchHistory] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ensayar_busquedas') ?? '[]') as string[] } catch { return [] } })
 
   const load = async (currentFilters = filters, nextPage = 1, append = false) => {
     if (append) setLoadingMore(true); else setLoading(true)
@@ -56,6 +69,9 @@ export function Catalogo() {
     if (currentFilters.ocasion) query.set('ocasion', currentFilters.ocasion)
     if (currentFilters.talla) query.set('talla', currentFilters.talla)
     if (currentFilters.color) query.set('color', currentFilters.color)
+    if (currentFilters.material) query.set('material', currentFilters.material)
+    if (currentFilters.estilo) query.set('estilo', currentFilters.estilo)
+    if (currentFilters.ajuste) query.set('ajuste', currentFilters.ajuste)
     if (currentFilters.precioMin) query.set('precioMin', currentFilters.precioMin)
     if (currentFilters.precioMax) query.set('precioMax', currentFilters.precioMax)
     if (currentFilters.sucursalId) query.set('sucursalId', currentFilters.sucursalId)
@@ -75,7 +91,7 @@ export function Catalogo() {
   const toggleCompare = (product: Producto) => setCompare(current => current.some(item => item.id === product.id) ? current.filter(item => item.id !== product.id) : current.length >= 3 ? current : [...current, product])
   const add = (product: Producto, variant: Variante) => { agregarAlCarrito({ productoId: product.id, nombre: product.nombre, precio: precioEfectivo(product), varianteId: variant.id, talla: variant.talla, color: variant.color }); setMessage(`${product.nombre} se añadió a tu bolsa.`) }
 
-  return <section className="catalog-page">
+  return <section className="catalog-page"><CatalogEditorialFilters filters={filters} updateFilter={updateFilter} /><div className="catalog-popular-searches" aria-label="Búsquedas populares">Populares: {['blazer', 'vestido', 'abrigo', 'sastrería'].map(item => <button key={item} type="button" onClick={() => { const next = { ...filters, search: item }; updateFilter('search', item); void load(next) }}>{item}</button>)}</div>
     {isClient ? <><section className="storefront-hero" style={{ backgroundImage: `url(${storefrontHeroImage})` }} aria-label="Nueva temporada"><div className="hero-copy"><p className="eyebrow">Edición 01 · otoño</p><h1>La nueva<br />sofisticación</h1><Link className="hero-cta" to="/inicio">Volver a inicio</Link></div></section><div className="season-strip">OFERTA DE TEMPORADA · HASTA 25%</div></> : null}
     <div className="catalog-heading"><div><p className="eyebrow">Colección</p><h1>Catálogo</h1><p>{page?.total ?? products.length} piezas{filters.sucursalId ? ` · ${branches.find(branch => branch.id === filters.sucursalId)?.nombre ?? 'Sucursal'}` : ''}</p></div><div className="catalog-heading-actions"><button type="button" className="catalog-filter-trigger" onClick={() => setMobileFilters(true)}>☷ Filtrar</button><button type="button" className="catalog-density" aria-label="Vista regular" aria-pressed={density === 'regular'} onClick={() => setDensity('regular')}>▦</button><button type="button" className="catalog-density" aria-label="Vista compacta" aria-pressed={density === 'compact'} onClick={() => setDensity('compact')}>▤</button></div></div>
     <form className="catalog-search-bar" onSubmit={submit}><input aria-label="Buscar productos" value={filters.search} onChange={event => updateFilter('search', event.target.value)} placeholder="Buscar prendas, colores o SKU" /><button type="submit">Buscar</button>{searchHistory.length ? <span className="catalog-history">Búsquedas recientes: {searchHistory.slice(0, 3).map(item => <button key={item} type="button" onClick={() => { const next = { ...filters, search: item }; updateFilter('search', item); void load(next) }}>{item}</button>)}</span> : null}</form>
@@ -83,6 +99,8 @@ export function Catalogo() {
     {compare.length ? <aside className="catalog-compare" aria-label="Comparar productos"><strong>Comparar ({compare.length}/3)</strong>{compare.map(product => <button key={product.id} type="button" onClick={() => toggleCompare(product)}>{product.nombre} ×</button>)}<button type="button" disabled={compare.length < 2} onClick={() => setMessage('Comparador preparado para la siguiente fase visual.')}>Abrir comparador</button></aside> : null}
     {quickView ? <div className="catalog-modal-backdrop" role="presentation" onClick={() => setQuickView(null)}><section className="catalog-quick-modal" role="dialog" aria-modal="true" aria-labelledby="quick-title" onClick={event => event.stopPropagation()}><button type="button" className="catalog-modal-close" onClick={() => setQuickView(null)} aria-label="Cerrar vista rápida">×</button><ProductImage product={quickView} /><div><p className="eyebrow">Vista rápida</p><h2 id="quick-title">{quickView.nombre}</h2><p>{quickView.descripcion}</p><strong>Bs {precioEfectivo(quickView).toFixed(2)}</strong><Link className="ui-button ui-button--primary" to={`/ficha/${quickView.id}`}>Abrir detalle</Link></div></section></div> : null}
     {message ? <p className="ok catalog-message" role="status">{message}</p> : null}
+    {compare.length >= 2 ? <button type="button" className="catalog-compare-open" onClick={() => setCompareOpen(true)}>Comparar selección ({compare.length})</button> : null}
+    {compareOpen ? <ComparePanel products={compare} onClose={() => setCompareOpen(false)} /> : null}
     {user?.rol === 'ADMIN' ? <AdminCreate onCreated={() => void load()} /> : null}
   </section>
 }

@@ -50,6 +50,9 @@ export class CatalogoService {
     ocasion?: string;
     talla?: string;
     color?: string;
+    material?: string;
+    estilo?: string;
+    ajuste?: string;
     precioMin?: number;
     precioMax?: number;
     temporadaId?: string;
@@ -121,6 +124,21 @@ export class CatalogoService {
         : {}),
       ...(filtros.categoria ? { categoria: filtros.categoria } : {}),
       ...(filtros.ocasion ? { ocasion: filtros.ocasion } : {}),
+      ...(filtros.material
+        ? { material: { contains: filtros.material, mode: 'insensitive' } }
+        : {}),
+      ...(filtros.ajuste
+        ? { ajuste: { contains: filtros.ajuste, mode: 'insensitive' } }
+        : {}),
+      ...(filtros.estilo
+        ? {
+            OR: [
+              { categoria: { contains: filtros.estilo, mode: 'insensitive' } },
+              { ocasion: { contains: filtros.estilo, mode: 'insensitive' } },
+              { descripcion: { contains: filtros.estilo, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
       ...(filtros.temporadaId ? { temporadaId: filtros.temporadaId } : {}),
       ...(filtros.coleccionId ? { coleccionId: filtros.coleccionId } : {}),
       ...(filtros.descuento ? { descuentoPct: { gt: 0 } } : {}),

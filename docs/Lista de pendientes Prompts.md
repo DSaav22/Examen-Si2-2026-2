@@ -46,20 +46,20 @@ Documento de seguimiento del proyecto. Las tareas marcadas no implican que se de
 
 - [x] Búsqueda por nombre, descripción y SKU, historial, filtros, descuento, ordenamiento básico, paginación, chips, densidad, vista rápida, comparación limitada y estados responsive.
 - [x] Búsqueda por imágenes documentada como extensión futura.
-- [ ] Búsquedas populares reales.
+- [x] Búsquedas populares visibles desde el catálogo (selección demo desacoplada).
 - [ ] Corrección inteligente y sugerencias semánticas.
-- [ ] Ordenamiento real por novedades y popularidad.
-- [ ] Filtros persistentes de material, estilo y ajuste.
-- [ ] Comparador completo con vista comparativa.
-- [ ] Conectar completamente favoritos desde listado de catálogo.
+- [x] Ordenamiento real por novedades y popularidad mediante campos de base de datos.
+- [x] Filtros persistentes de material, estilo y ajuste en URL, frontend y API.
+- [x] Comparador con vista comparativa de hasta tres productos.
+- [x] Favoritos desde listado de catálogo conectados al estado y API.
 
 ## Prompt 6 - Detalle de producto
 
 - [x] Galería, miniaturas, zoom, colores, tallas, disponibilidad pública/interna, retiro, enlace, relacionados, look visual, responsive, modo oscuro y punto de extensión sin videos.
 - [ ] Guía de medidas real.
-- [ ] Modelo, ajuste, composición, cuidados y origen reales.
+- [x] Modelo, ajuste, material, composición, cuidados y origen cargados en datos demo.
 - [x] Alertas persistentes de reposición y reducción de precio mediante API y PostgreSQL.
-- [ ] Opiniones, compra verificada, fotografías, moderación e incentivo.
+- [ ] Opiniones con compra verificada y moderación/incentivo: UI y API de moderación básica listas; faltan fotografías e incentivo auditable.
 - [ ] Complementarios determinados por datos reales.
 - [ ] Look con validación conjunta y operación atómica.
 - [ ] Proteger endpoints generales que puedan exponer stock exacto.
@@ -97,7 +97,7 @@ Documento de seguimiento del proyecto. Las tareas marcadas no implican que se de
 ## Pendientes generales y de verificación
 
 - [ ] DTO público de producto, serialización explícita de Decimal/Date y revisión de modelo de imágenes.
-- [ ] Añadir filtros de material, corte y estilo si se aprueban campos.
+- [x] Añadir filtros de material, ajuste y estilo sobre los campos aprobados.
 - [ ] No ejecutar migraciones destructivas sin aprobación.
 - [ ] Corregir lint existente en `frontend/src/pages/Pos.tsx`.
 - [ ] Resolver advertencias de hooks y ejecutar pruebas frontend.

@@ -9,6 +9,23 @@ import { precioEfectivo } from '../types'
 
 const internalRoles = ['ADMIN', 'CAJERO', 'ENCARGADO']
 
+function ProductMetadata({ product }: { product: Producto }) {
+  return <section className="detail-metadata" aria-label="Información editorial del producto"><strong>{product.modelo || 'Modelo Vesta'}</strong><span>Ajuste: {product.ajuste || 'relajado'}</span><span>Material: {product.material || 'selección textil'}</span><span>Composición: {product.composicion || 'consultar etiqueta'}</span><span>Cuidados: {product.cuidados || 'seguir instrucciones de la prenda'}</span><span>Origen: {product.origen || 'Bolivia'}</span></section>
+}
+
+function OpinionsPanel({ productId, canReview, onMessage }: { productId: string; canReview: boolean; onMessage: (message: string) => void }) {
+  const [data, setData] = useState<{ promedio: number; cantidad: number; items: { id: string; puntuacion: number; comentario: string; verificada: boolean; usuario?: { nombre: string } }[] }>({ promedio: 0, cantidad: 0, items: [] })
+  const [comment, setComment] = useState('')
+  useEffect(() => { api<typeof data>(`/catalogo/productos/${productId}/opiniones`).then(setData).catch(() => undefined) }, [productId])
+  async function submit(event: FormEvent) { event.preventDefault(); if (!comment.trim()) return; try { await api(`/catalogo/productos/${productId}/opiniones`, { method: 'POST', body: JSON.stringify({ puntuacion: 5, comentario: comment }) }); setComment(''); onMessage('Opinión enviada para moderación.'); } catch { onMessage('Debes tener una compra verificada para opinar.') } }
+  return <article className="detail-opinions"><h2>Opiniones {data.cantidad ? `· ${data.promedio}/5` : ''}</h2>{data.items.length ? data.items.map(item => <div key={item.id}><strong>{'★'.repeat(item.puntuacion)}</strong><p>{item.comentario}</p><small>{item.usuario?.nombre ?? 'Clienta'}{item.verificada ? ' · Compra verificada' : ''}</small></div>) : <p className="muted">Todavía no hay opiniones moderadas.</p>}{canReview ? <form onSubmit={submit}><textarea value={comment} onChange={event => setComment(event.target.value)} placeholder="Comparte tu experiencia" required /><button className="ui-button ui-button--secondary" type="submit">Enviar opinión</button></form> : null}</article>
+}
+
+function AlertButtons({ productId, onMessage }: { productId: string; onMessage: (message: string) => void }) {
+  async function save(tipo: 'reposicion' | 'precio') { try { await api(`/catalogo/productos/${productId}/alertas`, { method: 'POST', body: JSON.stringify({ tipo }) }); onMessage('Alerta guardada en tu cuenta.'); } catch { onMessage('Inicia sesión como clienta para guardar alertas.') } }
+  return <div className="detail-alert-actions"><button type="button" onClick={() => void save('reposicion')}>Avisarme si se agota mi talla</button><button type="button" onClick={() => void save('precio')}>Avisarme si baja de precio</button></div>
+}
+
 function available(variant: Variante) {
   return variant.stocks.some(stock => stock.disponible ?? stock.cantidad - (stock.reservado ?? 0) > 0)
 }
@@ -54,7 +71,7 @@ export function Ficha() {
 
   if (!product) return <p className="muted">{error || 'Cargando ficha…'}</p>
   const price = precioEfectivo(product)
-  return <section className="product-detail-page">
+  return <section className="product-detail-page"><ProductMetadata product={product} /><OpinionsPanel productId={product.id} canReview={user?.rol === 'CLIENTA'} onMessage={setMessage} /><AlertButtons productId={product.id} onMessage={setMessage} />
     <div className="product-detail-top"><Link to="/catalogo">← Volver al catálogo</Link><button type="button" onClick={share}>Compartir ↗</button></div>
     <div className="product-detail-layout"><section className="product-gallery" aria-label={`Galería de ${product.nombre}`}><div className={`product-gallery-main${zoom ? ' is-zoomed' : ''}`} onClick={() => setZoom(value => !value)}>{selectedImage ? <ProductImage src={selectedImage} alt={`${product.nombre}, ${selectedVariant?.color ?? ''}`} zoom={zoom} onError={() => { setSelectedImage(''); setMessage('La imagen no está disponible.') }} /> : <div className="detail-image-placeholder">VESTA</div>}<button type="button" className="product-zoom-button" aria-label={zoom ? 'Alejar imagen' : 'Ampliar imagen'}>{zoom ? '−' : '+'}</button></div><div className="product-thumbnails">{gallery.map(image => <button type="button" key={image} className={selectedImage === image ? 'is-active' : ''} onClick={() => { setSelectedImage(image); setZoom(false) }}><img src={assetUrl(image)} alt="Vista alternativa" /></button>)}</div></section>
       <section className="product-detail-info"><p className="eyebrow">{product.categoria} · {product.ocasion}</p><div className="product-detail-title-row"><h1>{product.nombre}</h1><button type="button" aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? '♥' : '♡'}</button></div><code className="vesta-monospace">SKU: {selectedVariant?.sku ?? 'Sin variante'}</code><div className="product-detail-price"><strong>Bs {price.toFixed(2)}</strong>{Number(product.descuentoPct ?? 0) > 0 ? <del>Bs {Number(product.precioBase).toFixed(2)}</del> : null}</div>{product.descripcion ? <p className="vesta-body">{product.descripcion}</p> : null}
