@@ -72,6 +72,7 @@ type Vision = {
 export async function crearPose() {
   const vision = (await import(
     /* @vite-ignore */
+    // @ts-expect-error MediaPipe is intentionally loaded from the CDN at runtime.
     'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs'
   )) as Vision
   const files = await vision.FilesetResolver.forVisionTasks(WASM)

@@ -45,7 +45,7 @@ export class AuthService {
     const usuario = await this.prisma.usuario.findUnique({
       where: { email: dto.email },
     });
-    if (!usuario?.passwordHash) {
+    if (!usuario?.passwordHash || !usuario.activo) {
       throw new UnauthorizedException({ codigo: 'CREDENCIALES' });
     }
     const ok = await bcrypt.compare(dto.password, usuario.passwordHash);
@@ -75,6 +75,11 @@ export class AuthService {
         proveedorId: true,
       },
     });
+  }
+
+  async logout(token: string) {
+    await this.tokens.revoke(token);
+    await this.prisma.auditoria.create({ data: { accion: 'logout', recurso: 'auth' } });
   }
 
   private publicUser(usuario: {

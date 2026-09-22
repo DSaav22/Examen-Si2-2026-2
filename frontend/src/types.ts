@@ -20,6 +20,8 @@ export type Variante = {
     almacenId: string
     cantidad: number
     reservado?: number
+    disponible?: boolean
+    estado?: 'agotado' | 'ultimas_unidades' | 'disponible' | 'reservado'
     almacen?: { id: string; nombre: string; sucursal?: Sucursal }
   }[]
 }
@@ -38,6 +40,13 @@ export type Producto = {
   temporada?: { id: string; nombre: string } | null
   coleccion?: { id: string; nombre: string } | null
   proveedor?: { id: string; nombre: string } | null
+  material?: string
+  ajuste?: string
+  composicion?: string
+  cuidados?: string
+  origen?: string
+  modelo?: string
+  popularidad?: number
   variantes: Variante[]
 }
 
@@ -76,7 +85,16 @@ export function homePorRol(rol: Rol) {
   if (rol === 'ENCARGADO') return '/encargado'
   if (rol === 'PROVEEDOR') return '/proveedor'
   if (rol === 'ADMIN') return '/admin'
-  return '/catalogo'
+  return '/inicio'
+}
+
+export type CatalogPage = {
+  items: Producto[]
+  total: number
+  pagina: number
+  limite: number
+  totalPaginas: number
+  hayMas: boolean
 }
 
 /** Precio cobrado por el servidor (precioBase − descuentoPct). */

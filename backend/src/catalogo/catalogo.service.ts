@@ -1,18 +1,51 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  ActualizarProductoDto,
-  CrearProductoDto,
-} from './dto/producto.dto';
+import { ActualizarProductoDto, CrearProductoDto } from './dto/producto.dto';
 import { ActualizarVarianteDto, CrearVarianteDto } from './dto/variante.dto';
 import { UpsertStockDto } from './dto/stock.dto';
+
+type ProductoCatalogo = Prisma.ProductoGetPayload<{
+  include: {
+    temporada: true;
+    coleccion: true;
+    proveedor: true;
+    variantes: {
+      include: { stocks: { include: { almacen: { include: { sucursal: true } } } } };
+    };
+  };
+}>;
 
 @Injectable()
 export class CatalogoService {
   constructor(private readonly prisma: PrismaService) {}
 
-  listarProductos(filtros: {
+  private productoPublico(producto: ProductoCatalogo) {
+    return {
+      ...producto,
+      variantes: producto.variantes.map((variante) => ({
+        ...variante,
+        stocks: variante.stocks.map((stock) => {
+          const disponible = stock.cantidad - stock.reservado;
+          return {
+            ...stock,
+            cantidad: 0,
+            reservado: 0,
+            disponible: disponible > 0,
+            estado: disponible <= 0 ? 'agotado' : disponible <= 2 ? 'ultimas_unidades' : 'disponible',
+          };
+        }),
+      })),
+    };
+  }
+
+  async listarProductos(filtros: {
+    busqueda?: string;
+    sku?: string;
     categoria?: string;
     ocasion?: string;
     talla?: string;
@@ -22,12 +55,75 @@ export class CatalogoService {
     temporadaId?: string;
     coleccionId?: string;
     sucursalId?: string;
+    descuento?: boolean;
+    ordenar?:
+      | 'relevancia'
+      | 'precio-asc'
+      | 'precio-desc'
+      | 'novedades'
+      | 'popularidad'
+      | 'descuento';
+    pagina?: number;
+    limite?: number;
   }) {
+    const paginada =
+      filtros.pagina !== undefined || filtros.limite !== undefined;
+    const pagina = Math.max(1, filtros.pagina ?? 1);
+    const limite = Math.min(50, Math.max(1, filtros.limite ?? 8));
+    const varianteWhere: Prisma.VarianteWhereInput = {
+      ...(filtros.talla ? { talla: filtros.talla } : {}),
+      ...(filtros.color ? { color: filtros.color } : {}),
+      ...(filtros.sucursalId
+        ? {
+            stocks: {
+              some: {
+                cantidad: { gt: 0 },
+                almacen: { sucursalId: filtros.sucursalId },
+              },
+            },
+          }
+        : {}),
+    };
+    const filtraVariante = Boolean(
+      filtros.talla || filtros.color || filtros.sucursalId,
+    );
     const where: Prisma.ProductoWhereInput = {
+      ...(filtros.busqueda
+        ? {
+            OR: [
+              { nombre: { contains: filtros.busqueda, mode: 'insensitive' } },
+              {
+                descripcion: {
+                  contains: filtros.busqueda,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                variantes: {
+                  some: {
+                    sku: { contains: filtros.busqueda, mode: 'insensitive' },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+      ...(filtros.sku
+        ? {
+            AND: [
+              {
+                variantes: {
+                  some: { sku: { contains: filtros.sku, mode: 'insensitive' } },
+                },
+              },
+            ],
+          }
+        : {}),
       ...(filtros.categoria ? { categoria: filtros.categoria } : {}),
       ...(filtros.ocasion ? { ocasion: filtros.ocasion } : {}),
       ...(filtros.temporadaId ? { temporadaId: filtros.temporadaId } : {}),
       ...(filtros.coleccionId ? { coleccionId: filtros.coleccionId } : {}),
+      ...(filtros.descuento ? { descuentoPct: { gt: 0 } } : {}),
       ...(filtros.precioMin !== undefined || filtros.precioMax !== undefined
         ? {
             precioBase: {
@@ -40,43 +136,50 @@ export class CatalogoService {
             },
           }
         : {}),
-      variantes:
-        filtros.talla || filtros.color || filtros.sucursalId
-          ? {
-              some: {
-                ...(filtros.talla ? { talla: filtros.talla } : {}),
-                ...(filtros.color ? { color: filtros.color } : {}),
-                ...(filtros.sucursalId
-                  ? {
-                      stocks: {
-                        some: {
-                          cantidad: { gt: 0 },
-                          almacen: { sucursalId: filtros.sucursalId },
-                        },
-                      },
-                    }
-                  : {}),
-              },
-            }
-          : undefined,
+      ...(filtraVariante ? { variantes: { some: varianteWhere } } : {}),
     };
-    return this.prisma.producto.findMany({
-      where,
-      include: {
-        temporada: true,
-        coleccion: true,
-        proveedor: true,
-        variantes: {
-          include: {
-            stocks: { include: { almacen: { include: { sucursal: true } } } },
+    const orderBy: Prisma.ProductoOrderByWithRelationInput =
+      filtros.ordenar === 'precio-asc'
+        ? { precioBase: 'asc' }
+        : filtros.ordenar === 'precio-desc'
+          ? { precioBase: 'desc' }
+            : filtros.ordenar === 'descuento'
+            ? { descuentoPct: 'desc' }
+            : filtros.ordenar === 'popularidad'
+              ? { popularidad: 'desc' }
+              : filtros.ordenar === 'novedades'
+                ? { creadoEn: 'desc' }
+                : { nombre: 'asc' };
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.producto.count({ where }),
+      this.prisma.producto.findMany({
+        where,
+        include: {
+          temporada: true,
+          coleccion: true,
+          proveedor: true,
+          variantes: {
+            include: {
+              stocks: { include: { almacen: { include: { sucursal: true } } } },
+            },
           },
         },
-      },
-      orderBy: { nombre: 'asc' },
-    });
+        orderBy,
+        ...(paginada ? { skip: (pagina - 1) * limite, take: limite } : {}),
+      }),
+    ]);
+    if (!paginada) return items;
+    return {
+      items,
+      total,
+      pagina,
+      limite,
+      totalPaginas: Math.ceil(total / limite),
+      hayMas: pagina * limite < total,
+    };
   }
 
-  async obtenerProducto(id: string) {
+  async obtenerProducto(id: string, interno = false) {
     const producto = await this.prisma.producto.findUnique({
       where: { id },
       include: {
@@ -93,7 +196,7 @@ export class CatalogoService {
     if (!producto) {
       throw new NotFoundException({ codigo: 'PRODUCTO_NO_EXISTE' });
     }
-    return producto;
+    return interno ? producto : this.productoPublico(producto);
   }
 
   async disponibilidad(sucursalId: string) {
@@ -152,7 +255,9 @@ export class CatalogoService {
       where: { id },
       data: {
         ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
-        ...(dto.descripcion !== undefined ? { descripcion: dto.descripcion } : {}),
+        ...(dto.descripcion !== undefined
+          ? { descripcion: dto.descripcion }
+          : {}),
         ...(dto.categoria !== undefined ? { categoria: dto.categoria } : {}),
         ...(dto.ocasion !== undefined ? { ocasion: dto.ocasion } : {}),
         ...(dto.precioBase !== undefined ? { precioBase: dto.precioBase } : {}),
@@ -213,7 +318,9 @@ export class CatalogoService {
   async upsertStock(dto: UpsertStockDto) {
     const qty = Math.max(0, dto.cantidad);
     return this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<{ cantidad: number; reservado: number }[]>`
+      const rows = await tx.$queryRaw<
+        { cantidad: number; reservado: number }[]
+      >`
         SELECT cantidad, reservado FROM stock_almacen
         WHERE variante_id = ${dto.varianteId} AND almacen_id = ${dto.almacenId}
         FOR UPDATE

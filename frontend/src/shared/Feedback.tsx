@@ -1,0 +1,1 @@
+export function Feedback({ type, children }: { type: 'error' | 'success' | 'info'; children: string }) { return <p className={`feedback feedback--${type}`} role={type === 'error' ? 'alert' : 'status'}>{children}</p> }

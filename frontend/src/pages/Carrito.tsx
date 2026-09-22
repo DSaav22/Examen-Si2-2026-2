@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { leerCarrito, totalCarrito, vaciarCarrito } from '../carrito'
+import { useStorefront } from '../storefront'
 import { TicketPrint, type TicketDatos } from './Ticket'
-import type { LineaCarrito, Sucursal } from '../types'
+import type { Sucursal } from '../types'
 
 export function Carrito() {
   const { user } = useAuth()
-  const [lineas, setLineas] = useState<LineaCarrito[]>(() => leerCarrito())
+  const { cart: lineas, clearCart, setCartQuantity, removeFromCart } = useStorefront()
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
   const [almacenId, setAlmacenId] = useState('')
   const [medio, setMedio] = useState<'contra_entrega' | 'qr'>('contra_entrega')
@@ -48,8 +48,7 @@ export function Carrito() {
         }),
       })
       const snapshot = lineas
-      vaciarCarrito()
-      setLineas([])
+      clearCart()
       setTicket(
         `Pedido ${venta.id.slice(0, 8)} · Bs ${Number(venta.total).toFixed(2)} · ${
           medio === 'qr' ? 'QR pendiente' : 'contra entrega'
@@ -82,7 +81,7 @@ export function Carrito() {
     setPagoId('')
   }
 
-  const total = totalCarrito(lineas)
+  const total = lineas.reduce((sum, line) => sum + line.precio * line.cantidad, 0)
 
   return (
     <section>
@@ -93,7 +92,10 @@ export function Carrito() {
         {lineas.map((l) => (
           <li key={l.varianteId}>
             {l.nombre} {l.talla}/{l.color} × {l.cantidad} · Bs{' '}
-            {(l.precio * l.cantidad).toFixed(2)}
+            {(l.precio * l.cantidad).toFixed(2)}{' '}
+            <button type="button" onClick={() => setCartQuantity(l.varianteId, l.cantidad - 1)} aria-label={`Reducir ${l.nombre}`}>−</button>{' '}
+            <button type="button" onClick={() => setCartQuantity(l.varianteId, l.cantidad + 1)} aria-label={`Aumentar ${l.nombre}`}>+</button>{' '}
+            <button type="button" onClick={() => removeFromCart(l.varianteId)}>Eliminar</button>
           </li>
         ))}
       </ul>

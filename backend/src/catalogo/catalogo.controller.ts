@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   ForbiddenException,
   Get,
@@ -38,6 +39,8 @@ export class CatalogoController {
 
   @Get('productos')
   listar(
+    @Query('q') busqueda?: string,
+    @Query('sku') sku?: string,
     @Query('categoria') categoria?: string,
     @Query('ocasion') ocasion?: string,
     @Query('talla') talla?: string,
@@ -47,8 +50,21 @@ export class CatalogoController {
     @Query('temporadaId') temporadaId?: string,
     @Query('coleccionId') coleccionId?: string,
     @Query('sucursalId') sucursalId?: string,
+    @Query('descuento') descuento?: string,
+    @Query('ordenar')
+    ordenar?:
+      | 'relevancia'
+      | 'precio-asc'
+      | 'precio-desc'
+      | 'novedades'
+      | 'popularidad'
+      | 'descuento',
+    @Query('pagina') pagina?: string,
+    @Query('limite') limite?: string,
   ) {
     return this.catalogo.listarProductos({
+      busqueda,
+      sku,
       categoria,
       ocasion,
       talla,
@@ -58,6 +74,10 @@ export class CatalogoController {
       temporadaId,
       coleccionId,
       sucursalId,
+      descuento: descuento === 'true',
+      ordenar,
+      pagina: pagina ? Number(pagina) : undefined,
+      limite: limite ? Number(limite) : undefined,
     });
   }
 
@@ -71,9 +91,41 @@ export class CatalogoController {
     return this.catalogo.obtenerProducto(id);
   }
 
+  @Get('productos/:id/interno')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO)
+  obtenerInterno(@Param('id') id: string) {
+    return this.catalogo.obtenerProducto(id, true);
+  }
+
   @Get('sucursales')
   sucursales() {
     return this.catalogo.sucursales();
+  }
+
+  @Get('productos/:id/opiniones')
+  async opiniones(@Param('id') productoId: string) {
+    const items = await this.prisma.opinion.findMany({ where: { productoId, moderada: true }, orderBy: { creadaEn: 'desc' }, include: { usuario: { select: { nombre: true } } } });
+    const promedio = items.length ? items.reduce((sum, item) => sum + item.puntuacion, 0) / items.length : 0;
+    return { promedio: Number(promedio.toFixed(2)), cantidad: items.length, items };
+  }
+
+  @Post('productos/:id/opiniones')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.CLIENTA)
+  async crearOpinion(@Param('id') productoId: string, @CurrentUser() user: JwtPayload, @Body() body: { puntuacion?: number; comentario?: string; imagenUrl?: string }) {
+    const puntuacion = Number(body.puntuacion);
+    if (!Number.isInteger(puntuacion) || puntuacion < 1 || puntuacion > 5) throw new BadRequestException('La puntuación debe estar entre 1 y 5');
+    const compra = await this.prisma.venta.count({ where: { clientaId: user.sub, lineas: { some: { variante: { productoId } } } } });
+    return this.prisma.opinion.upsert({ where: { productoId_usuarioId: { productoId, usuarioId: user.sub } }, update: { puntuacion, comentario: body.comentario ?? '', imagenUrl: body.imagenUrl ?? '', verificada: compra > 0, moderada: false }, create: { productoId, usuarioId: user.sub, puntuacion, comentario: body.comentario ?? '', imagenUrl: body.imagenUrl ?? '', verificada: compra > 0, moderada: false } });
+  }
+
+  @Post('productos/:id/alertas')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.CLIENTA)
+  alertar(@Param('id') productoId: string, @CurrentUser() user: JwtPayload, @Body() body: { tipo?: string }) {
+    const tipo = body.tipo === 'precio' ? 'precio' : 'reposicion';
+    return this.prisma.alertaProducto.upsert({ where: { productoId_usuarioId_tipo: { productoId, usuarioId: user.sub, tipo } }, update: { activa: true }, create: { productoId, usuarioId: user.sub, tipo } });
   }
 
   @Get('stock')
@@ -101,7 +153,11 @@ export class CatalogoController {
   )
   subir(
     @UploadedFile()
-    archivo: { filename: string; mimetype: string; originalname: string },
+    archivo: {
+      filename: string;
+      mimetype: string;
+      originalname: string;
+    },
   ) {
     return this.imagenes.desdeDisco(archivo);
   }

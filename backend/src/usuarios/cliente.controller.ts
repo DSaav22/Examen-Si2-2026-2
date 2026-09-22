@@ -1,0 +1,24 @@
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { IsString, MinLength } from 'class-validator'
+import { Rol } from '@prisma/client'
+import { CurrentUser } from '../auth/current-user'
+import type { JwtPayload } from '../auth/jwt-payload'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { Roles } from '../auth/roles.decorator'
+import { RolesGuard } from '../auth/roles.guard'
+import { PrismaService } from '../prisma/prisma.service'
+
+class DireccionDto { @IsString() @MinLength(3) detalle!: string; @IsString() ciudad!: string; @IsString() etiqueta!: string }
+
+@Controller('cliente')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Rol.CLIENTA)
+export class ClienteController {
+  constructor(private readonly prisma: PrismaService) {}
+  @Get('favoritos') favoritos(@CurrentUser() user: JwtPayload) { return this.prisma.favorito.findMany({ where: { usuarioId: user.sub }, select: { productoId: true }, orderBy: { creadoEn: 'desc' } }).then(items => items.map(item => item.productoId)) }
+  @Post('favoritos/:productoId') guardar(@CurrentUser() user: JwtPayload, @Param('productoId') productoId: string) { return this.prisma.favorito.upsert({ where: { usuarioId_productoId: { usuarioId: user.sub, productoId } }, update: {}, create: { usuarioId: user.sub, productoId } }) }
+  @Delete('favoritos/:productoId') quitar(@CurrentUser() user: JwtPayload, @Param('productoId') productoId: string) { return this.prisma.favorito.deleteMany({ where: { usuarioId: user.sub, productoId } }) }
+  @Get('perfil') perfil(@CurrentUser() user: JwtPayload) { return this.prisma.usuario.findUniqueOrThrow({ where: { id: user.sub }, select: { id: true, email: true, nombre: true, rol: true, direcciones: true, lealtad: true } }) }
+  @Get('direcciones') direcciones(@CurrentUser() user: JwtPayload) { return this.prisma.direccionCliente.findMany({ where: { usuarioId: user.sub }, orderBy: { id: 'desc' } }) }
+  @Post('direcciones') direccion(@CurrentUser() user: JwtPayload, @Body() dto: DireccionDto) { return this.prisma.direccionCliente.create({ data: { ...dto, usuarioId: user.sub } }) }
+}

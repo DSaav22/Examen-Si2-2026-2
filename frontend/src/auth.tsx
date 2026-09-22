@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return data.user
       },
       logout() {
+        void api('/auth/logout', { method: 'POST' }).catch(() => undefined)
         localStorage.removeItem('ensayar_token')
         localStorage.removeItem('ensayar_user')
         localStorage.removeItem('ensayar_carrito')

@@ -13,6 +13,9 @@ enum Rol {
   ADMIN
   ENCARGADO
   PROVEEDOR
+  VENDEDOR
+  RRHH
+  SUPERADMIN
 }
 
 enum Canal {
@@ -30,6 +33,9 @@ enum MedioPago {
   efectivo
   qr
   contra_entrega
+  tarjeta
+  transferencia
+  mixto
 }
 
 enum EstadoReserva {
@@ -59,6 +65,7 @@ model Usuario {
   email         String              @unique
   nombre        String              @default("")
   passwordHash  String              @map("password_hash")
+  activo        Boolean             @default(true)
   rol           Rol
   sucursalId    String?             @map("sucursal_id")
   sucursal      Sucursal?           @relation(fields: [sucursalId], references: [id])
@@ -68,6 +75,13 @@ model Usuario {
   ventasClienta Venta[]             @relation("ClientaVentas")
   reportes      ReporteEjecucion[]
   reservas      Reserva[]
+  opiniones     Opinion[]
+  alertas       AlertaProducto[]
+  direcciones   DireccionCliente[]
+  favoritos     Favorito[]
+  lealtad       CuentaLealtad?
+  pedidos       Pedido[]
+  empleado      Empleado?
 
   @@map("usuarios")
 }
@@ -137,6 +151,18 @@ model Producto {
   proveedorId  String?    @map("proveedor_id")
   proveedor    Proveedor? @relation(fields: [proveedorId], references: [id])
   variantes    Variante[]
+  opiniones    Opinion[]
+  alertas      AlertaProducto[]
+  favoritos    Favorito[]
+  categorias   ProductoCategoria[]
+  creadoEn     DateTime @default(now()) @map("creado_en")
+  material     String   @default("")
+  ajuste       String   @default("")
+  composicion  String   @default("")
+  cuidados     String   @default("")
+  origen       String   @default("")
+  modelo       String   @default("")
+  popularidad  Int      @default(0)
 
   @@map("productos")
 }
@@ -294,4 +320,191 @@ model ReporteEjecucion {
   admin    Usuario  @relation(fields: [adminId], references: [id])
 
   @@map("reporte_ejecuciones")
+}
+
+model Categoria {
+  id        String              @id @default(uuid())
+  nombre    String              @unique
+  activa    Boolean             @default(true)
+  productos ProductoCategoria[]
+  @@map("categorias")
+}
+
+model ProductoCategoria {
+  productoId  String   @map("producto_id")
+  categoriaId String   @map("categoria_id")
+  producto    Producto @relation(fields: [productoId], references: [id])
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+  @@id([productoId, categoriaId])
+  @@map("productos_categorias")
+}
+
+model DireccionCliente {
+  id        String  @id @default(uuid())
+  etiqueta  String  @default("Casa")
+  detalle   String
+  ciudad    String
+  usuarioId String  @map("usuario_id")
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  @@index([usuarioId])
+  @@map("direcciones_cliente")
+}
+
+model Favorito {
+  id        String   @id @default(uuid())
+  creadoEn  DateTime @default(now()) @map("creado_en")
+  usuarioId String   @map("usuario_id")
+  productoId String  @map("producto_id")
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  producto  Producto @relation(fields: [productoId], references: [id])
+  @@unique([usuarioId, productoId])
+  @@map("favoritos")
+}
+
+model CuentaLealtad {
+  id        String   @id @default(uuid())
+  puntos    Int      @default(0)
+  nivel     String   @default("inicial")
+  usuarioId String   @unique @map("usuario_id")
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  @@map("cuentas_lealtad")
+}
+
+model Cupon {
+  id          String   @id @default(uuid())
+  codigo      String   @unique
+  porcentaje  Decimal  @db.Decimal(5, 2)
+  activo      Boolean  @default(true)
+  venceEn     DateTime? @map("vence_en")
+  usoMaximo   Int?     @map("uso_maximo")
+  usado       Int      @default(0)
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  @@map("cupones")
+}
+
+model Pedido {
+  id          String   @id @default(uuid())
+  estado      String   @default("pendiente")
+  total       Decimal  @db.Decimal(12, 2)
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  usuarioId   String   @map("usuario_id")
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  @@index([usuarioId, creadoEn])
+  @@map("pedidos")
+}
+
+model Promocion {
+  id          String   @id @default(uuid())
+  nombre      String
+  porcentaje  Decimal  @db.Decimal(5, 2)
+  activa      Boolean  @default(true)
+  iniciaEn    DateTime @default(now()) @map("inicia_en")
+  venceEn     DateTime? @map("vence_en")
+  @@map("promociones")
+}
+
+model Empleado {
+  id          String   @id @default(uuid())
+  usuarioId   String   @unique @map("usuario_id")
+  puesto      String
+  contrato    String   @default("")
+  salario     Decimal  @default(0) @db.Decimal(12, 2)
+  ingresoEn   DateTime @default(now()) @map("ingreso_en")
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  turnos      TurnoEmpleado[]
+  @@map("empleados")
+}
+
+model TurnoEmpleado {
+  id         String   @id @default(uuid())
+  empleadoId String   @map("empleado_id")
+  inicio     DateTime
+  fin        DateTime?
+  estado     String   @default("programado")
+  empleado   Empleado @relation(fields: [empleadoId], references: [id])
+  @@index([empleadoId, inicio])
+  @@map("turnos_empleado")
+}
+
+model EventoAnalitica {
+  id        String   @id @default(uuid())
+  tipo      String
+  ruta      String   @default("")
+  datos     Json
+  creadoEn  DateTime @default(now()) @map("creado_en")
+  usuarioId String?  @map("usuario_id")
+  @@index([tipo, creadoEn])
+  @@map("eventos_analitica")
+}
+
+model Dispositivo {
+  id          String   @id
+  nombre      String   @default("")
+  activo      Boolean  @default(true)
+  ultimoUso   DateTime @default(now()) @map("ultimo_uso")
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  @@map("dispositivos")
+}
+
+model OperacionSync {
+  id          String   @id @default(uuid())
+  operationId String   @unique @map("operation_id")
+  dispositivoId String @map("dispositivo_id")
+  estado      String   @default("pending")
+  payload     Json
+  error       String   @default("")
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+  @@index([dispositivoId, estado])
+  @@map("operaciones_sync")
+}
+
+model TokenRevocado {
+  hash      String   @id
+  revocadoEn DateTime @default(now()) @map("revocado_en")
+  expiraEn  DateTime? @map("expira_en")
+  @@map("tokens_revocados")
+}
+
+model Auditoria {
+  id        String   @id @default(uuid())
+  accion    String
+  recurso   String   @default("")
+  detalle   String   @default("")
+  creadoEn  DateTime @default(now()) @map("creado_en")
+  usuarioId String?  @map("usuario_id")
+  @@index([usuarioId, creadoEn])
+  @@map("auditoria")
+}
+
+model Opinion {
+  id          String   @id @default(uuid())
+  puntuacion  Int
+  comentario  String   @default("")
+  imagenUrl   String   @default("") @map("imagen_url")
+  verificada  Boolean  @default(false)
+  moderada    Boolean  @default(false)
+  creadaEn    DateTime @default(now()) @map("creada_en")
+  productoId  String   @map("producto_id")
+  producto    Producto @relation(fields: [productoId], references: [id])
+  usuarioId   String   @map("usuario_id")
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@unique([productoId, usuarioId])
+  @@index([productoId, moderada])
+  @@map("opiniones")
+}
+
+model AlertaProducto {
+  id          String   @id @default(uuid())
+  tipo        String
+  activa      Boolean  @default(true)
+  creadaEn    DateTime @default(now()) @map("creada_en")
+  productoId  String   @map("producto_id")
+  producto    Producto @relation(fields: [productoId], references: [id])
+  usuarioId   String   @map("usuario_id")
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@unique([productoId, usuarioId, tipo])
+  @@map("alertas_producto")
 }

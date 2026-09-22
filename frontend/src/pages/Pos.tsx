@@ -1,8 +1,8 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { encolar, leerCola, sacarDeCola, type VentaCola } from '../cola-pos'
+import { encolar, guardarCatalogoOffline, hidratarCola, leerCatalogoOffline, leerCola, sacarDeCola, type VentaCola } from '../cola-pos'
 import { TicketPrint, type TicketDatos } from './Ticket'
 import type { Arqueo, Producto, Sucursal, Turno, Variante } from '../types'
 import { precioEfectivo } from '../types'
@@ -41,8 +41,18 @@ export function Pos() {
   const [declarado, setDeclarado] = useState('')
   const [arqueo, setArqueo] = useState<Arqueo | null>(null)
   const [colaError, setColaError] = useState('')
+  const [busqueda, setBusqueda] = useState('')
+  const [stockExacto, setStockExacto] = useState<Record<string, number>>({})
+  const [cobrando, setCobrando] = useState(false)
 
   const almacenId = turno?.sucursal.almacenes[0]?.id
+
+  useEffect(() => {
+    if (!turno) return
+    api<{ varianteId: string; disponible: number }[]>(`/catalogo/disponibilidad?sucursalId=${encodeURIComponent(turno.sucursal.id)}`)
+      .then(items => setStockExacto(Object.fromEntries(items.map(item => [item.varianteId, Math.max(0, item.disponible)]))))
+      .catch(() => setStockExacto({}))
+  }, [turno])
 
   const total = useMemo(
     () =>
@@ -71,16 +81,12 @@ export function Pos() {
         setSucursales(s)
         if (s[0]) setSucursalId(s[0].id)
       }),
-      api<Producto[]>('/catalogo/productos').then(setProductos),
+      api<Producto[]>('/catalogo/productos').then(items => { setProductos(items); guardarCatalogoOffline(items) }).catch(() => setProductos(leerCatalogoOffline<Producto>())),
     ]).catch(() => {
       setMsg('No se pudo cargar la caja.')
       setTurno((prev) => (prev === undefined ? null : prev))
     })
   }, [user])
-
-  if (user?.rol !== 'CAJERO' && user?.rol !== 'ADMIN') {
-    return <Navigate to="/catalogo" replace />
-  }
 
   async function abrir(e: FormEvent) {
     e.preventDefault()
@@ -100,6 +106,9 @@ export function Pos() {
     setTicket('')
     setLineas((prev) => {
       const i = prev.findIndex((l) => l.variante.id === variante.id)
+      const actual = i >= 0 ? prev[i].cantidad : 0
+      const limite = stockExacto[variante.id]
+      if (limite !== undefined && actual >= limite) { setMsg('No se puede superar el stock de esta variante.'); return prev }
       if (i >= 0) {
         return prev.map((l, idx) =>
           idx === i ? { ...l, cantidad: l.cantidad + 1 } : l,
@@ -154,6 +163,7 @@ export function Pos() {
   }
 
   useEffect(() => {
+    void hidratarCola().then(items => { if (items.length) setCola(items) })
     const on = () => {
       void sincronizar()
     }
@@ -162,8 +172,13 @@ export function Pos() {
     return () => window.removeEventListener('online', on)
   }, [])
 
+  if (user?.rol !== 'CAJERO' && user?.rol !== 'ADMIN') {
+    return <Navigate to="/catalogo" replace />
+  }
+
   async function cobrar() {
-    if (!turno || !almacenId || lineas.length === 0) return
+    if (cobrando || !turno || !almacenId || lineas.length === 0) return
+    setCobrando(true)
     setMsg('')
     const payload: VentaCola = {
       uuid: crypto.randomUUID(),
@@ -208,6 +223,8 @@ export function Pos() {
         return
       }
       setMsg(err instanceof Error ? err.message : 'Cobro falló')
+    } finally {
+      setCobrando(false)
     }
   }
 
@@ -283,8 +300,9 @@ export function Pos() {
           Fondo Bs {Number(turno.fondoInicial).toFixed(2)} · sistema Bs{' '}
           {Number(turno.totalSistema).toFixed(2)}
         </p>
+        <label className="pos-search">Buscar por nombre o SKU<input value={busqueda} onChange={event => setBusqueda(event.target.value)} placeholder="Buscar producto…" /></label>
         <div className="grid compact">
-          {productos.map((p) =>
+          {productos.filter(p => { const q = busqueda.trim().toLowerCase(); return !q || p.nombre.toLowerCase().includes(q) || p.variantes.some(v => v.sku.toLowerCase().includes(q)) }).map((p) =>
             p.variantes.map((v) => (
               <button
                 key={v.id}
@@ -308,6 +326,7 @@ export function Pos() {
         <ul>
           {lineas.map((l) => (
             <li key={l.variante.id}>
+              <div className="pos-line-actions"><button type="button" className="ghost" onClick={() => setLineas(items => items.map(item => item.variante.id === l.variante.id ? { ...item, cantidad: Math.max(1, item.cantidad - 1) } : item))}>−</button><button type="button" className="ghost" onClick={() => agregar(l.producto, l.variante)}>+</button><button type="button" className="ghost" onClick={() => setLineas(items => items.filter(item => item.variante.id !== l.variante.id))}>Eliminar</button></div>
               {l.producto.nombre} {l.variante.talla}/{l.variante.color} × {l.cantidad}
             </li>
           ))}
@@ -349,8 +368,8 @@ export function Pos() {
           </div>
         ) : null}
         {colaError ? <p className="error">{colaError}</p> : null}
-        <button type="button" disabled={!lineas.length} onClick={cobrar}>
-          Cobrar
+        <button type="button" disabled={!lineas.length || cobrando} onClick={() => void cobrar()}>
+          {cobrando ? 'Procesando…' : 'Cobrar'}
         </button>
         <label>
           Declarado al cerrar

@@ -15,6 +15,7 @@ import { ReportesModule } from './reportes/reportes.module';
 import { ReservasModule } from './reservas/reservas.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { VentasModule } from './ventas/ventas.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { VentasModule } from './ventas/ventas.module';
     ProveedoresModule,
     PagosModule,
     MetaModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

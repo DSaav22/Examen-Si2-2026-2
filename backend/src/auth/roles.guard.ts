@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Rol } from '@prisma/client';
 import { ROLES_KEY } from './roles.decorator';
@@ -17,6 +17,7 @@ export class RolesGuard implements CanActivate {
       return true;
     }
     const user = context.switchToHttp().getRequest().user as JwtPayload;
-    return roles.includes(user.rol);
+    if (!roles.includes(user.rol)) throw new ForbiddenException({ codigo: 'PERMISO_DENEGADO' });
+    return true;
   }
 }
