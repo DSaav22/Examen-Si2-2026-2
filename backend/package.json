@@ -21,7 +21,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "spike:b": "node scripts/run-spike-b.cjs",
     "demo:reset": "npx prisma migrate deploy && npx prisma db seed",
-    "demo:catalog": "ts-node scripts/seed-catalogo-demo.ts"
+    "demo:catalog": "ts-node scripts/seed-catalogo-demo.ts",
+    "demo:catalog-fotos": "ts-node scripts/replace-catalogo-fotos.ts"
   },
   "prisma": {
     "seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
