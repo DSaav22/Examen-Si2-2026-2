@@ -10,6 +10,7 @@ import { Carrito } from './pages/Carrito'
 import { Catalogo } from './pages/Catalogo'
 import { Cuenta } from './pages/Cuenta'
 import { Encargado } from './pages/Encargado'
+import { Despacho } from './pages/Despacho'
 import { Ficha } from './pages/Ficha'
 import { Historial } from './pages/Historial'
 import { Home } from './pages/Home'
@@ -19,6 +20,7 @@ import { Probador } from './pages/Probador'
 import { ProveedorPortal } from './pages/ProveedorPortal'
 import { Registro } from './pages/Registro'
 import { Reportes } from './pages/Reportes'
+import { Moderacion } from './pages/Moderacion'
 import { Reservas } from './pages/Reservas'
 import { Shell } from './pages/Shell'
 
@@ -49,7 +51,9 @@ export default function App() {
             <Route path="/historial" element={<ProtectedRoute roles={['CLIENTA', 'ADMIN', 'CAJERO', 'ENCARGADO']}><Historial /></ProtectedRoute>} />
             <Route path="/pos" element={<ProtectedRoute roles={['CAJERO', 'ENCARGADO', 'ADMIN', 'VENDEDOR']}><Pos /></ProtectedRoute>} />
             <Route path="/encargado" element={<ProtectedRoute roles={['ENCARGADO', 'ADMIN', 'SUPERADMIN']}><Encargado /></ProtectedRoute>} />
+            <Route path="/despacho" element={<ProtectedRoute roles={['ENCARGADO', 'ADMIN', 'SUPERADMIN']}><Despacho /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN']}><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/moderacion" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN']}><Moderacion /></ProtectedRoute>} />
             <Route path="/admin/configuracion" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN']}><Admin /></ProtectedRoute>} />
             <Route path="/proveedor" element={<ProtectedRoute roles={['PROVEEDOR', 'ADMIN']}><ProveedorPortal /></ProtectedRoute>} />
             <Route path="/reportes" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN', 'ENCARGADO']}><Reportes /></ProtectedRoute>} />

@@ -40,7 +40,7 @@ export class VentasController {
 
   @Get('sucursal')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ENCARGADO, Rol.ADMIN)
+  @Roles(Rol.ENCARGADO, Rol.ADMIN, Rol.CAJERO, Rol.SUPERADMIN)
   async deSucursal(@CurrentUser() user: JwtPayload) {
     if (user.rol === Rol.ADMIN) {
       return this.ventas.ventasDeSucursal(undefined);

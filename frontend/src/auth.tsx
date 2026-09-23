@@ -6,6 +6,7 @@ type AuthCtx = {
   user: User | null
   login: (email: string, password: string) => Promise<User>
   logout: () => void
+  rename: (nombre: string) => void
 }
 
 const Ctx = createContext<AuthCtx | null>(null)
@@ -28,6 +29,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('ensayar_user', JSON.stringify(data.user))
         setUser(data.user)
         return data.user
+      },
+      rename(nombre: string) {
+        setUser(current => {
+          if (!current) return current
+          const next = { ...current, nombre }
+          localStorage.setItem('ensayar_user', JSON.stringify(next))
+          return next
+        })
       },
       logout() {
         void api('/auth/logout', { method: 'POST' }).catch(() => undefined)

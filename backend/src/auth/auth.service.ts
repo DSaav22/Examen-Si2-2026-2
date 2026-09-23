@@ -99,6 +99,7 @@ export class AuthService {
     rol: Rol;
     sucursalId?: string | null;
     proveedorId?: string | null;
+    mayorista?: boolean;
   }) {
     return {
       id: usuario.id,
@@ -107,6 +108,7 @@ export class AuthService {
       rol: usuario.rol,
       sucursalId: usuario.sucursalId ?? null,
       proveedorId: usuario.proveedorId ?? null,
+      mayorista: usuario.mayorista ?? false,
     };
   }
 }

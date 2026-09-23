@@ -16,6 +16,7 @@ export function Carrito() {
   const [ticket, setTicket] = useState('')
   const [comprobante, setComprobante] = useState<TicketDatos | null>(null)
   const [pagoId, setPagoId] = useState('')
+  const [cuponCodigo, setCuponCodigo] = useState('')
 
   useEffect(() => {
     api<Sucursal[]>('/catalogo/sucursales').then((s) => {
@@ -45,6 +46,7 @@ export function Carrito() {
             varianteId: l.varianteId,
             cantidad: l.cantidad,
           })),
+          ...(cuponCodigo.trim() ? { cuponCodigo: cuponCodigo.trim() } : {}),
         }),
       })
       const snapshot = lineas
@@ -54,6 +56,7 @@ export function Carrito() {
           medio === 'qr' ? 'QR pendiente' : 'contra entrega'
         }`,
       )
+      setCuponCodigo('')
       setComprobante({
         id: venta.id,
         medio: medio === 'qr' ? 'QR simulado' : 'contra entrega',
@@ -67,17 +70,22 @@ export function Carrito() {
       })
       if (venta.pago?.id) setPagoId(venta.pago.id)
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'No se pudo pedir')
+      const codigo = err instanceof Error ? err.message : ''
+      const textos: Record<string, string> = {
+        CUPON_INVALIDO: 'Ese cupón no existe o ya venció.',
+        CUPON_AGOTADO: 'Ese cupón llegó a su tope de usos.',
+      }
+      setMsg(textos[codigo] ?? (codigo || 'No se pudo pedir'))
     }
   }
 
-  async function aprobarQr() {
+  async function resolverQr(resultado: 'aprobado' | 'rechazado') {
     if (!pagoId) return
     await api(`/pagos/${pagoId}/simular`, {
       method: 'POST',
-      body: JSON.stringify({ resultado: 'aprobado' }),
+      body: JSON.stringify({ resultado }),
     })
-    setMsg('Pago QR aprobado (sandbox RF19).')
+    setMsg(resultado === 'aprobado' ? 'Pago QR de prueba aprobado.' : 'Pago QR de prueba rechazado. El stock reservado volvió al almacén.')
     setPagoId('')
   }
 
@@ -113,6 +121,10 @@ export function Carrito() {
         </select>
       </label>
       <label>
+        Cupón
+        <input value={cuponCodigo} onChange={(e) => setCuponCodigo(e.target.value)} placeholder="Código, si tienes uno" />
+      </label>
+      <label>
         Pago
         <select
           value={medio}
@@ -122,12 +134,14 @@ export function Carrito() {
           <option value="qr">QR simulado (pasarela sandbox)</option>
         </select>
       </label>
-      {msg ? <p className="ok">{msg}</p> : null}
+      {msg ? <p className={msg.startsWith('Ese cupón') || msg.startsWith('No se') ? 'error' : 'ok'}>{msg}</p> : null}
       {ticket ? <p className="ok">{ticket}</p> : null}
       {pagoId ? (
-        <button type="button" onClick={() => void aprobarQr()}>
-          Aprobar pago QR
-        </button>
+        <div className="pay-test">
+          <p>Pasarela de prueba. No se cobra dinero real.</p>
+          <button type="button" className="ui-button ui-button--primary" onClick={() => void resolverQr('aprobado')}>Aprobar QR</button>
+          <button type="button" className="ui-button ui-button--secondary" onClick={() => void resolverQr('rechazado')}>Rechazar QR</button>
+        </div>
       ) : null}
       {comprobante ? <TicketPrint ticket={comprobante} /> : null}
       <button type="button" disabled={!lineas.length} onClick={() => void pedir()}>

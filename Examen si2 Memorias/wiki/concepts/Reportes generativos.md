@@ -1,7 +1,7 @@
 ---
 tipo: concept
 fuentes: 3
-actualizado: 2026-09-22
+actualizado: 2026-09-23
 tags: [innovacion, ia, sql]
 ---
 
@@ -25,9 +25,9 @@ Garzón lo pone en el actor “Servicio de IA”: reportes generativos bajo dema
 
 Sin clave OpenAI. `compilarPregunta` arma el SELECT; `validarSelect` lo acota a `v_reporte_ventas`. `POST /reportes/generativo` y **`GET /reportes/dia`** (ADMIN). UI en `/reportes` (Consultar + Ventas del día). Spike C. [[UC10 Reporte generativo]]
 
-## Madurez real (22 sep)
+## Madurez real (23 sep, tarde)
 
-[[contexto-completo-proyecto]]: **no usa IA generativa**. Filtros/reglas + SQL restringido. También existen reportes fijos día e inventario. En el informe: “compilador de pregunta → SELECT acotado”, no “LLM”. [[Estado del codigo]]
+El modelo propone `{titulo, sql}` sobre `v_reporte_ventas`. Si el SQL no pasa `validarSelect`, se usa el compilador por reglas. Luego narra hasta 12 filas. Sigue sin SQL libre. También existen el reporte del día y el de inventario. [[codigo-23-sep]] · [[Estado del codigo]]
 
 ## Relacionado
 

@@ -30,6 +30,18 @@ class AjusteDto {
   nota?: string;
 }
 
+class TransferenciaDto {
+  @IsString()
+  varianteId!: string;
+  @IsString()
+  origenId!: string;
+  @IsString()
+  destinoId!: string;
+  @IsInt()
+  @Min(1)
+  cantidad!: number;
+}
+
 class IngresoDto {
   @IsString()
   varianteId!: string;
@@ -131,6 +143,18 @@ export class InventarioController {
       dto.cantidad,
       user.sub,
       dto.nota,
+    );
+  }
+
+  @Post('transferencias')
+  @Roles(Rol.ENCARGADO, Rol.ADMIN, Rol.SUPERADMIN)
+  transferir(@CurrentUser() user: JwtPayload, @Body() dto: TransferenciaDto) {
+    return this.inventario.transferir(
+      dto.varianteId,
+      dto.origenId,
+      dto.destinoId,
+      dto.cantidad,
+      user.sub,
     );
   }
 

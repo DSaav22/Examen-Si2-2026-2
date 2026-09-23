@@ -8,6 +8,8 @@ type Resultado = {
   sql: string
   columnas: string[]
   filas: Record<string, string | number | null>[]
+  narracion?: string | null
+  fuente?: 'modelo' | 'reglas'
 }
 
 export function Reportes() {
@@ -74,6 +76,7 @@ export function Reportes() {
     <section>
       <p className="eyebrow">Innovación 2</p>
       <h2>Reportes generativos</h2>
+      <p className="muted">El modelo redacta la consulta. Solo se ejecuta un SELECT que el validador acepta sobre la vista de ventas.</p>
       <form className="card col-form wide" onSubmit={consultar}>
         <label>
           Pregunta en lenguaje natural
@@ -111,6 +114,8 @@ export function Reportes() {
       {data ? (
         <div className="card">
           <h3>{data.titulo}</h3>
+          {data.narracion ? <p>{data.narracion}</p> : null}
+          <p className="muted">{data.fuente === 'modelo' ? 'Consulta propuesta por el modelo y aceptada por el validador.' : 'Consulta armada por las reglas de la tienda.'}</p>
           <pre className="sql">{data.sql}</pre>
           <div className="table-wrap">
             <table>

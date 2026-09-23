@@ -4,6 +4,12 @@ import './index.css'
 import './styles/vesta-typography.css'
 import App from './App.tsx'
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js')
+  })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

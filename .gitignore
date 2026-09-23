@@ -1,4 +1,6 @@
 node_modules/
+.azure/**
+!.azure/deployment-plan.md
 dist/
 .env
 *.log

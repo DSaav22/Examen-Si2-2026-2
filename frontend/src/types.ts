@@ -7,6 +7,7 @@ export type User = {
   rol: Rol
   sucursalId?: string | null
   proveedorId?: string | null
+  mayorista?: boolean
 }
 
 export type Variante = {
@@ -34,6 +35,8 @@ export type Producto = {
   ocasion: string
   precioBase: string | number
   descuentoPct?: string | number
+  precioMayorista?: number | null
+  minimoMayorista?: number
   temporadaId?: string | null
   coleccionId?: string | null
   proveedorId?: string | null

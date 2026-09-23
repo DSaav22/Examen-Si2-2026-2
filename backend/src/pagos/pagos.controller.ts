@@ -18,6 +18,7 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { InventarioService } from '../inventario/inventario.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { VentasService } from '../ventas/ventas.service';
 
 class SimularDto {
   @IsIn(['aprobado', 'rechazado'])
@@ -30,10 +31,11 @@ export class PagosController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventario: InventarioService,
+    private readonly ventas: VentasService,
   ) {}
 
   @Get(':id')
-  @Roles(Rol.CLIENTA, Rol.ADMIN)
+  @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.VENDEDOR)
   async uno(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     const pago = await this.prisma.pagoSimulado.findUnique({
       where: { id },
@@ -50,7 +52,7 @@ export class PagosController {
   }
 
   @Post(':id/simular')
-  @Roles(Rol.CLIENTA, Rol.ADMIN)
+  @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.VENDEDOR)
   async simular(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
@@ -154,10 +156,23 @@ export class PagosController {
           nota: 'Pago QR aprobado',
         });
       }
-      await tx.venta.update({
+      const cobrada = await tx.venta.update({
         where: { id: pago.ventaId },
         data: { estado: 'cobrada' },
       });
+      if (cobrada.canal === 'online' && cobrada.clientaId) {
+        await this.ventas.abrirPedido(tx, {
+          id: cobrada.id,
+          clientaId: cobrada.clientaId,
+          total: cobrada.total,
+        });
+      }
+      if (pago.venta.cajaTurnoId) {
+        await tx.cajaTurno.update({
+          where: { id: pago.venta.cajaTurnoId },
+          data: { totalSistema: { increment: pago.venta.total } },
+        });
+      }
       return tx.pagoSimulado.findUniqueOrThrow({
         where: { id },
         include: { venta: { include: { lineas: true } } },

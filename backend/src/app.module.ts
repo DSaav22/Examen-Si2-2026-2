@@ -16,6 +16,8 @@ import { ReservasModule } from './reservas/reservas.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { VentasModule } from './ventas/ventas.module';
 import { AdminModule } from './admin/admin.module';
+import { PedidosModule } from './pedidos/pedidos.module';
+import { DevolucionesModule } from './devoluciones/devoluciones.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { AdminModule } from './admin/admin.module';
     PagosModule,
     MetaModule,
     AdminModule,
+    PedidosModule,
+    DevolucionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

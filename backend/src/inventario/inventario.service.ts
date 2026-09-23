@@ -128,4 +128,59 @@ export class InventarioService {
       });
     });
   }
+
+  transferir(
+    varianteId: string,
+    origenId: string,
+    destinoId: string,
+    cantidad: number,
+    usuarioId?: string,
+  ) {
+    if (origenId === destinoId) {
+      throw new ConflictException({ codigo: 'MISMO_ALMACEN' });
+    }
+    if (cantidad < 1) {
+      throw new ConflictException({ codigo: 'CANTIDAD_INVALIDA' });
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<
+        { cantidad: number; reservado: number }[]
+      >`
+        SELECT cantidad, reservado FROM stock_almacen
+        WHERE variante_id = ${varianteId} AND almacen_id = ${origenId}
+        FOR UPDATE
+      `;
+      const origen = rows[0];
+      const disponible = origen ? origen.cantidad - origen.reservado : 0;
+      if (!origen || disponible < cantidad) {
+        throw new ConflictException({ codigo: 'STOCK_INSUFICIENTE' });
+      }
+      await tx.stockAlmacen.update({
+        where: { varianteId_almacenId: { varianteId, almacenId: origenId } },
+        data: { cantidad: { decrement: cantidad } },
+      });
+      await tx.stockAlmacen.upsert({
+        where: { varianteId_almacenId: { varianteId, almacenId: destinoId } },
+        create: { varianteId, almacenId: destinoId, cantidad, reservado: 0 },
+        update: { cantidad: { increment: cantidad } },
+      });
+      await this.registrar(tx, {
+        tipo: 'transferencia_salida',
+        varianteId,
+        almacenId: origenId,
+        cantidad,
+        usuarioId,
+        nota: `Hacia ${destinoId}`,
+      });
+      await this.registrar(tx, {
+        tipo: 'transferencia_entrada',
+        varianteId,
+        almacenId: destinoId,
+        cantidad,
+        usuarioId,
+        nota: `Desde ${origenId}`,
+      });
+      return { varianteId, origenId, destinoId, cantidad };
+    });
+  }
 }

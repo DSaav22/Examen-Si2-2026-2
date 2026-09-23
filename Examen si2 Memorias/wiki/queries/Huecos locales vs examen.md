@@ -1,13 +1,18 @@
 ---
 tipo: query
 fuentes: 7
-actualizado: 2026-09-22
+actualizado: 2026-09-23
 tags: [examen, huecos, garzon, rf]
 ---
 
 # ¿Qué falta frente a Garzón RF/RNF?
 
-Canon dominio: PDF Garzón RF01–RF25 + RNF. Stack: Nest/React/RN ([[stack-metodologia-parcial]]). Madurez código: [[Estado del codigo]] (22 sep) — la matriz del 19 sep era optimista en RF13/25.
+Canon dominio: PDF Garzón RF01–RF25 + RNF. Stack: Nest/React/RN ([[stack-metodologia-parcial]]). Madurez código: [[Estado del codigo]] (23 sep, tarde). La matriz de abajo es la del 22 sep; estas filas quedaron viejas:
+
+- RF13 vestidor: en la web hay 2D y volumen CSS si hay modelo. El móvil sigue en prototipo 2D.
+- RF20: ya hay transferencia entre almacenes (`POST /inventario/transferencias`).
+- RF24 / RF25: el reporte generativo y el bot llaman a `gpt-4.1-mini` en local. El SQL sigue pasando por `validarSelect`.
+- Deploy: hay sitio en Azure, pero no incluye el corte del 23 sep por la tarde.
 
 ## Matriz RF01–RF25 (revisada 22 sep)
 

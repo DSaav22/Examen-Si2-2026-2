@@ -150,3 +150,7 @@ El informe suma módulos (`modulos.md`), fichas UC01–UC35 con espacio de diagr
 
 El Word `docs/parcial/EnsayAR-Informe-Primer-Parcial.docx` sigue el índice de `raw/inbox/Examen SI2 1.pdf`: Parte I perfil 1.1–1.8, Parte II marco 2.1–2.3 (módulos), Parte III requisitos con ciclos, fichas, análisis, diseño, implementación, pruebas, y cierre (conclusión, recomendación, bibliografía, URL y QR). La capacitación quedó en 3.4.4. Dominio y stack siguen siendo EnsayAR.
 
+## [2026-09-23] ingest | Código de la tarde (UC28–UC35 y bot)
+
+Fuente [[codigo-23-sep]] (working tree, sin archivo en `raw/`). Canon nuevo: [[Estado del codigo]]. Local: bot `POST /ia/bot`, reportes con modelo + `validarSelect`, probador 3D CSS si hay `urlModelo`, mayorista, transferencia, despacho `VESTA-`, devolución con reembolso simulado, PWA y NIT de prueba. Falta: deploy de este corte, móvil (sigue 2D y sin bot), imagen generada (cuota 0), commit. Actualiza casos de uso, asistente, probador, reportes, Azure, React Native, huecos e índice.
+

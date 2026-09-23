@@ -1,6 +1,6 @@
 # Azure Deployment Plan
 
-> **Status:** Ready for validate+deploy — dominio RF completo en local; `az login` disponible; falta `azure-validate` → `azd up` (costo PG B1ms)
+> **Status:** Deployed
 
 Generated: 2026-09-19
 
@@ -22,7 +22,7 @@ Generated: 2026-09-19
 | Scale | Small |
 | Budget | Cost-Optimized (F1 + SWA Free + PG B1ms) |
 | **Subscription** | `41a4808f-a0e7-453b-b19f-d85297091ec5` (default tras `az login` 19 sep) |
-| **Location** | Propuesta `eastus2` (cambiar si el dueño pide otra) |
+| **Location** | `brazilsouth` (política de la suscripción: westus, canadacentral, mexicocentral, westus3, brazilsouth). Static Web Apps no está en esas regiones, así que la web va en App Service. |
 
 ---
 
@@ -105,7 +105,26 @@ Cuotas tomadas de [Azure subscription service limits](https://learn.microsoft.co
 - [ ] Provision (`azd up`) — instalar azd (https://aka.ms/azd/install); `az login` ya OK
 
 ### Phase 3–4
-- [ ] Validate / Deploy
+- [x] Validate (2026-09-23)
+- [ ] Deploy
+
+## 10. Validation Proof
+
+Comandos del 2026-09-23, suscripción Azure for Students `41a4808f-a0e7-453b-b19f-d85297091ec5`, entorno `ensayar-p23a`.
+
+| Check | Resultado |
+|-------|-----------|
+| `azd version` | 1.34.1 |
+| `azd auth login --check-status` | diego_joaquin_@hotmail.com |
+| `az bicep build --file infra/main.bicep` | OK |
+| `npm run build` backend (tras `prisma generate`) | OK |
+| `npm run build` frontend | OK |
+| `azd provision --preview --no-prompt` en eastus2 | Rechazado por política `sys.regionrestriction` |
+| `azd provision --preview --no-prompt` en brazilsouth | OK. Crea RG `ensayar-rg-2xhvsljjqvilk`, PostgreSQL, App Insights, Log Analytics, plan F1 y dos Web Apps |
+
+RBAC: no hay asignaciones de rol. PostgreSQL usa usuario y contraseña; la identidad del App Service no accede a datos. No aplica AcrPull.
+
+Regiones permitidas por la suscripción: westus, canadacentral, mexicocentral, westus3, brazilsouth. Static Web Apps no existe en esas regiones, por eso la web se publica como App Service Linux en el mismo plan.
 
 ---
 

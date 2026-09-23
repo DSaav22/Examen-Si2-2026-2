@@ -9,6 +9,103 @@ import { precioEfectivo } from '../types'
 
 type Linea = { variante: Variante; producto: Producto; cantidad: number }
 
+type VentaSucursal = {
+  id: string
+  total: string | number
+  estado: string
+  canal: string
+  creadaEn: string
+  lineas: {
+    id: string
+    cantidad: number
+    cantidadDevuelta?: number
+    variante: { producto: { nombre: string }; talla?: string; color?: string }
+  }[]
+}
+
+const ERRORES_DEV: Record<string, string> = {
+  VENTA_NO: 'No se encontró la venta.',
+  YA_DEVUELTA: 'Esa venta ya fue devuelta.',
+  CANTIDAD_INVALIDA: 'La cantidad a devolver no es válida.',
+  NO_ES_TU_VENTA: 'No podés devolver una venta que no es tuya.',
+}
+
+function DevolverVentaPanel({
+  ventas,
+  cant,
+  msg,
+  err,
+  onRefresh,
+  onCantidad,
+  onDevolver,
+}: {
+  ventas: VentaSucursal[]
+  cant: Record<string, Record<string, number>>
+  msg: string
+  err: string
+  onRefresh: () => void
+  onCantidad: (ventaId: string, lineaId: string, value: number, max: number) => void
+  onDevolver: (venta: VentaSucursal) => void
+}) {
+  return (
+    <article className="card">
+      <h3>Devolver una venta</h3>
+      <button type="button" className="ghost" onClick={onRefresh}>
+        Actualizar lista
+      </button>
+      {msg ? <p className="ok">{msg}</p> : null}
+      {err ? <p className="error">{err}</p> : null}
+      {!ventas.length && !err ? (
+        <p className="muted">No hay ventas cobradas recientes.</p>
+      ) : null}
+      {ventas.map((v) => (
+        <div key={v.id}>
+          <p>
+            {new Date(v.creadaEn).toLocaleString()} · {v.canal} · Bs{' '}
+            {Number(v.total).toFixed(2)} · {v.id.slice(0, 8)}
+          </p>
+          <ul>
+            {v.lineas.map((l) => {
+              const max = Math.max(0, l.cantidad - (l.cantidadDevuelta ?? 0))
+              return (
+                <li key={l.id}>
+                  {l.variante.producto.nombre} × {l.cantidad}
+                  {l.cantidadDevuelta ? ` (devuelto ${l.cantidadDevuelta})` : null}
+                  {max > 0 ? (
+                    <label>
+                      {' '}
+                      Devolver{' '}
+                      <input
+                        type="number"
+                        min={0}
+                        max={max}
+                        value={cant[v.id]?.[l.id] ?? 0}
+                        onChange={(e) =>
+                          onCantidad(v.id, l.id, Number(e.target.value), max)
+                        }
+                      />
+                      <span className="muted"> / {max}</span>
+                    </label>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+          {v.lineas.some((l) => l.cantidad - (l.cantidadDevuelta ?? 0) > 0) ? (
+            <button
+              type="button"
+              className="ui-button ui-button--secondary"
+              onClick={() => onDevolver(v)}
+            >
+              Devolver
+            </button>
+          ) : null}
+        </div>
+      ))}
+    </article>
+  )
+}
+
 function esFalloRed(err: unknown): boolean {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return true
   if (err instanceof TypeError) return true
@@ -46,8 +143,47 @@ export function Pos() {
   const [cuponCodigo, setCuponCodigo] = useState('')
   const [stockExacto, setStockExacto] = useState<Record<string, number>>({})
   const [cobrando, setCobrando] = useState(false)
+  const [pagoId, setPagoId] = useState('')
+  const [tarjeta, setTarjeta] = useState('')
+  const [ventasDev, setVentasDev] = useState<VentaSucursal[]>([])
+  const [devCant, setDevCant] = useState<Record<string, Record<string, number>>>({})
+  const [devMsg, setDevMsg] = useState('')
+  const [devErr, setDevErr] = useState('')
 
   const almacenId = turno?.sucursal.almacenes[0]?.id
+
+  async function cargarVentasDevolucion() {
+    setDevErr('')
+    try {
+      const data = await api<VentaSucursal[]>('/ventas/sucursal')
+      const cobradas = data.filter((v) => v.estado === 'cobrada')
+      setVentasDev(cobradas)
+      setDevCant((prev) => {
+        const next: Record<string, Record<string, number>> = {}
+        for (const v of cobradas) {
+          next[v.id] = {}
+          for (const l of v.lineas) {
+            next[v.id][l.id] = prev[v.id]?.[l.id] ?? 0
+          }
+        }
+        return next
+      })
+    } catch (err) {
+      setVentasDev([])
+      const status = (err as Error & { status?: number }).status
+      const codigo = err instanceof Error ? err.message : ''
+      if (status === 403) {
+        setDevErr('No tenés permiso para listar ventas de sucursal. Podés intentar devolver si conocés la venta.')
+      } else {
+        setDevErr(codigo || 'No se cargaron las ventas para devolver.')
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!user || !['CAJERO', 'ADMIN', 'ENCARGADO'].includes(user.rol)) return
+    void cargarVentasDevolucion()
+  }, [user])
 
   useEffect(() => {
     if (!turno) return
@@ -121,11 +257,28 @@ export function Pos() {
   }
 
   async function enviarVenta(payload: VentaCola) {
-    const venta = await api<{ id: string; total: string }>('/ventas', {
+    const venta = await api<{ id: string; total: string; pago?: { id: string; estado: string } | null }>('/ventas', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
     return venta
+  }
+
+  function decisionTarjeta(numero: string) {
+    const digits = numero.replace(/\s+/g, '')
+    if (digits === '4242424242424242') return 'aprobado' as const
+    if (digits === '4000000000000002') return 'rechazado' as const
+    return null
+  }
+
+  async function resolverPago(resultado: 'aprobado' | 'rechazado') {
+    if (!pagoId) return
+    await api(`/pagos/${pagoId}/simular`, { method: 'POST', body: JSON.stringify({ resultado }) })
+    setPagoId('')
+    setTarjeta('')
+    setLineas([])
+    setTicket(resultado === 'aprobado' ? 'Pago de prueba aprobado. La venta quedó cobrada.' : 'Pago de prueba rechazado. El stock reservado volvió al almacén.')
+    await cargarTurno({ soft: true })
   }
 
   async function sincronizar() {
@@ -181,7 +334,11 @@ export function Pos() {
   }
 
   async function cobrar() {
-    if (cobrando || !turno || !almacenId || lineas.length === 0) return
+    if (cobrando || !turno || !almacenId || lineas.length === 0 || pagoId) return
+    if ((medio === 'qr' || medio === 'tarjeta') && !navigator.onLine) {
+      setMsg('QR y tarjeta de prueba necesitan conexión. Sin red, cobra en efectivo para usar la cola.')
+      return
+    }
     setCobrando(true)
     setMsg('')
     const payload: VentaCola = {
@@ -213,6 +370,11 @@ export function Pos() {
           subtotal: precioEfectivo(l.producto) * l.cantidad,
         })),
       })
+      if (venta.pago?.id && venta.pago.estado === 'pendiente') {
+        setPagoId(venta.pago.id)
+        setTicket(`Venta ${venta.id.slice(0, 8)} espera la pasarela de prueba.`)
+        return
+      }
       setLineas([])
       await cargarTurno({ soft: true })
       try {
@@ -228,7 +390,12 @@ export function Pos() {
         setLineas([])
         return
       }
-      setMsg(err instanceof Error ? err.message : 'Cobro falló')
+      const codigo = err instanceof Error ? err.message : ''
+      const textos: Record<string, string> = {
+        CUPON_INVALIDO: 'Ese cupón no existe o ya venció.',
+        CUPON_AGOTADO: 'Ese cupón llegó a su tope de usos.',
+      }
+      setMsg(textos[codigo] ?? (codigo || 'Cobro falló'))
     } finally {
       setCobrando(false)
     }
@@ -250,6 +417,44 @@ export function Pos() {
       setTurno(null)
     } catch (err) {
       setMsg(err instanceof Error ? err.message : 'No se cerró la caja')
+    }
+  }
+
+  function setDevCantidad(ventaId: string, lineaId: string, value: number, max: number) {
+    const n = Math.max(0, Math.min(max, Number.isFinite(value) ? value : 0))
+    setDevCant((prev) => ({
+      ...prev,
+      [ventaId]: { ...(prev[ventaId] ?? {}), [lineaId]: n },
+    }))
+  }
+
+  async function devolverVenta(venta: VentaSucursal) {
+    setDevErr('')
+    setDevMsg('')
+    const lineas = venta.lineas
+      .map((l) => ({
+        lineaId: l.id,
+        cantidad: devCant[venta.id]?.[l.id] ?? 0,
+      }))
+      .filter((l) => l.cantidad > 0)
+    if (!lineas.length) {
+      setDevErr('Elegí al menos una cantidad a devolver.')
+      return
+    }
+    try {
+      const res = await api<{ estado: string; pagoEstado?: string }>('/devoluciones', {
+        method: 'POST',
+        body: JSON.stringify({ ventaId: venta.id, lineas }),
+      })
+      await cargarVentasDevolucion()
+      if (res.pagoEstado === 'reembolsado') {
+        setDevMsg('Devolución registrada. El pago quedó reembolsado (modo prueba).')
+      } else {
+        setDevMsg(`Devolución registrada. Estado: ${res.estado}.`)
+      }
+    } catch (err) {
+      const codigo = err instanceof Error ? err.message : ''
+      setDevErr(ERRORES_DEV[codigo] ?? (codigo || 'No se pudo devolver'))
     }
   }
 
@@ -293,11 +498,23 @@ export function Pos() {
           {msg ? <p className="error">{msg}</p> : null}
           <button type="submit">Abrir turno</button>
         </form>
+        {['CAJERO', 'ADMIN', 'ENCARGADO'].includes(user.rol) ? (
+          <DevolverVentaPanel
+            ventas={ventasDev}
+            cant={devCant}
+            msg={devMsg}
+            err={devErr}
+            onRefresh={() => void cargarVentasDevolucion()}
+            onCantidad={setDevCantidad}
+            onDevolver={(v) => void devolverVenta(v)}
+          />
+        ) : null}
       </section>
     )
   }
 
   return (
+    <>
     <section className="pos">
       <div>
         <p className="eyebrow">Punto de venta</p>
@@ -356,6 +573,26 @@ export function Pos() {
             <option value="mixto">Pago mixto simulado</option>
           </select>
         </label>
+        {medio === 'tarjeta' ? (
+          <label className="pay-test">
+            Tarjeta Stripe de prueba
+            <input value={tarjeta} onChange={(e) => setTarjeta(e.target.value)} placeholder="4242 4242 4242 4242" inputMode="numeric" />
+            <small>Aprueba 4242424242424242. Rechaza 4000000000000002. No se cobra dinero real.</small>
+          </label>
+        ) : null}
+        {pagoId ? (
+          <div className="pay-test">
+            <p>El cobro quedó en espera. Confírmalo en la pasarela de prueba.</p>
+            {medio === 'tarjeta' ? (
+              <button type="button" className="ui-button ui-button--primary" onClick={() => { const decision = decisionTarjeta(tarjeta); if (!decision) { setMsg('Usa 4242424242424242 o 4000000000000002.'); return } void resolverPago(decision) }}>Aplicar tarjeta de prueba</button>
+            ) : (
+              <div className="account-actions">
+                <button type="button" className="ui-button ui-button--primary" onClick={() => void resolverPago('aprobado')}>Aprobar</button>
+                <button type="button" className="ui-button ui-button--secondary" onClick={() => void resolverPago('rechazado')}>Rechazar</button>
+              </div>
+            )}
+          </div>
+        ) : null}
         {msg ? <p className="error">{msg}</p> : null}
         {ticket ? <p className="ok">{ticket}</p> : null}
         {comprobante ? <TicketPrint ticket={comprobante} /> : null}
@@ -400,5 +637,17 @@ export function Pos() {
         </button>
       </aside>
     </section>
+    {['CAJERO', 'ADMIN', 'ENCARGADO'].includes(user.rol) ? (
+      <DevolverVentaPanel
+        ventas={ventasDev}
+        cant={devCant}
+        msg={devMsg}
+        err={devErr}
+        onRefresh={() => void cargarVentasDevolucion()}
+        onCantidad={setDevCantidad}
+        onDevolver={(v) => void devolverVenta(v)}
+      />
+    ) : null}
+    </>
   )
 }

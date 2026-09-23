@@ -13,7 +13,8 @@ Portal compilado. En cada query, empezar aquí.
 - [[Mapa del examen]] — qué hay que entregar y qué es canónico
 - [[Contradicciones entre fuentes]] — audio vs Garzón vs stack vs código
 - [[MVP y alcance]] — esencial vs complemento
-- [[Estado del codigo]] — snapshot 22 sep (qué demoar / qué no inflar)
+- [[Estado del codigo]] — snapshot 23 sep tarde (qué hay en local, qué falta publicar y en el móvil)
+- [[codigo-23-sep]] — fuente de ese corte
 - [[Comparacion informes ejemplo]] — Tatiana vs Lozada (calidad documental)
 - [[Checklist informe EnsayAR]] — puntos a poner en el PDF del parcial
 - [[Indice del informe]] — docs/parcial = cuerpo; wiki = memoria
@@ -33,7 +34,7 @@ Portal compilado. En cada query, empezar aquí.
 - [[Inventario matricial]] — producto × talla × color × almacén
 - [[Punto de venta]] — caja, turnos, arqueo
 - [[Reservas de prendas]] — flujo fuerte en Garzón
-- [[Asistente IA]] — ficha determinística (no LLM)
+- [[Asistente IA]] — ficha por reglas + bot `POST /ia/bot` (local)
 - [[Pasarelas de pago]] — QR, tarjeta, efectivo, contra entrega
 - [[Modo offline]] — cola POS parcial
 - [[Proceso Unificado]] — metodología obligatoria
@@ -58,7 +59,8 @@ Portal compilado. En cada query, empezar aquí.
 - [[examen1-garzon-fashionstore]] — PDF otro docente (RF, actores, reservas)
 - [[stack-metodologia-parcial]] — **canon** resumido (misma clase que el audio de arriba)
 - [[correccion-alcance-parcial]] — solo el parcial; fecha 23 sep
-- [[contexto-completo-proyecto]] — snapshot código 22 sep (Andrés merge)
+- [[contexto-completo-proyecto]] — snapshot código 22 sep (Andrés merge); superado por [[codigo-23-sep]]
+- [[codigo-23-sep]] — working tree 23 sep tarde (UC28–UC35, bot, Azure viejo)
 - [[ejemplo-informe-tatiana-autogo]] — modelo de profundidad (172 p.)
 - [[ejemplo-informe-lozada-asistencia-mecanica]] — parcial más corto (63 p.)
 

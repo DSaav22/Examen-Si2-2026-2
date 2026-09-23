@@ -1,11 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ModeloClient } from '../ia/modelo.client';
 import { PrismaService } from '../prisma/prisma.service';
 import { compilarPregunta, validarSelect } from './sql-seguro';
 
+const COLUMNAS = 'fecha_hora, sucursal_nombre, cajero_nombre, cliente_nombre, producto_nombre, talla, color, cantidad, precio_unitario, subtotal, medio_pago, variante_sku';
+
 @Injectable()
 export class ReportesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly modelo: ModeloClient,
+  ) {}
 
   async inventario(adminId: string) {
     const filas = await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(
@@ -75,13 +81,7 @@ export class ReportesService {
   }
 
   async generar(pregunta: string, adminId: string) {
-    let compilado;
-    try {
-      compilado = compilarPregunta(pregunta);
-    } catch {
-      throw new BadRequestException({ codigo: 'PREGUNTA_ILEGAL' });
-    }
-
+    const compilado = await this.compilarConModelo(pregunta);
     let sql: string;
     try {
       sql = validarSelect(compilado.sql);
@@ -95,6 +95,8 @@ export class ReportesService {
       sql,
     );
     const columnas = filas[0] ? Object.keys(filas[0]) : [];
+    const serializadas = this.serializar(filas);
+    const narracion = await this.narrar(pregunta, serializadas.slice(0, 12));
 
     await this.prisma.reporteEjecucion.create({
       data: {
@@ -109,8 +111,52 @@ export class ReportesService {
       titulo: compilado.titulo,
       sql,
       columnas,
-      filas: this.serializar(filas),
+      filas: serializadas,
+      narracion,
+      fuente: compilado.fuente,
     };
+  }
+
+  private async compilarConModelo(pregunta: string) {
+    const propuesto = await this.modelo.completar(
+      [
+        {
+          role: 'system',
+          content: `Eres el compilador de reportes de EnsayAR. Responde solo JSON {"titulo":"...","sql":"SELECT ..."}.
+La SQL es un único SELECT sobre v_reporte_ventas. Columnas permitidas: ${COLUMNAS}.
+Si filtras por sucursal, cajero o producto, usa ILIKE '%texto%' porque el nombre guardado puede ser más largo.
+Siempre incluye LIMIT 200. Sin punto y coma y sin otras tablas.
+Si piden contraseñas, usuarios o modificar datos, responde {"titulo":"rechazada","sql":""}.`,
+        },
+        { role: 'user', content: pregunta },
+      ],
+      true,
+    );
+    const leido = leerPropuesta(propuesto);
+    if (leido) {
+      try {
+        return { titulo: leido.titulo, sql: validarSelect(leido.sql), fuente: 'modelo' as const };
+      } catch {
+        /* el validador rechazó la propuesta; sigue el compilador fijo */
+      }
+    }
+    try {
+      const fijo = compilarPregunta(pregunta);
+      return { ...fijo, fuente: 'reglas' as const };
+    } catch {
+      throw new BadRequestException({ codigo: 'PREGUNTA_ILEGAL' });
+    }
+  }
+
+  private async narrar(pregunta: string, filas: Record<string, string | number | null>[]) {
+    if (!filas.length) return 'La consulta no devolvió filas.';
+    return this.modelo.completar([
+      {
+        role: 'system',
+        content: 'Resume en español, en dos frases, el resultado de un reporte de ventas. Usa solo los números que te pasan. No inventes totales.',
+      },
+      { role: 'user', content: JSON.stringify({ pregunta, filas }) },
+    ]);
   }
 
   private serializar(filas: Record<string, unknown>[]) {
@@ -124,5 +170,17 @@ export class ReportesService {
       }
       return out;
     });
+  }
+}
+
+function leerPropuesta(texto: string | null) {
+  if (!texto) return null;
+  try {
+    const data = JSON.parse(texto) as { titulo?: string; sql?: string };
+    const sql = data.sql?.trim() ?? '';
+    if (!/^select\s/i.test(sql)) return null;
+    return { titulo: data.titulo?.slice(0, 80) || 'Ventas', sql };
+  } catch {
+    return null;
   }
 }

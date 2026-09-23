@@ -27,6 +27,8 @@ enum EstadoVenta {
   cobrada
   anulada
   pendiente_pago
+  devuelta
+  devuelta_parcial
 }
 
 enum MedioPago {
@@ -52,12 +54,16 @@ enum TipoMovimiento {
   liberacion
   ajuste
   ingreso_proveedor
+  transferencia_salida
+  transferencia_entrada
+  devolucion
 }
 
 enum EstadoPago {
   pendiente
   aprobado
   rechazado
+  reembolsado
 }
 
 model Usuario {
@@ -66,6 +72,7 @@ model Usuario {
   nombre        String              @default("")
   passwordHash  String              @map("password_hash")
   activo        Boolean             @default(true)
+  mayorista     Boolean             @default(false)
   rol           Rol
   sucursalId    String?             @map("sucursal_id")
   sucursal      Sucursal?           @relation(fields: [sucursalId], references: [id])
@@ -142,8 +149,10 @@ model Producto {
   descripcion  String     @default("")
   categoria    String
   ocasion      String
-  precioBase   Decimal    @map("precio_base") @db.Decimal(12, 2)
-  descuentoPct Decimal    @default(0) @map("descuento_pct") @db.Decimal(5, 2)
+  precioBase      Decimal  @map("precio_base") @db.Decimal(12, 2)
+  precioMayorista Decimal? @map("precio_mayorista") @db.Decimal(12, 2)
+  minimoMayorista Int      @default(0) @map("minimo_mayorista")
+  descuentoPct    Decimal  @default(0) @map("descuento_pct") @db.Decimal(5, 2)
   temporadaId  String?    @map("temporada_id")
   temporada    Temporada? @relation(fields: [temporadaId], references: [id])
   coleccionId  String?    @map("coleccion_id")
@@ -176,6 +185,7 @@ model Variante {
   sku           String                 @unique
   urlFoto       String                 @default("") @map("url_foto")
   urlOverlay    String                 @default("") @map("url_overlay")
+  urlModelo     String                 @default("") @map("url_modelo")
   stocks        StockAlmacen[]
   lineas        LineaVenta[]
   lineasReserva LineaReserva[]
@@ -277,9 +287,11 @@ model Venta {
   cajaTurno   CajaTurno?             @relation(fields: [cajaTurnoId], references: [id])
   clientaId   String?                @map("clienta_id")
   clienta     Usuario?               @relation("ClientaVentas", fields: [clientaId], references: [id])
-  lineas      LineaVenta[]
-  pago        PagoSimulado?
-  movimientos MovimientoInventario[]
+  lineas       LineaVenta[]
+  pago         PagoSimulado?
+  movimientos  MovimientoInventario[]
+  pedido       Pedido?
+  devoluciones Devolucion[]
 
   @@index([creadaEn])
   @@index([cajaTurnoId])
@@ -293,8 +305,9 @@ model LineaVenta {
   venta          Venta    @relation(fields: [ventaId], references: [id])
   varianteId     String   @map("variante_id")
   variante       Variante @relation(fields: [varianteId], references: [id])
-  cantidad       Int
-  precioUnitario Decimal  @map("precio_unitario") @db.Decimal(12, 2)
+  cantidad         Int
+  cantidadDevuelta Int      @default(0) @map("cantidad_devuelta")
+  precioUnitario   Decimal  @map("precio_unitario") @db.Decimal(12, 2)
 
   @@map("lineas_venta")
 }
@@ -383,14 +396,43 @@ model Cupon {
 }
 
 model Pedido {
-  id          String   @id @default(uuid())
-  estado      String   @default("pendiente")
-  total       Decimal  @db.Decimal(12, 2)
-  creadoEn    DateTime @default(now()) @map("creado_en")
-  usuarioId   String   @map("usuario_id")
-  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  id           String    @id @default(uuid())
+  estado       String    @default("pendiente")
+  total        Decimal   @db.Decimal(12, 2)
+  direccion    String    @default("")
+  seguimiento  String    @default("")
+  creadoEn     DateTime  @default(now()) @map("creado_en")
+  enviadoEn    DateTime? @map("enviado_en")
+  usuarioId    String    @map("usuario_id")
+  usuario      Usuario   @relation(fields: [usuarioId], references: [id])
+  ventaId      String?   @unique @map("venta_id")
+  venta        Venta?    @relation(fields: [ventaId], references: [id])
   @@index([usuarioId, creadoEn])
+  @@index([estado])
   @@map("pedidos")
+}
+
+model Devolucion {
+  id        String            @id @default(uuid())
+  nota      String            @default("")
+  creadaEn  DateTime          @default(now()) @map("creada_en")
+  ventaId   String            @map("venta_id")
+  venta     Venta             @relation(fields: [ventaId], references: [id])
+  usuarioId String?           @map("usuario_id")
+  lineas    DevolucionLinea[]
+
+  @@index([ventaId])
+  @@map("devoluciones")
+}
+
+model DevolucionLinea {
+  id           String     @id @default(uuid())
+  cantidad     Int
+  devolucionId String     @map("devolucion_id")
+  devolucion   Devolucion @relation(fields: [devolucionId], references: [id])
+  lineaVentaId String     @map("linea_venta_id")
+
+  @@map("devolucion_lineas")
 }
 
 model Promocion {

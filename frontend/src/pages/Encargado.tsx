@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import type { Sucursal } from '../types'
+import type { Producto, Sucursal } from '../types'
 
 type Reserva = {
   id: string
@@ -36,16 +36,28 @@ type VentaSuc = {
   lineas: { cantidad: number; variante: { producto: { nombre: string } } }[]
 }
 
+type OpcionVariante = {
+  id: string
+  label: string
+}
+
 export function Encargado() {
   const { user } = useAuth()
   const [reservas, setReservas] = useState<Reserva[]>([])
   const [ventas, setVentas] = useState<VentaSuc[]>([])
   const [movs, setMovs] = useState<Mov[]>([])
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
+  const [variantes, setVariantes] = useState<OpcionVariante[]>([])
   const [varianteId, setVarianteId] = useState('')
   const [almacenId, setAlmacenId] = useState('')
   const [cantidad, setCantidad] = useState('10')
   const [msg, setMsg] = useState('')
+  const [xferVarianteId, setXferVarianteId] = useState('')
+  const [origenId, setOrigenId] = useState('')
+  const [destinoId, setDestinoId] = useState('')
+  const [xferCantidad, setXferCantidad] = useState('1')
+  const [xferError, setXferError] = useState('')
+  const [xferOk, setXferOk] = useState('')
 
   async function cargar() {
     setReservas(await api<Reserva[]>('/reservas/sucursal'))
@@ -56,7 +68,20 @@ export function Encargado() {
   useEffect(() => {
     api<Sucursal[]>('/catalogo/sucursales').then((s) => {
       setSucursales(s)
-      setAlmacenId(s[0]?.almacenes[0]?.id ?? '')
+      const primer = s[0]?.almacenes[0]?.id ?? ''
+      setAlmacenId(primer)
+      setOrigenId(primer)
+      setDestinoId(s[0]?.almacenes[1]?.id ?? s[1]?.almacenes[0]?.id ?? primer)
+    })
+    api<Producto[]>('/catalogo/productos').then((productos) => {
+      const opts = productos.flatMap((p) =>
+        p.variantes.map((v) => ({
+          id: v.id,
+          label: `${p.nombre} · ${v.talla}/${v.color} (${v.sku})`,
+        })),
+      )
+      setVariantes(opts)
+      setXferVarianteId(opts[0]?.id ?? '')
     })
     cargar().catch(() => setMsg('No se cargó la bandeja'))
   }, [])
@@ -89,10 +114,47 @@ export function Encargado() {
     await cargar()
   }
 
+  async function transferir(e: FormEvent) {
+    e.preventDefault()
+    setXferError('')
+    setXferOk('')
+    try {
+      await api('/inventario/transferencias', {
+        method: 'POST',
+        body: JSON.stringify({
+          varianteId: xferVarianteId,
+          origenId,
+          destinoId,
+          cantidad: Number(xferCantidad),
+        }),
+      })
+      setXferOk('Transferencia realizada')
+      await cargar()
+    } catch (err) {
+      const codigo = err instanceof Error ? err.message : ''
+      const textos: Record<string, string> = {
+        MISMO_ALMACEN: 'El origen y el destino no pueden ser el mismo almacén.',
+        STOCK_INSUFICIENTE: 'No hay stock suficiente en el almacén de origen.',
+      }
+      setXferError(textos[codigo] ?? (codigo || 'No se pudo transferir'))
+    }
+  }
+
+  const opcionesAlmacen = sucursales.flatMap((s) =>
+    s.almacenes.map((a) => (
+      <option key={a.id} value={a.id}>
+        {s.nombre} · {a.nombre}
+      </option>
+    )),
+  )
+
   return (
     <section>
       <p className="eyebrow">Encargado de sucursal</p>
       <h2>Reservas, ventas y stock</h2>
+      <p>
+        <Link to="/despacho">Despachar pedidos →</Link>
+      </p>
       {msg ? <p className="ok">{msg}</p> : null}
       <div className="grid">
         {reservas.map((r) => (
@@ -141,6 +203,49 @@ export function Encargado() {
         {ventas.length === 0 ? <li className="muted">Sin ventas recientes</li> : null}
       </ul>
 
+      <form className="card col-form" onSubmit={transferir}>
+        <h3>Transferir stock</h3>
+        {xferOk ? <p className="ok">{xferOk}</p> : null}
+        {xferError ? <p className="error">{xferError}</p> : null}
+        <label>
+          Variante
+          <select
+            value={xferVarianteId}
+            onChange={(e) => setXferVarianteId(e.target.value)}
+            required
+          >
+            {variantes.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Almacén origen
+          <select value={origenId} onChange={(e) => setOrigenId(e.target.value)} required>
+            {opcionesAlmacen}
+          </select>
+        </label>
+        <label>
+          Almacén destino
+          <select value={destinoId} onChange={(e) => setDestinoId(e.target.value)} required>
+            {opcionesAlmacen}
+          </select>
+        </label>
+        <label>
+          Cantidad
+          <input
+            type="number"
+            min="1"
+            value={xferCantidad}
+            onChange={(e) => setXferCantidad(e.target.value)}
+            required
+          />
+        </label>
+        <button type="submit">Confirmar</button>
+      </form>
+
       <form className="card col-form" onSubmit={ajustar}>
         <h3>Ajuste de inventario</h3>
         <label>
@@ -150,13 +255,7 @@ export function Encargado() {
         <label>
           Almacén
           <select value={almacenId} onChange={(e) => setAlmacenId(e.target.value)}>
-            {sucursales.flatMap((s) =>
-              s.almacenes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {s.nombre} · {a.nombre}
-                </option>
-              )),
-            )}
+            {opcionesAlmacen}
           </select>
         </label>
         <label>

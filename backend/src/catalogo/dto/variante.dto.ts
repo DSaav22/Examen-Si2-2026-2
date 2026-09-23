@@ -39,4 +39,8 @@ export class ActualizarVarianteDto {
   @IsOptional()
   @IsString()
   urlOverlay?: string;
+
+  @IsOptional()
+  @IsString()
+  urlModelo?: string;
 }

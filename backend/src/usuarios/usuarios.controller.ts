@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -52,6 +53,12 @@ class PatchUsuarioDto {
   @IsOptional()
   @IsString()
   proveedorId?: string | null;
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  mayorista?: boolean;
 }
 
 @Controller('usuarios')
@@ -68,6 +75,8 @@ export class UsuariosController {
         email: true,
         nombre: true,
         rol: true,
+        activo: true,
+        mayorista: true,
         sucursalId: true,
         proveedorId: true,
         sucursal: true,
@@ -111,12 +120,16 @@ export class UsuariosController {
         ...(dto.proveedorId !== undefined
           ? { proveedorId: dto.proveedorId }
           : {}),
+        ...(dto.activo !== undefined ? { activo: dto.activo } : {}),
+        ...(dto.mayorista !== undefined ? { mayorista: dto.mayorista } : {}),
       },
       select: {
         id: true,
         email: true,
         nombre: true,
         rol: true,
+        activo: true,
+        mayorista: true,
         sucursalId: true,
         proveedorId: true,
       },

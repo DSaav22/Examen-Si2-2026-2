@@ -1,7 +1,7 @@
 ---
 tipo: concept
 fuentes: 3
-actualizado: 2026-09-22
+actualizado: 2026-09-23
 tags: [innovacion, ra, mvp]
 ---
 
@@ -32,9 +32,11 @@ MVP = cámara + pose + overlay **2D** de la variante; fallback foto de cuerpo co
 
 `GET /catalogo/variantes/:id/overlay`. Overlay SVG anclado al torso. Web `/probar/:id` (MediaPipe, toques, **foto de cuerpo** o demo) y Expo `movil/` (toques en hombros). [[UC03 Probador]]
 
-## Madurez real (22 sep)
+## Madurez real (23 sep, tarde)
 
-[[contexto-completo-proyecto]]: prototipo experimental. Cámara + superposición básica; **sin** tracking robusto, segmentación ni ajuste realista. **No presentar como módulo terminado** en la defensa. Frase: “spike / prototipo del UC03”. [[Estado del codigo]]
+Web: overlay 2D (MediaPipe o toques, o foto de cuerpo) y, si la variante tiene `urlModelo`, volumen CSS con giro, color y botón para volver al 2D. No es un archivo GLB ni Three.js. El blazer demo `VESTA-DEMO-001` ya trae modelo. El admin lo activa desde el probador. [[codigo-23-sep]]
+
+Expo sigue solo en 2D. No vender el móvil como probador 3D. [[Estado del codigo]]
 
 ## Relacionado
 

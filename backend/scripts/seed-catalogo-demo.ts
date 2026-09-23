@@ -41,6 +41,19 @@ async function main() {
       for (const almacen of almacenes) await prisma.stockAlmacen.upsert({ where: { varianteId_almacenId: { varianteId: variante.id, almacenId: almacen.id } }, update: { cantidad: 6 + ((index + almacen.id.length) % 8), reservado: 0 }, create: { varianteId: variante.id, almacenId: almacen.id, cantidad: 6 + ((index + almacen.id.length) % 8), reservado: 0 } });
     }
   }
+  await prisma.producto.update({
+    where: { id: stableId('producto-vesta-demo-1') },
+    data: { precioMayorista: 480, minimoMayorista: 3 },
+  });
+  await prisma.variante.updateMany({
+    where: { sku: { startsWith: 'VESTA-DEMO-001-' } },
+    data: { urlModelo: 'vesta-volumen' },
+  });
+  await prisma.cupon.upsert({
+    where: { codigo: 'VESTA10' },
+    update: { porcentaje: 10, activo: true, usoMaximo: 50 },
+    create: { codigo: 'VESTA10', porcentaje: 10, usoMaximo: 50 },
+  });
   console.log(`Catálogo demo cargado: ${products.length} productos femeninos, ${products.length * 2} variantes.`);
 }
 

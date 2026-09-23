@@ -70,6 +70,11 @@ export class AdminController {
 
   @Patch('opiniones/:id/moderacion')
   async moderarOpinion(@Param('id') id: string, @Body() body: { aprobar?: boolean }) {
-    return this.prisma.opinion.update({ where: { id }, data: { moderada: body.aprobar === true } });
+    const aprobar = body.aprobar === true
+    const opinion = aprobar
+      ? await this.prisma.opinion.update({ where: { id }, data: { moderada: true } })
+      : await this.prisma.opinion.delete({ where: { id } })
+    await this.prisma.auditoria.create({ data: { accion: aprobar ? 'opinion_publicada' : 'opinion_rechazada', recurso: id, detalle: 'moderacion' } })
+    return opinion
   }
 }

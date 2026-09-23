@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { PrismaClient, Rol } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { SPIKE_UUIDS } from '../src/spike-ids';
@@ -226,6 +227,14 @@ async function main() {
       fondoInicial: 200,
     },
   });
+
+  await prisma.cupon.upsert({
+    where: { codigo: 'VESTA10' },
+    update: { porcentaje: 10, activo: true, usoMaximo: 50 },
+    create: { codigo: 'VESTA10', porcentaje: 10, usoMaximo: 50 },
+  });
+
+  execSync('npx ts-node scripts/seed-catalogo-demo.ts', { stdio: 'inherit' });
 }
 
 main()

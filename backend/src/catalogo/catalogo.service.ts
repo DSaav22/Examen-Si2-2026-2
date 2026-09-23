@@ -282,6 +282,12 @@ export class CatalogoService {
         ...(dto.descuentoPct !== undefined
           ? { descuentoPct: dto.descuentoPct }
           : {}),
+        ...(dto.precioMayorista !== undefined
+          ? { precioMayorista: dto.precioMayorista }
+          : {}),
+        ...(dto.minimoMayorista !== undefined
+          ? { minimoMayorista: dto.minimoMayorista }
+          : {}),
         ...(dto.temporadaId !== undefined
           ? { temporadaId: dto.temporadaId }
           : {}),
@@ -323,6 +329,7 @@ export class CatalogoService {
       color: variante.color,
       urlOverlay: variante.urlOverlay || '/overlay-polera.png',
       producto: variante.producto.nombre,
+      urlModelo: variante.urlModelo,
     };
   }
 

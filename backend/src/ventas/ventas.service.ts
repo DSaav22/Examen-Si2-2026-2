@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { Canal, EstadoVenta, Prisma, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventarioService } from '../inventario/inventario.service';
@@ -32,6 +32,7 @@ export class VentasService {
       include: {
         lineas: { include: { variante: { include: { producto: true } } } },
         pago: true,
+        pedido: true,
         almacen: { include: { sucursal: true } },
       },
       orderBy: { creadaEn: 'desc' },
@@ -42,7 +43,7 @@ export class VentasService {
     return this.prisma.venta.findMany({
       where: {
         ...(sucursalId ? { almacen: { sucursalId } } : {}),
-        estado: { in: ['cobrada', 'pendiente_pago'] },
+        estado: { in: ['cobrada', 'pendiente_pago', 'devuelta', 'devuelta_parcial'] },
       },
       include: {
         lineas: { include: { variante: { include: { producto: true } } } },
@@ -74,8 +75,23 @@ export class VentasService {
     }
 
     const lineasConPrecio = await this.preciosDeLineas(dto);
-    const cupon = dto.cuponCodigo ? await this.prisma.cupon.findFirst({ where: { codigo: dto.cuponCodigo, activo: true, OR: [{ venceEn: null }, { venceEn: { gt: new Date() } }] } }) : null;
-    const pendientePago = dto.canal === Canal.online && dto.medioPago === 'qr';
+    const codigoCupon = dto.cuponCodigo?.trim();
+    const cupon = codigoCupon
+      ? await this.prisma.cupon.findFirst({
+          where: {
+            codigo: codigoCupon,
+            activo: true,
+            OR: [{ venceEn: null }, { venceEn: { gt: new Date() } }],
+          },
+        })
+      : null;
+    if (codigoCupon && !cupon) {
+      throw new ConflictException({ codigo: 'CUPON_INVALIDO' });
+    }
+    if (cupon?.usoMaximo != null && cupon.usado >= cupon.usoMaximo) {
+      throw new ConflictException({ codigo: 'CUPON_AGOTADO' });
+    }
+    const pendientePago = dto.medioPago === 'qr' || dto.medioPago === 'tarjeta';
 
     return this.prisma.$transaction(async (tx) => {
       if (dto.canal === Canal.pos && dto.cajaTurnoId) {
@@ -160,7 +176,13 @@ export class VentasService {
         0,
       );
       const total = Math.max(0, subtotal * (1 - (cupon ? Number(cupon.porcentaje) / 100 : 0)));
-      if (cupon) await tx.cupon.update({ where: { id: cupon.id }, data: { usado: { increment: 1 } } });
+      if (cupon) {
+        const fresco = await tx.cupon.findUnique({ where: { id: cupon.id } });
+        if (!fresco || (fresco.usoMaximo != null && fresco.usado >= fresco.usoMaximo)) {
+          throw new ConflictException({ codigo: 'CUPON_AGOTADO' });
+        }
+        await tx.cupon.update({ where: { id: cupon.id }, data: { usado: { increment: 1 } } });
+      }
 
       const estado: EstadoVenta = pendientePago ? 'pendiente_pago' : 'cobrada';
 
@@ -190,7 +212,7 @@ export class VentasService {
           data: {
             ventaId: venta.id,
             estado: 'pendiente',
-            referencia: `QR-${venta.id.slice(0, 8)}`,
+            referencia: `PRUEBA-${dto.medioPago}-${venta.id.slice(0, 8)}`,
           },
         });
         for (const [varianteId, cantidad] of pedidas) {
@@ -226,6 +248,14 @@ export class VentasService {
       }
 
       await tx.auditoria.create({ data: { accion: 'venta_creada', recurso: venta.id, detalle: dto.canal, usuarioId: actor?.id ?? dto.clientaId } });
+
+      if (estado === 'cobrada' && dto.canal === 'online' && dto.clientaId) {
+        await this.abrirPedido(tx, {
+          id: venta.id,
+          clientaId: dto.clientaId,
+          total,
+        });
+      }
 
       return tx.venta.findUniqueOrThrow({
         where: { id: venta.id },
@@ -270,6 +300,10 @@ export class VentasService {
   }
 
   private async preciosDeLineas(dto: CrearVentaDto) {
+    const clienta = dto.clientaId
+      ? await this.prisma.usuario.findUnique({ where: { id: dto.clientaId } })
+      : null;
+    const mayorista = !!clienta?.mayorista;
     const variantes = await this.prisma.variante.findMany({
       where: { id: { in: dto.lineas.map((l) => l.varianteId) } },
       include: { producto: true },
@@ -281,14 +315,24 @@ export class VentasService {
       if (!variante) {
         throw new StockInsuficienteError(linea.varianteId);
       }
-      const base = Number(variante.producto.precioBase);
+      const producto = variante.producto;
+      const base = Number(producto.precioBase);
       const desc =
-        Math.min(100, Math.max(0, Number(variante.producto.descuentoPct))) /
-        100;
+        Math.min(100, Math.max(0, Number(producto.descuentoPct))) / 100;
+      const detalle = Math.round(base * (1 - desc) * 100) / 100;
+      const mayor =
+        producto.precioMayorista != null
+          ? Number(producto.precioMayorista)
+          : null;
+      const usaMayorista =
+        mayorista &&
+        mayor != null &&
+        producto.minimoMayorista > 0 &&
+        linea.cantidad >= producto.minimoMayorista;
       return {
         varianteId: linea.varianteId,
         cantidad: linea.cantidad,
-        precioUnitario: Math.round(base * (1 - desc) * 100) / 100,
+        precioUnitario: usaMayorista ? mayor : detalle,
       };
     });
   }
@@ -327,5 +371,28 @@ export class VentasService {
         linea.varianteId === b[i].varianteId &&
         linea.cantidad === b[i].cantidad,
     );
+  }
+
+  async abrirPedido(
+    tx: Tx,
+    venta: { id: string; clientaId: string; total: Prisma.Decimal | number },
+  ) {
+    const existe = await tx.pedido.findUnique({ where: { ventaId: venta.id } });
+    if (existe) return existe;
+    const direccion = await tx.direccionCliente.findFirst({
+      where: { usuarioId: venta.clientaId },
+      orderBy: { id: 'desc' },
+    });
+    return tx.pedido.create({
+      data: {
+        usuarioId: venta.clientaId,
+        ventaId: venta.id,
+        total: venta.total,
+        estado: 'pendiente',
+        direccion: direccion
+          ? `${direccion.etiqueta}: ${direccion.detalle}, ${direccion.ciudad}`
+          : '',
+      },
+    });
   }
 }

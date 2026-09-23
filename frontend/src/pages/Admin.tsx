@@ -9,7 +9,9 @@ type Usuario = {
   email: string
   nombre: string
   rol: Rol
+  activo: boolean
   sucursalId?: string | null
+  mayorista?: boolean
 }
 
 type Nom = { id: string; nombre: string }
@@ -136,10 +138,48 @@ export function Admin() {
         </select>
         <button type="submit">Crear (clave diego)</button>
       </form>
-      <ul>
+      <ul className="user-admin-list">
         {usuarios.map((u) => (
-          <li key={u.id}>
-            {u.nombre} · {u.email} · {u.rol}
+          <li key={u.id} className={u.activo ? '' : 'is-inactive'}>
+            <div>
+              <input aria-label={`Nombre de ${u.email}`} value={u.nombre} onChange={(e) => setUsuarios(items => items.map(item => item.id === u.id ? { ...item, nombre: e.target.value } : item))} />
+              <span>{u.email}</span>
+            </div>
+            <select
+              aria-label={`Rol de ${u.nombre}`}
+              value={u.rol}
+              onChange={(e) => setUsuarios(items => items.map(item => item.id === u.id ? { ...item, rol: e.target.value as Rol } : item))}
+            >
+              <option value="CAJERO">CAJERO</option>
+              <option value="ENCARGADO">ENCARGADO</option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="PROVEEDOR">PROVEEDOR</option>
+              <option value="CLIENTA">CLIENTA</option>
+              <option value="VENDEDOR">VENDEDOR</option>
+              <option value="SUPERADMIN">SUPERADMIN</option>
+            </select>
+            <button
+              type="button"
+              className="ui-button ui-button--secondary"
+              onClick={() => setUsuarios(items => items.map(item => item.id === u.id ? { ...item, activo: !item.activo } : item))}
+            >
+              {u.activo ? 'Activa' : 'Desactivada'}
+            </button>
+            <button
+              type="button"
+              className="ui-button ui-button--secondary"
+              aria-pressed={Boolean(u.mayorista)}
+              onClick={() => setUsuarios(items => items.map(item => item.id === u.id ? { ...item, mayorista: !item.mayorista } : item))}
+            >
+              {u.mayorista ? 'Mayorista' : 'Detalle'}
+            </button>
+            <button
+              type="button"
+              className="ui-button ui-button--primary"
+              onClick={() => void api(`/usuarios/${u.id}`, { method: 'PATCH', body: JSON.stringify({ nombre: u.nombre, rol: u.rol, activo: u.activo, mayorista: Boolean(u.mayorista) }) }).then(() => setMsg(`${u.nombre} actualizado`)).catch(() => setMsg('No se guardó el usuario'))}
+            >
+              Guardar
+            </button>
           </li>
         ))}
       </ul>

@@ -8,5 +8,5 @@ services:
     host: appservice
   web:
     project: ./frontend
-    language: ts
-    host: staticwebapp
+    language: js
+    host: appservice

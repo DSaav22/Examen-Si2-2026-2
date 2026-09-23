@@ -11,10 +11,14 @@
             "id": "a6d26e16a241f0eb",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Vista gráfica"
+              "type": "markdown",
+              "state": {
+                "file": "wiki/concepts/Stack del parcial.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Stack del parcial"
             }
           }
         ]
@@ -181,8 +185,9 @@
       "bases:Crear nueva base": false
     }
   },
-  "active": "7b19f284da2b89f0",
+  "active": "a6d26e16a241f0eb",
   "lastOpenFiles": [
+    "wiki/sources/codigo-23-sep.md",
     "raw/inbox/Examen SI2 1.pdf.crswap",
     "raw/inbox/Examen SI2 1.pdf",
     "Sin nombre",
@@ -200,7 +205,6 @@
     "raw/_join_tatiana_toc.py",
     "raw/_extract-toc-examen-si2-1.txt",
     "raw/_extract-collapsed-examen-si2-1.txt",
-    "raw/_collapse_tatiana.py",
     "AGENTS.md",
     "raw/inbox/Contexto completo del proyecto.md",
     "wiki/log.md",
