@@ -536,6 +536,40 @@ body { min-width: 320px; overflow-x: hidden; }
 @media (max-width: 900px) { .home-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 699px) { .home-hero { height: 570px; min-height: 0; }.home-hero > img { object-position: 62% center; }.home-hero-copy { right: 22px; bottom: 34px; left: 22px; }.home-hero-copy h1 { font-size: 46px; }.home-campaign { display: grid; gap: .2rem; }.home-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem .4rem; }.home-section-heading h2 { font-size: 1.8rem; }.occasion-grid { grid-template-columns: repeat(2, 1fr); }.occasion-card { min-height: 160px; }.home-editorial, .home-look { grid-template-columns: 1fr; }.home-editorial-image, .home-look-image { min-height: 300px; }.home-benefits { grid-template-columns: repeat(2, 1fr); row-gap: 1.5rem; } }
 
+/* Ajustes de composición del storefront según la referencia editorial. */
+.shell-full-bleed {
+  width: 100vw;
+  max-width: none;
+  margin-left: calc(50% - 50vw);
+  padding: 0;
+}
+.shell-full-bleed .vesta-home,
+.shell-full-bleed .catalog-page { margin: 0; }
+.home-hero { width: 100%; min-height: min(700px, 75vh); }
+.home-hero > img { object-position: center center; }
+.shell-link,
+.shell-icon-button,
+.branch-selector,
+.shell-topbar .theme-toggle { transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.shell-link:hover,
+.shell-link:focus-visible { padding-inline: .75rem; border-radius: 999px; color: #fff; background: rgba(255,255,255,.14); box-shadow: 0 6px 18px rgba(0,0,0,.22); }
+.shell-icon-button:hover,
+.shell-icon-button:focus-visible,
+.shell-topbar .theme-toggle:hover,
+.shell-topbar .theme-toggle:focus-visible { color: #fff; background: rgba(255,255,255,.14); box-shadow: 0 8px 20px rgba(0,0,0,.3); transform: translateY(-1px); }
+.branch-selector:hover,
+.branch-selector:focus-within { background: rgba(255,255,255,.12); box-shadow: 0 8px 20px rgba(0,0,0,.28); }
+.shell-actions .branch-selector { position: relative; min-height: 40px; padding: .35rem .55rem; border-radius: 4px; }
+.shell-actions .branch-selector select { width: auto; min-width: 92px; min-height: 30px; padding: .2rem 1.4rem .2rem .4rem; border: 0; border-radius: 2px; color: #fff; background: transparent; appearance: none; cursor: pointer; }
+.shell-actions .branch-selector select option { color: #fff; background: #111; }
+.shell-actions .branch-selector .shell-icon { pointer-events: none; }
+.shell-topbar .brand-mark:hover { text-shadow: 0 4px 16px rgba(255,255,255,.25); }
+
+@media (max-width: 760px) {
+  .shell-full-bleed { width: 100%; margin-left: 0; }
+  .home-hero { min-height: 570px; }
+}
+
 /* Catálogo Vesta */
 .catalog-page { margin: calc(clamp(1rem, 3vw, 2.5rem) * -1); }
 .catalog-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding: 2.5rem clamp(1rem, 3vw, 2rem) 1.5rem; }
