@@ -1,4 +1,4 @@
-export type Rol = 'ADMIN' | 'CAJERO' | 'CLIENTA' | 'ENCARGADO' | 'PROVEEDOR'
+export type Rol = 'ADMIN' | 'CAJERO' | 'CLIENTA' | 'ENCARGADO' | 'PROVEEDOR' | 'VENDEDOR' | 'RRHH' | 'SUPERADMIN'
 
 export type User = {
   id: string
@@ -86,6 +86,15 @@ export function homePorRol(rol: Rol) {
   if (rol === 'PROVEEDOR') return '/proveedor'
   if (rol === 'ADMIN') return '/admin'
   return '/inicio'
+}
+
+/** El backend oculta cantidades al cliente y expone solo disponibilidad/estado. */
+export function stockDisponible(stock: Variante['stocks'][number]) {
+  return stock.disponible ?? (stock.cantidad - (stock.reservado ?? 0) > 0)
+}
+
+export function stockCapacidad(stock: Variante['stocks'][number]) {
+  return stock.cantidad > 0 ? Math.max(0, stock.cantidad - (stock.reservado ?? 0)) : stockDisponible(stock) ? 1 : 0
 }
 
 export type CatalogPage = {

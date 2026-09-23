@@ -74,6 +74,7 @@ export class VentasService {
     }
 
     const lineasConPrecio = await this.preciosDeLineas(dto);
+    const cupon = dto.cuponCodigo ? await this.prisma.cupon.findFirst({ where: { codigo: dto.cuponCodigo, activo: true, OR: [{ venceEn: null }, { venceEn: { gt: new Date() } }] } }) : null;
     const pendientePago = dto.canal === Canal.online && dto.medioPago === 'qr';
 
     return this.prisma.$transaction(async (tx) => {
@@ -154,10 +155,12 @@ export class VentasService {
         }
       }
 
-      const total = lineasConPrecio.reduce(
+      const subtotal = lineasConPrecio.reduce(
         (acc, l) => acc + l.precioUnitario * l.cantidad,
         0,
       );
+      const total = Math.max(0, subtotal * (1 - (cupon ? Number(cupon.porcentaje) / 100 : 0)));
+      if (cupon) await tx.cupon.update({ where: { id: cupon.id }, data: { usado: { increment: 1 } } });
 
       const estado: EstadoVenta = pendientePago ? 'pendiente_pago' : 'cobrada';
 
@@ -221,6 +224,8 @@ export class VentasService {
           data: { totalSistema: { increment: total } },
         });
       }
+
+      await tx.auditoria.create({ data: { accion: 'venta_creada', recurso: venta.id, detalle: dto.canal, usuarioId: actor?.id ?? dto.clientaId } });
 
       return tx.venta.findUniqueOrThrow({
         where: { id: venta.id },

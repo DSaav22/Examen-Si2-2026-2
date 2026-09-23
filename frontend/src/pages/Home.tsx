@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { assetUrl } from '../asset'
 import type { Producto, Sucursal, Variante } from '../types'
-import { precioEfectivo } from '../types'
+import { precioEfectivo, stockCapacidad, stockDisponible } from '../types'
 import { storefrontHeroImage } from '../shared/vestaAssets'
 import { useStorefront } from '../storefront'
 
@@ -38,28 +38,27 @@ function ProductRail({ title, eyebrow, products, onAdd }: { title: string; eyebr
 
 function stockAvailable(product: Producto) {
   return product.variantes.some(variant => variant.stocks.some(stock => {
-    const available = stock.cantidad - (stock.reservado ?? 0)
-    return available > 0 && available <= 2
+    return stock.estado === 'ultimas_unidades' || (stockDisponible(stock) && stock.cantidad > 0 && stock.cantidad <= 2)
   }))
 }
 
 export function Home() {
   const { recent, addToCart } = useStorefront()
   const [products, setProducts] = useState<Producto[]>([])
+  const [bestSellers, setBestSellers] = useState<Producto[]>([])
   const [branches, setBranches] = useState<Sucursal[]>([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    Promise.all([api<Producto[]>('/catalogo/productos'), api<Sucursal[]>('/catalogo/sucursales')]).then(([items, locations]) => { setProducts(items); setBranches(locations) }).catch(() => setError('No pudimos cargar la selección.'))
+    Promise.all([api<Producto[]>('/catalogo/productos'), api<Sucursal[]>('/catalogo/sucursales'), api<Producto[]>('/catalogo/productos?ordenar=popularidad'), api<Producto[]>('/catalogo/productos?ordenar=novedades')]).then(([items, locations, popular, newestItems]) => { setProducts(newestItems.length ? newestItems : items); setBranches(locations); setBestSellers(popular.slice(0, 4)) }).catch(() => setError('No pudimos cargar la selección.'))
   }, [])
 
   const newest = products.slice(0, 5)
-  const bestSellers = products.slice(0, 4)
   const lowStock = products.filter(stockAvailable).slice(-4)
   const recentProducts = useMemo(() => recent.map(id => products.find(product => product.id === id)).filter((product): product is Producto => Boolean(product)), [products, recent])
-  const look = products.slice(0, 3).filter(product => product.variantes.some(variant => variant.stocks.some(stock => stock.cantidad - (stock.reservado ?? 0) > 0)))
-  const add = (product: Producto, variant: Variante) => { const maxStock = variant.stocks.reduce((total, stock) => total + Math.max(0, stock.cantidad - (stock.reservado ?? 0)), 0); setMessage(addToCart({ productoId: product.id, nombre: product.nombre, precio: precioEfectivo(product), varianteId: variant.id, talla: variant.talla, color: variant.color }, maxStock) ? `${product.nombre} se añadió a tu bolsa.` : 'No puedes superar el stock disponible.') }
+  const look = products.slice(0, 3).filter(product => product.variantes.some(variant => variant.stocks.some(stockDisponible)))
+  const add = (product: Producto, variant: Variante) => { const maxStock = variant.stocks.reduce((total, stock) => total + stockCapacidad(stock), 0); setMessage(addToCart({ productoId: product.id, nombre: product.nombre, precio: precioEfectivo(product), varianteId: variant.id, talla: variant.talla, color: variant.color }, maxStock) ? `${product.nombre} se añadió a tu bolsa.` : 'No puedes superar el stock disponible.') }
   const branch = branches.find(item => item.id === localStorage.getItem('ensayar_sucursal')) ?? branches[0]
 
   return <div className="vesta-home"><div className="home-countdown-live"><span>Oferta activa</span> <HomeCountdown /></div>
@@ -71,9 +70,9 @@ export function Home() {
     <ProductRail eyebrow="Última oportunidad" title="Quedan pocas unidades" products={lowStock} onAdd={add} />
     <section className="home-section home-occasions"><div className="home-section-heading"><div><p className="eyebrow">Descubre por ocasión</p><h2>Vestir cada momento</h2></div></div><div className="occasion-grid">{['Trabajo', 'Fiesta', 'Casual', 'Temporada'].map((occasion, index) => <Link key={occasion} to={`/catalogo?ocasion=${occasion.toLowerCase()}`} className={`occasion-card occasion-card-${index + 1}`}><span>{occasion}</span><b>Explorar →</b></Link>)}</div></section>
     <section className="home-editorial"><div className="home-editorial-image"><img src={heroImage} alt="Selección editorial Vesta" /></div><div className="home-editorial-copy"><p className="eyebrow">Vesta Journal · 01</p><h2>Vestir menos.<br />Elegir mejor.</h2><p>Una historia editorial de tonos serenos, cortes amplios y prendas que permanecen.</p><Link className="hero-cta" to="/catalogo">Leer la historia</Link></div></section>
-    <section className="home-look"><div className="home-look-image"><img src={heroImage} alt="Look de sastrería tonal" /></div><div className="home-look-copy"><p className="eyebrow">Compra el look</p><h2>Sastrería tonal</h2><p>Combina piezas de la selección y construye un uniforme contemporáneo.</p><div className="home-look-list">{look.map(product => <div key={product.id}><span>{product.nombre}</span><b>Bs {precioEfectivo(product).toFixed(0)}</b></div>)}</div><button className="ui-button ui-button--primary" type="button" disabled={!look.some(product => product.variantes[0])} onClick={() => look.forEach(product => { if (product.variantes[0]) add(product, product.variantes[0]) })}>Añadir look disponible</button></div></section>
+    <section className="home-look"><div className="home-look-image"><img src={heroImage} alt="Look de sastrería tonal" /></div><div className="home-look-copy"><p className="eyebrow">Compra el look</p><h2>Sastrería tonal</h2><p>Combina piezas de la selección y construye un uniforme contemporáneo.</p><div className="home-look-list">{look.map(product => <div key={product.id}><span>{product.nombre}</span><b>Bs {precioEfectivo(product).toFixed(0)}</b></div>)}</div><button className="ui-button ui-button--primary" type="button" disabled={look.length < 3} onClick={() => { if (look.length === 3) look.forEach(product => { if (product.variantes[0]) add(product, product.variantes[0]) }) }}>Añadir look completo</button></div></section>
     {recentProducts.length ? <ProductRail eyebrow="Vistos recientemente" title="Continúa donde lo dejaste" products={recentProducts} onAdd={add} /> : null}
-    <section className="home-benefits" aria-label="Beneficios de compra"><div><span>↗</span><strong>Envío nacional</strong></div><div><span>⌂</span><strong>Retiro en tienda</strong></div><div><span>↻</span><strong>Cambios simples</strong></div><div><span>▣</span><strong>Compra segura</strong></div></section>
+    <section className="home-benefits" aria-label="Beneficios de compra"><div><span aria-hidden="true">↗</span><strong>Envío nacional</strong></div><div><span aria-hidden="true">⌂</span><strong>Retiro en tienda</strong></div><div><span aria-hidden="true">↻</span><strong>Cambios simples</strong></div><div><span aria-hidden="true">▣</span><strong>Compra segura</strong></div></section><section className="home-customer-care" aria-label="Atención al cliente"><p className="eyebrow">Estamos para ayudarte</p><h2>Atención Vesta</h2><p>Consulta disponibilidad, cambios y retiro en tienda con nuestro equipo.</p><a className="ui-button ui-button--secondary" href="mailto:hola@vesta.local">Contactar atención</a></section>
     {branch ? <p className="home-branch">Sucursal seleccionada: <strong>{branch.nombre}</strong> · {branch.ciudad}</p> : null}
   </div>
 }

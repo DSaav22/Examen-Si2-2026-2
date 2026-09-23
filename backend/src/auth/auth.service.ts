@@ -52,6 +52,7 @@ export class AuthService {
     if (!ok) {
       throw new UnauthorizedException({ codigo: 'CREDENCIALES' });
     }
+    await this.prisma.auditoria.create({ data: { accion: 'login', recurso: 'auth', detalle: usuario.id } });
     const payload: JwtPayload = {
       sub: usuario.id,
       email: usuario.email,
@@ -75,6 +76,15 @@ export class AuthService {
         proveedorId: true,
       },
     });
+  }
+
+  async cambiarClave(userId: string, actual: string, nueva: string) {
+    const usuario = await this.prisma.usuario.findUniqueOrThrow({ where: { id: userId } });
+    if (!(await bcrypt.compare(actual, usuario.passwordHash))) throw new UnauthorizedException({ codigo: 'CREDENCIALES' });
+    const passwordHash = await bcrypt.hash(nueva, 10);
+    await this.prisma.usuario.update({ where: { id: userId }, data: { passwordHash } });
+    await this.prisma.auditoria.create({ data: { accion: 'cambio_clave', recurso: 'auth', usuarioId: userId } });
+    return { ok: true };
   }
 
   async logout(token: string) {

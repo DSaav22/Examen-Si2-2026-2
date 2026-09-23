@@ -5,12 +5,16 @@ import { assetUrl } from '../asset'
 import { useAuth } from '../auth'
 import { useStorefront } from '../storefront'
 import type { Producto, Sucursal, Variante } from '../types'
-import { precioEfectivo } from '../types'
+import { precioEfectivo, stockCapacidad, stockDisponible } from '../types'
 
 const internalRoles = ['ADMIN', 'CAJERO', 'ENCARGADO']
 
 function ProductMetadata({ product }: { product: Producto }) {
-  return <section className="detail-metadata" aria-label="Información editorial del producto"><strong>{product.modelo || 'Modelo Vesta'}</strong><span>Ajuste: {product.ajuste || 'relajado'}</span><span>Material: {product.material || 'selección textil'}</span><span>Composición: {product.composicion || 'consultar etiqueta'}</span><span>Cuidados: {product.cuidados || 'seguir instrucciones de la prenda'}</span><span>Origen: {product.origen || 'Bolivia'}</span></section>
+  return <><section className="detail-metadata" aria-label="Información editorial del producto"><strong>{product.modelo || 'Modelo Vesta'}</strong><span>Ajuste: {product.ajuste || 'relajado'}</span><span>Material: {product.material || 'selección textil'}</span><span>Composición: {product.composicion || 'consultar etiqueta'}</span><span>Cuidados: {product.cuidados || 'seguir instrucciones de la prenda'}</span><span>Origen: {product.origen || 'Bolivia'}</span></section><SizeGuide /></>
+}
+
+function SizeGuide() {
+  return <details className="detail-size-guide"><summary>Guía de medidas</summary><p>Usa una prenda similar y mide sobre una superficie plana.</p><table><thead><tr><th>Talla</th><th>Busto</th><th>Cintura</th><th>Cadera</th></tr></thead><tbody><tr><td>S</td><td>84–88 cm</td><td>66–70 cm</td><td>92–96 cm</td></tr><tr><td>M</td><td>89–94 cm</td><td>71–76 cm</td><td>97–102 cm</td></tr><tr><td>L</td><td>95–101 cm</td><td>77–84 cm</td><td>103–109 cm</td></tr></tbody></table></details>
 }
 
 function OpinionsPanel({ productId, canReview, onMessage }: { productId: string; canReview: boolean; onMessage: (message: string) => void }) {
@@ -27,11 +31,11 @@ function AlertButtons({ productId, onMessage }: { productId: string; onMessage: 
 }
 
 function available(variant: Variante) {
-  return variant.stocks.some(stock => stock.disponible ?? stock.cantidad - (stock.reservado ?? 0) > 0)
+  return variant.stocks.some(stockDisponible)
 }
 
 function lowStock(variant: Variante) {
-  return variant.stocks.some(stock => stock.estado === 'ultimas_unidades' || (stock.cantidad > 0 && stock.cantidad - (stock.reservado ?? 0) <= 2))
+  return variant.stocks.some(stock => stock.estado === 'ultimas_unidades')
 }
 
 function ProductImage({ src, alt, zoom, onError }: { src: string; alt: string; zoom: boolean; onError: () => void }) {
@@ -50,6 +54,7 @@ export function Ficha() {
     const first = current.variantes[0]; setSelectedVariantId(first?.id ?? ''); setSelectedImage(first?.urlFoto ?? '')
     const candidates = await api<Producto[]>(`/catalogo/productos?categoria=${encodeURIComponent(current.categoria)}`)
     setRelated(candidates.filter(item => item.id !== current.id).slice(0, 4))
+    api<Producto[]>(`/catalogo/productos/${current.id}/complementarios`).then(items => setRelated(currentItems => [...currentItems, ...items].slice(0, 6))).catch(() => undefined)
   }
 
   useEffect(() => { load().then(() => { if (id) rememberProduct(id) }).catch(() => setError('No se encontró la prenda.')); api<Sucursal[]>('/catalogo/sucursales').then(items => { setBranches(items); setWarehouseId(items[0]?.almacenes[0]?.id ?? '') }).catch(() => undefined) }, [id, internal])
@@ -59,11 +64,11 @@ export function Ficha() {
   const sizes = useMemo(() => Array.from(new Set(product?.variantes.map(variant => variant.talla) ?? [])), [product])
   const gallery = useMemo(() => Array.from(new Set(product?.variantes.map(variant => variant.urlFoto).filter(Boolean) ?? [])), [product])
   const productAvailability = selectedVariant ? available(selectedVariant) : false
-  const pickupAvailable = selectedVariant?.stocks.some(stock => stock.disponible ?? stock.cantidad - (stock.reservado ?? 0) > 0) ?? false
+  const pickupAvailable = selectedVariant?.stocks.some(stockDisponible) ?? false
 
   function selectColor(color: string) { const next = product?.variantes.find(variant => variant.color === color && (variant.talla === selectedVariant?.talla || available(variant))) ?? product?.variantes.find(variant => variant.color === color); if (next) { setSelectedVariantId(next.id); setSelectedImage(next.urlFoto) } }
   function selectSize(size: string) { const next = product?.variantes.find(variant => variant.talla === size && variant.color === selectedVariant?.color); if (next) { setSelectedVariantId(next.id); setSelectedImage(next.urlFoto) } }
-  function addSelected() { if (!product || !selectedVariant || !productAvailability) return; const maxStock = selectedVariant.stocks.reduce((total, stock) => total + Math.max(0, stock.cantidad - (stock.reservado ?? 0)), 0); setMessage(addToCart({ productoId: product.id, nombre: product.nombre, precio: precioEfectivo(product), varianteId: selectedVariant.id, talla: selectedVariant.talla, color: selectedVariant.color }, maxStock) ? 'La prenda se añadió a tu bolsa.' : 'No puedes superar el stock disponible.') }
+  function addSelected() { if (!product || !selectedVariant || !productAvailability) return; const maxStock = selectedVariant.stocks.reduce((total, stock) => total + stockCapacidad(stock), 0); setMessage(addToCart({ productoId: product.id, nombre: product.nombre, precio: precioEfectivo(product), varianteId: selectedVariant.id, talla: selectedVariant.talla, color: selectedVariant.color }, maxStock) ? 'La prenda se añadió a tu bolsa.' : 'No puedes superar el stock disponible.') }
   async function share() { const url = window.location.href; try { await navigator.clipboard.writeText(url); setMessage('Enlace copiado al portapapeles.') } catch { setMessage(url) } }
   async function ask(event: FormEvent) { event.preventDefault(); if (!product) return; try { const result = await api<{ respuesta: string }>('/ia/ficha', { method: 'POST', body: JSON.stringify({ productoId: product.id, pregunta: question }) }); setMessage(result.respuesta) } catch { setError('No se pudo consultar la ficha.') } }
   async function saveProduct(event: FormEvent) { event.preventDefault(); if (!product) return; try { await api(`/catalogo/productos/${product.id}`, { method: 'PATCH', body: JSON.stringify({ nombre: editName, descripcion: editDescription, precioBase: Number(editPrice), descuentoPct: Number(editDiscount) }) }); setMessage('Producto actualizado.'); await load() } catch { setError('No se guardó el producto.') } }

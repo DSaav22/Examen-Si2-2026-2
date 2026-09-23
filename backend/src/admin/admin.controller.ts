@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { Rol } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -35,7 +35,7 @@ const schema = [
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Rol.ADMIN)
+@Roles(Rol.ADMIN, Rol.SUPERADMIN)
 export class AdminController {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -63,5 +63,13 @@ export class AdminController {
       this.prisma.empleado.count(), this.prisma.eventoAnalitica.count(), this.prisma.operacionSync.count(),
     ]);
     return { pedidos, cupones, opiniones, empleados, eventos, sync };
+  }
+
+  @Get('opiniones/pendientes')
+  opinionesPendientes() { return this.prisma.opinion.findMany({ where: { moderada: false }, include: { producto: { select: { nombre: true } }, usuario: { select: { nombre: true, email: true } } }, orderBy: { creadaEn: 'asc' } }); }
+
+  @Patch('opiniones/:id/moderacion')
+  async moderarOpinion(@Param('id') id: string, @Body() body: { aprobar?: boolean }) {
+    return this.prisma.opinion.update({ where: { id }, data: { moderada: body.aprobar === true } });
   }
 }

@@ -1,7 +1,7 @@
 export type VentaCola = {
   uuid: string
   canal: 'pos'
-  medioPago: 'efectivo' | 'qr'
+  medioPago: 'efectivo' | 'qr' | 'tarjeta' | 'transferencia' | 'mixto'
   almacenId: string
   cajaTurnoId: string
   lineas: { varianteId: string; cantidad: number }[]
@@ -15,6 +15,7 @@ const DEVICE_KEY = 'ensayar_device_id'
 const DB_NAME = 'ensayar-pos-offline'
 const STORE = 'operaciones'
 const CATALOGO_KEY = 'ensayar_catalogo_offline'
+const INVENTARIO_KEY = 'ensayar_inventario_offline'
 
 export function deviceId() {
   let id = localStorage.getItem(DEVICE_KEY)
@@ -59,5 +60,12 @@ export function marcarFallo(uuid: string, error: string) {
   localStorage.setItem(CLAVE, JSON.stringify(cola)); const item = cola.find(value => value.uuid === uuid); if (item) void saveLocal(item)
 }
 
+export function marcarEstado(uuid: string, estado: NonNullable<VentaCola['estado']>, error = '') {
+  const cola = leerCola().map(item => item.uuid === uuid ? { ...item, estado, ultimoError: error } : item)
+  localStorage.setItem(CLAVE, JSON.stringify(cola)); const item = cola.find(value => value.uuid === uuid); if (item) void saveLocal(item)
+}
+
 export function guardarCatalogoOffline<T>(items: T[]) { localStorage.setItem(CATALOGO_KEY, JSON.stringify(items)) }
 export function leerCatalogoOffline<T>(): T[] { try { return JSON.parse(localStorage.getItem(CATALOGO_KEY) ?? '[]') as T[] } catch { return [] } }
+export function guardarInventarioOffline(items: Record<string, number>) { localStorage.setItem(INVENTARIO_KEY, JSON.stringify(items)) }
+export function leerInventarioOffline(): Record<string, number> { try { return JSON.parse(localStorage.getItem(INVENTARIO_KEY) ?? '{}') as Record<string, number> } catch { return {} } }

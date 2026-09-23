@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider } from './auth'
+import type { ReactNode } from 'react'
+import { AuthProvider, useAuth } from './auth'
 import { StorefrontProvider } from './storefront'
 import { Favoritos } from './pages/Favoritos'
 import { AdminDashboard } from './pages/AdminDashboard'
@@ -7,6 +8,7 @@ import { DatabaseExplorer } from './pages/DatabaseExplorer'
 import { Admin } from './pages/Admin'
 import { Carrito } from './pages/Carrito'
 import { Catalogo } from './pages/Catalogo'
+import { Cuenta } from './pages/Cuenta'
 import { Encargado } from './pages/Encargado'
 import { Ficha } from './pages/Ficha'
 import { Historial } from './pages/Historial'
@@ -18,7 +20,14 @@ import { ProveedorPortal } from './pages/ProveedorPortal'
 import { Registro } from './pages/Registro'
 import { Reportes } from './pages/Reportes'
 import { Reservas } from './pages/Reservas'
-import { Shell, ShellPlaceholder } from './pages/Shell'
+import { Shell } from './pages/Shell'
+
+function ProtectedRoute({ roles, children }: { roles?: string[]; children: ReactNode }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  if (roles && !roles.includes(user.rol)) return <Navigate to="/inicio" replace />
+  return <>{children}</>
+}
 
 export default function App() {
   return (
@@ -32,18 +41,18 @@ export default function App() {
             <Route path="/inicio" element={<Home />} />
             <Route path="/catalogo" element={<Catalogo />} />
             <Route path="/favoritos" element={<Favoritos />} />
-            <Route path="/cuenta" element={<ShellPlaceholder title="Mi cuenta" description="El área de cuenta está preparada para conectar preferencias, pedidos y fidelización." />} />
-            <Route path="/base-datos" element={<DatabaseExplorer />} />
+            <Route path="/cuenta" element={<Cuenta />} />
+            <Route path="/base-datos" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN']}><DatabaseExplorer /></ProtectedRoute>} />
             <Route path="/ficha/:id" element={<Ficha />} />
             <Route path="/carrito" element={<Carrito />} />
-            <Route path="/reservas" element={<Reservas />} />
-            <Route path="/historial" element={<Historial />} />
-            <Route path="/pos" element={<Pos />} />
-            <Route path="/encargado" element={<Encargado />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/configuracion" element={<Admin />} />
-            <Route path="/proveedor" element={<ProveedorPortal />} />
-            <Route path="/reportes" element={<Reportes />} />
+            <Route path="/reservas" element={<ProtectedRoute roles={['CLIENTA', 'ADMIN', 'CAJERO', 'ENCARGADO']}><Reservas /></ProtectedRoute>} />
+            <Route path="/historial" element={<ProtectedRoute roles={['CLIENTA', 'ADMIN', 'CAJERO', 'ENCARGADO']}><Historial /></ProtectedRoute>} />
+            <Route path="/pos" element={<ProtectedRoute roles={['CAJERO', 'ENCARGADO', 'ADMIN', 'VENDEDOR']}><Pos /></ProtectedRoute>} />
+            <Route path="/encargado" element={<ProtectedRoute roles={['ENCARGADO', 'ADMIN', 'SUPERADMIN']}><Encargado /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN']}><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/configuracion" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN']}><Admin /></ProtectedRoute>} />
+            <Route path="/proveedor" element={<ProtectedRoute roles={['PROVEEDOR', 'ADMIN']}><ProveedorPortal /></ProtectedRoute>} />
+            <Route path="/reportes" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN', 'ENCARGADO']}><Reportes /></ProtectedRoute>} />
             <Route path="/probar/:varianteId" element={<Probador />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />

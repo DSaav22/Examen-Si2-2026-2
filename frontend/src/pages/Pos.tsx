@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { encolar, guardarCatalogoOffline, hidratarCola, leerCatalogoOffline, leerCola, sacarDeCola, type VentaCola } from '../cola-pos'
+import { encolar, guardarCatalogoOffline, guardarInventarioOffline, hidratarCola, leerCatalogoOffline, leerCola, leerInventarioOffline, marcarEstado, sacarDeCola, type VentaCola } from '../cola-pos'
 import { TicketPrint, type TicketDatos } from './Ticket'
 import type { Arqueo, Producto, Sucursal, Turno, Variante } from '../types'
 import { precioEfectivo } from '../types'
@@ -37,11 +37,13 @@ export function Pos() {
   const [ticket, setTicket] = useState('')
   const [comprobante, setComprobante] = useState<TicketDatos | null>(null)
   const [cola, setCola] = useState<VentaCola[]>(() => leerCola())
-  const [medio, setMedio] = useState<'efectivo' | 'qr'>('efectivo')
+  const [medio, setMedio] = useState<'efectivo' | 'qr' | 'tarjeta' | 'transferencia' | 'mixto'>('efectivo')
   const [declarado, setDeclarado] = useState('')
   const [arqueo, setArqueo] = useState<Arqueo | null>(null)
   const [colaError, setColaError] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [clientaId, setClientaId] = useState('')
+  const [cuponCodigo, setCuponCodigo] = useState('')
   const [stockExacto, setStockExacto] = useState<Record<string, number>>({})
   const [cobrando, setCobrando] = useState(false)
 
@@ -50,8 +52,8 @@ export function Pos() {
   useEffect(() => {
     if (!turno) return
     api<{ varianteId: string; disponible: number }[]>(`/catalogo/disponibilidad?sucursalId=${encodeURIComponent(turno.sucursal.id)}`)
-      .then(items => setStockExacto(Object.fromEntries(items.map(item => [item.varianteId, Math.max(0, item.disponible)]))))
-      .catch(() => setStockExacto({}))
+      .then(items => { const stock = Object.fromEntries(items.map(item => [item.varianteId, Math.max(0, item.disponible)])); setStockExacto(stock); guardarInventarioOffline(stock) })
+      .catch(() => setStockExacto(leerInventarioOffline()))
   }, [turno])
 
   const total = useMemo(
@@ -74,7 +76,7 @@ export function Pos() {
   }
 
   useEffect(() => {
-    if (!user || (user.rol !== 'CAJERO' && user.rol !== 'ADMIN')) return
+    if (!user || !['CAJERO', 'ADMIN', 'VENDEDOR', 'ENCARGADO'].includes(user.rol)) return
     Promise.all([
       cargarTurno(),
       api<Sucursal[]>('/catalogo/sucursales').then((s) => {
@@ -131,7 +133,9 @@ export function Pos() {
     setColaError('')
     for (const item of pendientes) {
       try {
+        marcarEstado(item.uuid, 'syncing')
         await enviarVenta(item)
+        marcarEstado(item.uuid, 'synced')
         sacarDeCola(item.uuid)
       } catch (err) {
         const codigo = err instanceof Error ? err.message : ''
@@ -172,7 +176,7 @@ export function Pos() {
     return () => window.removeEventListener('online', on)
   }, [])
 
-  if (user?.rol !== 'CAJERO' && user?.rol !== 'ADMIN') {
+  if (!user || !['CAJERO', 'ADMIN', 'VENDEDOR', 'ENCARGADO'].includes(user.rol)) {
     return <Navigate to="/catalogo" replace />
   }
 
@@ -190,6 +194,8 @@ export function Pos() {
         varianteId: l.variante.id,
         cantidad: l.cantidad,
       })),
+      ...(clientaId ? { clientaId } : {}),
+      ...(cuponCodigo ? { cuponCodigo } : {}),
     }
     try {
       const venta = await enviarVenta(payload)
@@ -333,13 +339,21 @@ export function Pos() {
         </ul>
         <p className="price">Total Bs {total.toFixed(2)}</p>
         <label>
+          Cliente opcional (ID)
+          <input value={clientaId} onChange={(e) => setClientaId(e.target.value)} placeholder="UUID de cliente" />
+        </label>
+        <label> Cupón <input value={cuponCodigo} onChange={(e) => setCuponCodigo(e.target.value)} placeholder="Código opcional" /></label>
+        <label>
           Medio
           <select
             value={medio}
-            onChange={(e) => setMedio(e.target.value as 'efectivo' | 'qr')}
+            onChange={(e) => setMedio(e.target.value as typeof medio)}
           >
             <option value="efectivo">Efectivo</option>
             <option value="qr">QR simulado</option>
+            <option value="tarjeta">Tarjeta simulada</option>
+            <option value="transferencia">Transferencia simulada</option>
+            <option value="mixto">Pago mixto simulado</option>
           </select>
         </label>
         {msg ? <p className="error">{msg}</p> : null}

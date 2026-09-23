@@ -5,13 +5,20 @@ import { assetUrl } from '../asset'
 import { useAuth } from '../auth'
 import { agregarAlCarrito } from '../carrito'
 import type { CatalogPage, Producto, Sucursal, Variante } from '../types'
-import { precioEfectivo } from '../types'
+import { precioEfectivo, stockDisponible } from '../types'
 import { storefrontHeroImage } from '../shared/vestaAssets'
 import { useStorefront } from '../storefront'
 
 type Sort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'novedades' | 'popularidad' | 'descuento'
 type Filters = { search: string; categoria: string; ocasion: string; talla: string; color: string; material: string; estilo: string; ajuste: string; precioMin: string; precioMax: string; sucursalId: string; descuento: boolean; ordenar: Sort }
 const initialFilters: Filters = { search: '', categoria: '', ocasion: '', talla: '', color: '', material: '', estilo: '', ajuste: '', precioMin: '', precioMax: '', sucursalId: '', descuento: false, ordenar: 'relevancia' }
+const searchVocabulary = ['blazer', 'vestido', 'abrigo', 'sastrería', 'camisa', 'blusa', 'pantalón', 'falda', 'jean', 'bolso', 'calzado', 'accesorios']
+
+function closestSearch(value: string) {
+  const term = value.trim().toLocaleLowerCase()
+  if (!term || term.length < 3) return ''
+  return searchVocabulary.find(candidate => candidate.startsWith(term.slice(0, 3)) || candidate.includes(term.slice(0, 4))) ?? ''
+}
 
 function readInitialFilters(): Filters {
   const params = new URLSearchParams(window.location.search)
@@ -26,18 +33,18 @@ function ProductImage({ product }: { product: Producto }) {
 }
 
 function stockState(product: Producto) {
-  const available = product.variantes.some(variant => variant.stocks.some(stock => stock.cantidad - (stock.reservado ?? 0) > 0))
-  const low = product.variantes.some(variant => variant.stocks.some(stock => { const value = stock.cantidad - (stock.reservado ?? 0); return value > 0 && value <= 2 }))
+  const available = product.variantes.some(variant => variant.stocks.some(stockDisponible))
+  const low = product.variantes.some(variant => variant.stocks.some(stock => stock.estado === 'ultimas_unidades'))
   return { available, low }
 }
 
 function ProductCard({ product, isClient, selected, compared, onCompare, onQuickView, onAdd, onFavorite: onFavoriteMessage }: { product: Producto; isClient: boolean; selected: boolean; compared: boolean; onCompare: () => void; onQuickView: () => void; onAdd: (variant: Variante) => void; onFavorite: () => void }) {
-  const { toggleFavorite } = useStorefront()
+  const { toggleFavorite, rememberProduct } = useStorefront()
   const onFavorite = () => { toggleFavorite(product.id); onFavoriteMessage() }
   const variant = product.variantes[0]
   const discount = Number(product.descuentoPct ?? 0)
   const stock = stockState(product)
-  return <article className={`catalog-product-card${selected ? ' is-selected' : ''}`}>
+  return <article onClick={() => rememberProduct(product.id)} className={`catalog-product-card${selected ? ' is-selected' : ''}`}>
     <div className="catalog-product-media"><ProductImage product={product} /><div className="catalog-badges">{discount > 0 ? <span>-{discount}%</span> : null}{stock.low ? <span>Últimas unidades</span> : null}</div><div className="catalog-product-actions"><button type="button" aria-label={`Añadir ${product.nombre} a favoritos`} onClick={onFavorite}>♡</button><button type="button" aria-label={`Comparar ${product.nombre}`} aria-pressed={compared} onClick={onCompare}>⇄</button></div><button type="button" className="catalog-quick-view" onClick={onQuickView}>Vista rápida</button></div>
     <div className="catalog-product-info"><Link to={`/ficha/${product.id}`} className="catalog-product-name">{product.nombre}</Link><span className="catalog-product-meta">{product.categoria} · {product.ocasion}</span><span className="catalog-product-sku">SKU {variant?.sku ?? 'No disponible'}</span><div className="catalog-price-row"><b>Bs {precioEfectivo(product).toFixed(2)}</b>{discount > 0 ? <del>Bs {Number(product.precioBase).toFixed(2)}</del> : null}</div><span className={`catalog-stock ${stock.available ? '' : 'is-empty'}`}>{stock.low ? 'Últimas unidades' : stock.available ? 'Disponible' : 'Agotado'}</span>{isClient && variant && stock.available ? <button type="button" className="catalog-add" onClick={() => onAdd(variant)}>Añadir a la bolsa</button> : null}</div>
   </article>
@@ -84,6 +91,7 @@ export function Catalogo() {
   useEffect(() => { api<Sucursal[]>('/catalogo/sucursales').then(setBranches).catch(() => undefined); void load() }, [])
   const activeFilters = useMemo(() => Object.entries(filters).filter(([key, value]) => value && key !== 'ordenar'), [filters])
   const suggestion = useMemo(() => { if (!filters.search || products.length) return ''; return filters.search.length > 3 ? `Prueba buscar por nombre, categoría o SKU.` : '' }, [filters.search, products.length])
+  const suggestedTerm = useMemo(() => products.length ? '' : closestSearch(filters.search), [filters.search, products.length])
   const updateFilter = (key: keyof Filters, value: string | boolean) => setFilters(current => ({ ...current, [key]: value }))
   const submit = (event: FormEvent) => { event.preventDefault(); setMobileFilters(false); void load() }
   const clearAll = () => { setFilters(initialFilters); setCompare([]); void load(initialFilters); }
@@ -91,7 +99,7 @@ export function Catalogo() {
   const toggleCompare = (product: Producto) => setCompare(current => current.some(item => item.id === product.id) ? current.filter(item => item.id !== product.id) : current.length >= 3 ? current : [...current, product])
   const add = (product: Producto, variant: Variante) => { agregarAlCarrito({ productoId: product.id, nombre: product.nombre, precio: precioEfectivo(product), varianteId: variant.id, talla: variant.talla, color: variant.color }); setMessage(`${product.nombre} se añadió a tu bolsa.`) }
 
-  return <section className="catalog-page"><CatalogEditorialFilters filters={filters} updateFilter={updateFilter} /><div className="catalog-popular-searches" aria-label="Búsquedas populares">Populares: {['blazer', 'vestido', 'abrigo', 'sastrería'].map(item => <button key={item} type="button" onClick={() => { const next = { ...filters, search: item }; updateFilter('search', item); void load(next) }}>{item}</button>)}</div>
+  return <section className="catalog-page"><CatalogEditorialFilters filters={filters} updateFilter={updateFilter} /><div className="catalog-popular-searches" aria-label="Búsquedas populares">Populares: {['blazer', 'vestido', 'abrigo', 'sastrería'].map(item => <button key={item} type="button" onClick={() => { const next = { ...filters, search: item }; updateFilter('search', item); void load(next) }}>{item}</button>)}</div>{suggestedTerm && suggestedTerm !== filters.search.toLocaleLowerCase() ? <p className="catalog-correction" role="status">¿Quizás quisiste decir <button type="button" onClick={() => { const next = { ...filters, search: suggestedTerm }; updateFilter('search', suggestedTerm); void load(next) }}>{suggestedTerm}</button>?</p> : null}
     {isClient ? <><section className="storefront-hero" style={{ backgroundImage: `url(${storefrontHeroImage})` }} aria-label="Nueva temporada"><div className="hero-copy"><p className="eyebrow">Edición 01 · otoño</p><h1>La nueva<br />sofisticación</h1><Link className="hero-cta" to="/inicio">Volver a inicio</Link></div></section><div className="season-strip">OFERTA DE TEMPORADA · HASTA 25%</div></> : null}
     <div className="catalog-heading"><div><p className="eyebrow">Colección</p><h1>Catálogo</h1><p>{page?.total ?? products.length} piezas{filters.sucursalId ? ` · ${branches.find(branch => branch.id === filters.sucursalId)?.nombre ?? 'Sucursal'}` : ''}</p></div><div className="catalog-heading-actions"><button type="button" className="catalog-filter-trigger" onClick={() => setMobileFilters(true)}>☷ Filtrar</button><button type="button" className="catalog-density" aria-label="Vista regular" aria-pressed={density === 'regular'} onClick={() => setDensity('regular')}>▦</button><button type="button" className="catalog-density" aria-label="Vista compacta" aria-pressed={density === 'compact'} onClick={() => setDensity('compact')}>▤</button></div></div>
     <form className="catalog-search-bar" onSubmit={submit}><input aria-label="Buscar productos" value={filters.search} onChange={event => updateFilter('search', event.target.value)} placeholder="Buscar prendas, colores o SKU" /><button type="submit">Buscar</button>{searchHistory.length ? <span className="catalog-history">Búsquedas recientes: {searchHistory.slice(0, 3).map(item => <button key={item} type="button" onClick={() => { const next = { ...filters, search: item }; updateFilter('search', item); void load(next) }}>{item}</button>)}</span> : null}</form>

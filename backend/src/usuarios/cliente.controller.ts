@@ -21,4 +21,5 @@ export class ClienteController {
   @Get('perfil') perfil(@CurrentUser() user: JwtPayload) { return this.prisma.usuario.findUniqueOrThrow({ where: { id: user.sub }, select: { id: true, email: true, nombre: true, rol: true, direcciones: true, lealtad: true } }) }
   @Get('direcciones') direcciones(@CurrentUser() user: JwtPayload) { return this.prisma.direccionCliente.findMany({ where: { usuarioId: user.sub }, orderBy: { id: 'desc' } }) }
   @Post('direcciones') direccion(@CurrentUser() user: JwtPayload, @Body() dto: DireccionDto) { return this.prisma.direccionCliente.create({ data: { ...dto, usuarioId: user.sub } }) }
+  @Get('cupones') cupones() { return this.prisma.cupon.findMany({ where: { activo: true, OR: [{ venceEn: null }, { venceEn: { gt: new Date() } }] }, select: { id: true, codigo: true, porcentaje: true, venceEn: true, usoMaximo: true, usado: true }, orderBy: { creadoEn: 'desc' } }) }
 }

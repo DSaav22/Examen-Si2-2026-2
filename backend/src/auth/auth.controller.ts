@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user';
@@ -33,5 +33,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: JwtPayload) {
     return this.auth.me(user.sub);
+  }
+
+  @Post('cambiar-clave')
+  @UseGuards(JwtAuthGuard)
+  cambiarClave(@CurrentUser() user: JwtPayload, @Body() body: { actual?: string; nueva?: string }) {
+    if (!body.actual || !body.nueva || body.nueva.length < 8) throw new BadRequestException('La nueva clave debe tener al menos 8 caracteres');
+    return this.auth.cambiarClave(user.sub, body.actual, body.nueva);
   }
 }

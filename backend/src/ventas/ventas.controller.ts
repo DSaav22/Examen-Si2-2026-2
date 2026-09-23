@@ -55,7 +55,7 @@ export class VentasController {
   @Post()
   @HttpCode(201)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.CAJERO, Rol.ADMIN, Rol.CLIENTA)
+  @Roles(Rol.CAJERO, Rol.ADMIN, Rol.CLIENTA, Rol.VENDEDOR, Rol.ENCARGADO)
   async crear(@CurrentUser() user: JwtPayload, @Body() dto: CrearVentaDto) {
     if (user.rol === Rol.CLIENTA) {
       dto.canal = Canal.online;

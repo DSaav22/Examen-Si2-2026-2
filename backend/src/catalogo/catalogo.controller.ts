@@ -97,6 +97,14 @@ export class CatalogoController {
     return this.catalogo.obtenerProducto(id);
   }
 
+  @Get('productos/:id/complementarios')
+  async complementarios(@Param('id') id: string) {
+    const producto = await this.catalogo.obtenerProducto(id);
+    const items = await this.catalogo.listarProductos({ ocasion: producto.ocasion });
+    const list = Array.isArray(items) ? items : items.items;
+    return list.filter(item => item.id !== id && item.categoria !== producto.categoria).slice(0, 4);
+  }
+
   @Get('productos/:id/interno')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO)
@@ -107,6 +115,14 @@ export class CatalogoController {
   @Get('sucursales')
   sucursales() {
     return this.catalogo.sucursales();
+  }
+
+  @Get('categorias')
+  async categorias() {
+    const categorias = await this.prisma.categoria.findMany({ where: { activa: true }, orderBy: { nombre: 'asc' } });
+    if (categorias.length) return categorias;
+    const legacy = await this.prisma.producto.findMany({ distinct: ['categoria'], select: { categoria: true }, orderBy: { categoria: 'asc' } });
+    return legacy.map(item => ({ id: item.categoria, nombre: item.categoria, activa: true, origen: 'compatibilidad' }));
   }
 
   @Get('productos/:id/opiniones')
@@ -135,6 +151,8 @@ export class CatalogoController {
   }
 
   @Get('stock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
   stock(@Query('almacenId') almacenId?: string) {
     return this.catalogo.listarStock(almacenId);
   }
