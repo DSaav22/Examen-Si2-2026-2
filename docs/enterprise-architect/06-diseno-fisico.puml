@@ -1,0 +1,36 @@
+@startuml
+title EnsayAR - Dise?o f?sico de datos
+entity usuarios
+entity sucursales
+entity almacenes
+entity productos
+entity variantes
+entity stock_almacen
+entity movimientos_inventario
+entity ventas
+entity lineas_venta
+entity caja_turnos
+entity reservas
+entity lineas_reserva
+entity opiniones
+entity favoritos
+entity auditoria
+usuarios ||--o{ sucursales : sucursal_id
+sucursales ||--o{ almacenes : sucursal_id
+productos ||--o{ variantes : producto_id
+variantes ||--o{ stock_almacen : variante_id
+almacenes ||--o{ stock_almacen : almacen_id
+variantes ||--o{ movimientos_inventario : variante_id
+almacenes ||--o{ movimientos_inventario : almacen_id
+ventas ||--o{ lineas_venta : venta_id
+variantes ||--o{ lineas_venta : variante_id
+caja_turnos ||--o{ ventas : caja_turno_id
+sucursales ||--o{ reservas : sucursal_id
+reservas ||--o{ lineas_reserva : reserva_id
+productos ||--o{ opiniones : producto_id
+usuarios ||--o{ opiniones : usuario_id
+usuarios ||--o{ favoritos : usuario_id
+productos ||--o{ favoritos : producto_id
+usuarios ||--o{ auditoria : usuario_id
+@enduml
+

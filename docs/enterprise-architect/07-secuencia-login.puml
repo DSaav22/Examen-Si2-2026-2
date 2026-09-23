@@ -1,0 +1,24 @@
+@startuml
+title EnsayAR - Secuencia de inicio de sesi?n
+actor Usuario
+participant "Login.tsx" as UI
+participant "AuthContext" as Auth
+participant "POST /auth/login" as Controller
+participant AuthService
+participant Prisma
+database PostgreSQL
+Usuario -> UI : ingresar correo y clave
+UI -> Auth : login()
+Auth -> Controller : POST credenciales
+Controller -> AuthService : login(dto)
+AuthService -> Prisma : buscar usuario
+Prisma -> PostgreSQL : SELECT usuarios
+PostgreSQL --> Prisma : usuario
+AuthService -> AuthService : bcrypt.compare
+AuthService -> Prisma : registrar auditor?a
+AuthService --> Controller : accessToken + user
+Controller --> Auth : respuesta
+Auth -> UI : guardar sesi?n
+UI --> Usuario : mostrar inicio
+@enduml
+

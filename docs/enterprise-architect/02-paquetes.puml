@@ -1,0 +1,47 @@
+@startuml
+title EnsayAR - Diagrama de paquetes
+skinparam packageStyle rectangle
+package "Presentaci?n Web" as Web {
+ [Shell]
+ [Inicio]
+ [Cat?logo]
+ [Ficha]
+ [Cliente]
+ [POS]
+ [Administraci?n]
+}
+package "Aplicaci?n M?vil" as Mobile
+package "API NestJS" as API {
+ [Auth]
+ [Cat?logo API]
+ [Ventas]
+ [Caja]
+ [Inventario]
+ [Reservas]
+ [Usuarios]
+ [Proveedores]
+ [Reportes]
+ [Administraci?n API]
+}
+package "Persistencia" as Persistence {
+ [Prisma]
+ [PostgreSQL]
+}
+package "Operaci?n Offline" as Offline {
+ [IndexedDB]
+ [Cola POS]
+ [Sincronizaci?n]
+}
+Web --> API
+Mobile --> API
+[POS] --> Offline
+Offline --> API
+API --> Persistence
+[Administraci?n] --> [Administraci?n API]
+[Cat?logo] --> [Cat?logo API]
+[Cliente] --> [Usuarios]
+[POS] --> [Ventas]
+[POS] --> [Caja]
+[POS] --> [Inventario]
+@enduml
+

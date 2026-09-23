@@ -1,0 +1,26 @@
+@startuml
+title EnsayAR - Actividad de inventario
+start
+:Empleado inicia sesi?n;
+:Selecciona almac?n y variante;
+if (?operaci?n de ingreso?) then (s?)
+  :Validar proveedor o rol;
+  :Bloquear fila de stock;
+  :Incrementar cantidad;
+  :Registrar ingreso_proveedor;
+else (no)
+  :Solicitar ajuste;
+  :Validar sucursal autorizada;
+  :Bloquear fila de stock;
+  if (?cantidad menor que reservado?) then (s?)
+    :Rechazar ajuste;
+    stop
+  else (no)
+    :Actualizar saldo;
+    :Registrar ajuste;
+  endif
+endif
+:Confirmar transacci?n;
+stop
+@enduml
+

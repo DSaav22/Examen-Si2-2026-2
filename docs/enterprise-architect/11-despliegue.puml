@@ -1,0 +1,28 @@
+@startuml
+title EnsayAR - Diagrama de despliegue
+node "Cliente Windows" as Client {
+ artifact "VS Code / Cliente MCP"
+ artifact "Enterprise Architect"
+}
+node "Navegador" as Browser
+node "Dispositivo m?vil" as Mobile
+node "Azure Static Web App" as Web
+node "Azure App Service" as App {
+ artifact "NestJS API"
+}
+database "PostgreSQL Flexible Server" as PG
+node "Desarrollo local" as Local {
+ artifact "Vite :5173"
+ artifact "NestJS :3000"
+ artifact "PostgreSQL :5432"
+}
+Browser --> Web : HTTPS
+Mobile --> App : HTTPS/JSON
+Web --> App : API
+App --> PG : Prisma/SQL
+Client --> "Enterprise Architect" : MCP STDIO
+"Cliente Windows" --> App : desarrollo/operaci?n
+Local --> Browser : HTTP
+Local --> PG : SQL
+@enduml
+

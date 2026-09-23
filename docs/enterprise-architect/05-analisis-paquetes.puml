@@ -1,0 +1,32 @@
+@startuml
+title EnsayAR - Dependencias de an?lisis
+package "Identidad" as Identity
+package "Cat?logo" as Catalog
+package "Cliente" as Customer
+package "Ventas" as Sales
+package "Caja" as Cash
+package "Inventario" as Inventory
+package "Reservas" as Booking
+package "Reportes" as Reports
+package "Administraci?n" as Admin
+package "Offline" as Offline
+Identity --> Customer
+Identity --> Sales
+Catalog --> Customer
+Catalog --> Sales
+Catalog --> Inventory
+Customer --> Sales
+Customer --> Booking
+Sales --> Cash
+Sales --> Inventory
+Sales --> Reports
+Booking --> Catalog
+Booking --> Inventory
+Admin --> Identity
+Admin --> Catalog
+Admin --> Inventory
+Admin --> Reports
+Offline --> Sales
+Offline --> Inventory
+@enduml
+

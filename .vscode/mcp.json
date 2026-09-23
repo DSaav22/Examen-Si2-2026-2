@@ -19,6 +19,13 @@
         "--query-db",
         "tmp/gold_traces_query.db"
       ]
+    },
+    "Enterprise Architect": {
+      "type": "stdio",
+      "command": "C:\\Program Files (x86)\\Sparx Systems\\EA Trial\\MCP_Server\\MCP3.exe",
+      "args": [
+        "-enableEdit"
+      ]
     }
   }
 }

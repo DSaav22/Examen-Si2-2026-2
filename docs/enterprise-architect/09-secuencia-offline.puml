@@ -1,0 +1,23 @@
+@startuml
+title EnsayAR - Secuencia de venta offline
+actor Cajero
+participant POS
+database IndexedDB
+participant "Cola POS" as Queue
+participant API
+database PostgreSQL
+Cajero -> POS : confirmar sin conexi?n
+POS -> Queue : generar UUID y deviceId
+Queue -> IndexedDB : guardar pending
+POS --> Cajero : operaci?n pendiente
+... recuperaci?n de conexi?n ...
+POS -> Queue : marcar syncing
+Queue -> API : POST /ventas con mismo UUID
+API -> PostgreSQL : validar UUID y transacci?n
+PostgreSQL --> API : venta o conflicto
+API --> Queue : resultado
+Queue -> IndexedDB : marcar synced/failed/conflict
+Queue --> POS : actualizar estado
+POS --> Cajero : mostrar sincronizaci?n
+@enduml
+

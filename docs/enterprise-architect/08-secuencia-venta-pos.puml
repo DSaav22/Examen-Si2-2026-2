@@ -1,0 +1,27 @@
+@startuml
+title EnsayAR - Secuencia de venta POS
+actor Cajero
+participant POS
+participant "VentasController" as VC
+participant "VentasService" as VS
+participant "CajaService" as CS
+participant PostgreSQL
+Cajero -> POS : confirmar venta
+POS -> VC : POST /ventas
+VC -> CS : validar turno
+VC -> VS : cobrar(dto)
+VS -> PostgreSQL : comprobar UUID
+VS -> PostgreSQL : consultar precios
+VS -> PostgreSQL : SELECT stock FOR UPDATE
+VS -> PostgreSQL : validar disponibilidad
+VS -> PostgreSQL : descontar stock
+VS -> PostgreSQL : insertar venta y l?neas
+VS -> PostgreSQL : insertar movimiento
+VS -> PostgreSQL : actualizar caja
+VS -> PostgreSQL : insertar auditor?a
+PostgreSQL --> VS : commit
+VS --> VC : venta
+VC --> POS : comprobante
+POS --> Cajero : venta confirmada
+@enduml
+

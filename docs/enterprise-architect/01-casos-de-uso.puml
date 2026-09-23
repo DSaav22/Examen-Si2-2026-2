@@ -1,0 +1,58 @@
+@startuml
+title EnsayAR - Casos de uso principales
+left to right direction
+actor Cliente
+actor Cajero
+actor Vendedor
+actor Encargado
+actor Administrador
+actor Proveedor
+actor "PostgreSQL" as DB
+rectangle EnsayAR {
+ usecase "Registrarse" as UC1
+ usecase "Iniciar sesi?n" as UC2
+ usecase "Consultar cat?logo" as UC3
+ usecase "Filtrar productos" as UC4
+ usecase "Gestionar favoritos" as UC5
+ usecase "Gestionar carrito" as UC6
+ usecase "Comprar online" as UC7
+ usecase "Crear reserva" as UC8
+ usecase "Consultar historial" as UC9
+ usecase "Registrar venta POS" as UC10
+ usecase "Abrir/cerrar caja" as UC11
+ usecase "Gestionar inventario" as UC12
+ usecase "Registrar ingreso de proveedor" as UC13
+ usecase "Consultar reportes" as UC14
+ usecase "Administrar usuarios y cat?logo" as UC15
+ usecase "Consultar auditor?a" as UC16
+ usecase "Sincronizar venta offline" as UC17
+}
+Cliente --> UC1
+Cliente --> UC2
+Cliente --> UC3
+Cliente --> UC4
+Cliente --> UC5
+Cliente --> UC6
+Cliente --> UC7
+Cliente --> UC8
+Cliente --> UC9
+Cajero --> UC2
+Cajero --> UC10
+Cajero --> UC11
+Vendedor --> UC10
+Encargado --> UC10
+Encargado --> UC12
+Encargado --> UC14
+Proveedor --> UC13
+Administrador --> UC12
+Administrador --> UC14
+Administrador --> UC15
+Administrador --> UC16
+UC17 --> UC10
+UC1 --> DB
+UC2 --> DB
+UC7 --> DB
+UC10 --> DB
+UC12 --> DB
+@enduml
+

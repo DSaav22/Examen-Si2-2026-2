@@ -1,0 +1,24 @@
+@startuml
+title EnsayAR - Diagrama de comunicaci?n: venta POS
+object Cajero
+object PosFrontend
+object VentasController
+object VentasService
+object CajaService
+object InventarioService
+object Prisma
+database PostgreSQL
+Cajero -> PosFrontend : 1 seleccionar variante
+Cajero -> PosFrontend : 2 confirmar venta
+PosFrontend -> VentasController : 3 POST /ventas
+VentasController -> CajaService : 4 validar turno
+VentasController -> VentasService : 5 cobrar(dto)
+VentasService -> Prisma : 6 buscar UUID y precios
+VentasService -> PostgreSQL : 7 bloquear stock FOR UPDATE
+VentasService -> InventarioService : 8 registrar movimiento
+VentasService -> Prisma : 9 crear venta y l?neas
+Prisma -> PostgreSQL : 10 confirmar transacci?n
+VentasController --> PosFrontend : 11 comprobante
+PosFrontend --> Cajero : 12 mostrar resultado
+@enduml
+

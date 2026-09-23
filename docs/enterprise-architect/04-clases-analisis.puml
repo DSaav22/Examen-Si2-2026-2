@@ -1,0 +1,71 @@
+@startuml
+title EnsayAR - Clases de an?lisis
+class Usuario {
+ +id
+ +email
+ +rol
+ +activo
+}
+class Sucursal {
+ +id
+ +nombre
+ +ciudad
+}
+class Almacen {
+ +id
+ +nombre
+}
+class Producto {
+ +id
+ +nombre
+ +precioBase
+ +descuentoPct
+ +categoria
+}
+class Variante {
+ +id
+ +sku
+ +talla
+ +color
+}
+class StockAlmacen {
+ +cantidad
+ +reservado
+}
+class Venta {
+ +uuid
+ +canal
+ +estado
+ +total
+}
+class LineaVenta {
+ +cantidad
+ +precioUnitario
+}
+class CajaTurno {
+ +fondoInicial
+ +totalSistema
+}
+class MovimientoInventario {
+ +tipo
+ +cantidad
+}
+class Reserva {
+ +estado
+ +horario
+}
+Usuario "1" -- "0..1" Sucursal
+Sucursal "1" -- "*" Almacen
+Producto "1" -- "*" Variante
+Variante "1" -- "*" StockAlmacen
+Almacen "1" -- "*" StockAlmacen
+Venta "1" -- "*" LineaVenta
+Variante "1" -- "*" LineaVenta
+Venta "*" -- "0..1" CajaTurno
+Venta "1" -- "*" MovimientoInventario
+Variante "1" -- "*" MovimientoInventario
+Almacen "1" -- "*" MovimientoInventario
+Sucursal "1" -- "*" Reserva
+Usuario "1" -- "*" Reserva
+@enduml
+
