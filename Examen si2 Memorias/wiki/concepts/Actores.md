@@ -1,20 +1,24 @@
 ---
 tipo: concept
-fuentes: 5
-actualizado: 2026-09-12
+fuentes: 6
+actualizado: 2026-09-22
 tags: [puds, inicio]
 ---
 
 # Actores
 
-MVP del 23. Encargado de sucursal y proveedor (Garzón) no entran.
+Actualizado con [[Decisiones del parcial]] (19 sep) y roles reales del código [[contexto-completo-proyecto]].
 
-| Actor | Tipo | Quiere |
-|-------|------|--------|
-| Clienta | primario | Ver, ensayar, comprar |
-| Cajero | primario | Abrir, cobrar, cerrar caja |
-| Administrador | primario | Catálogo, stock, reportes |
-| Servicio de IA | apoyo | Ficha y SQL; no toca stock |
-| Pasarela simulada | apoyo | QR de prueba |
+| Actor | Tipo | Quiere | Código |
+|-------|------|--------|--------|
+| Clienta | primario | Ver, ensayar, comprar, reservar | OK |
+| Cajero | primario | Abrir, cobrar, cerrar caja | OK |
+| Vendedor | primario | POS/ventas (módulo acotado) | parcial |
+| Encargado | primario | Inventario/ventas/reservas de sucursal | OK |
+| Administrador | primario | Catálogo, stock, reportes, usuarios | OK |
+| Proveedor | primario | Productos propios + ingresos | OK |
+| Superadmin / RRHH | — | Enum; sin módulo completo | no demo |
+| Servicio de IA | apoyo | Ficha y SQL acotado; no toca stock | reglas |
+| Pasarela simulada | apoyo | QR / contra entrega de prueba | OK |
 
-Ver [[Casos de uso]].
+Ver [[Casos de uso]] · [[Estado del codigo]].

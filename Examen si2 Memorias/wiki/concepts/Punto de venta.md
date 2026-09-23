@@ -1,7 +1,7 @@
 ---
 tipo: concept
-fuentes: 2
-actualizado: 2026-09-12
+fuentes: 3
+actualizado: 2026-09-22
 tags: [pos, caja, offline]
 ---
 
@@ -18,6 +18,10 @@ Garzón nombra al cajero: consultar productos, venta presencial, pagos en caja, 
 ## Offline
 
 Sin internet **no se para la tienda**. Ver [[Modo offline]].
+
+## Código (22 sep)
+
+Flujo: turno → variantes → clienta opcional → cupón → pago simulado → TX stock/venta/caja/auditoría. Sin lector físico ni fiscal. [[contexto-completo-proyecto]] · [[UC07 Venta POS]]
 
 ## Relacionado
 

@@ -14,4 +14,4 @@ Justificación frente a un e-commerce genérico:
 1. [[Probador virtual]] sobre el cuerpo de la clienta (cámara + pose + overlay 2D).
 2. [[Reportes generativos]] por voz/texto → SQL SELECT acotado.
 
-El nombre junta *ensayar* y *AR*. Documento: `docs/parcial/02-puds/01-fase-inicio.md` §2–4.
+El nombre junta *ensayar* y *AR*. Documento formal (capítulo 3, alineado al perfil del 23 sep): `docs/parcial/02-puds/01-fase-inicio.md`.

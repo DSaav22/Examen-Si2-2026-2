@@ -1,7 +1,7 @@
 ---
 tipo: concept
-fuentes: 2
-actualizado: 2026-09-19
+fuentes: 3
+actualizado: 2026-09-22
 tags: [innovacion, ra, mvp]
 ---
 
@@ -31,6 +31,10 @@ MVP = cámara + pose + overlay **2D** de la variante; fallback foto de cuerpo co
 ## Construcción (19 sep)
 
 `GET /catalogo/variantes/:id/overlay`. Overlay SVG anclado al torso. Web `/probar/:id` (MediaPipe, toques, **foto de cuerpo** o demo) y Expo `movil/` (toques en hombros). [[UC03 Probador]]
+
+## Madurez real (22 sep)
+
+[[contexto-completo-proyecto]]: prototipo experimental. Cámara + superposición básica; **sin** tracking robusto, segmentación ni ajuste realista. **No presentar como módulo terminado** en la defensa. Frase: “spike / prototipo del UC03”. [[Estado del codigo]]
 
 ## Relacionado
 

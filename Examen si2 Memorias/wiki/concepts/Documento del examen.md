@@ -1,7 +1,7 @@
 ---
 tipo: concept
-fuentes: 2
-actualizado: 2026-09-19
+fuentes: 5
+actualizado: 2026-09-23
 tags: [informe, entrega]
 ---
 
@@ -9,14 +9,23 @@ tags: [informe, entrega]
 
 ## Canónico (docente propio)
 
-1. **Fundamentación teórica** — e-commerce, RA, NestJS, React, etc.
-2. **Proceso de desarrollo** — 100% [[Proceso Unificado]]. [[Fase Inicio]], [[Fase Elaboracion]] y [[Fase Construccion]] en `docs/parcial/02-puds/`. Código en `backend/`.
-3. **Adopción y capacitación** — `docs/parcial/03-adopcion/`. [[stack-metodologia-parcial]]
+Fuente oral literal: [[transcripcion-audio-stack-metodologia-parcial]]. Resumen: [[stack-metodologia-parcial]].
 
-La Parte 1 está en `docs/parcial/01-fundamentacion/`. La Parte 2 incluye Transición (`02-puds/04-fase-transicion.md`).
+1. **Fundamentación teórica** — e-commerce, RA, NestJS, React, etc.
+2. **Proceso de desarrollo** — 100% [[Proceso Unificado]] (PUD).
+3. **Adopción y capacitación** — mecanismo para que el usuario aprenda.
+
+## Dónde se escribe el cuerpo
+
+**`docs/parcial/`** — un `.md` por capítulo (copiar luego a Word).  
+Índice y tabla de archivos: `docs/parcial/README.md` · síntesis wiki: [[Indice del informe]].
+
+La wiki **no** sustituye el informe: guarda fuentes, decisiones y checklist ([[Checklist informe EnsayAR]]).
 
 ## Extra útil de Garzón (investigación, no stack)
 
-Parte I sugiere estudiar Amazon/Alibaba/Shopify como *usuario*; Magento/PrestaShop/WooCommerce como *desarrollador* (para entender e-commerce, **prohibido usarlos**). También pasarelas (Libélula, PayPal, Stripe) y deliverys (Yaigo, Yummy). Perfil: intro, objetivos, problema, alcance. [[examen1-garzon-fashionstore]]
+Amazon/Shopify como *usuario*; Magento etc. solo estudio (**prohibido usarlos**). [[examen1-garzon-fashionstore]]
 
-Usar esa lista para nutrir la Parte 1, no para copiar el índice de Garzón al pie de la letra.
+## Modelos de calidad
+
+[[ejemplo-informe-tatiana-autogo]] · [[ejemplo-informe-lozada-asistencia-mecanica]] · [[Comparacion informes ejemplo]]

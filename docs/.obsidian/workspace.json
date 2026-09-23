@@ -1,0 +1,217 @@
+{
+  "main": {
+    "id": "da8e98f91a8325cc",
+    "type": "split",
+    "children": [
+      {
+        "id": "a353f03710ddf213",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "fae5a4d505e300f8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "parcial/02-puds/casos-de-uso-detalle.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "casos-de-uso-detalle"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "517a6d0a0d48afec",
+    "type": "split",
+    "children": [
+      {
+        "id": "5c23c9e64f7e6663",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "94c4eda477795a9a",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de archivos"
+            }
+          },
+          {
+            "id": "c21d6a23cda2e33d",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Buscar"
+            }
+          },
+          {
+            "id": "8f5c210d69453e28",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "b20e3098e4c27862",
+    "type": "split",
+    "children": [
+      {
+        "id": "995526ae1638a9dc",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6ae457fb94c3a603",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "parcial/02-puds/casos-de-uso-detalle.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Enlaces entrantes"
+            }
+          },
+          {
+            "id": "576017e44897d259",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "parcial/02-puds/casos-de-uso-detalle.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Enlaces salientes"
+            }
+          },
+          {
+            "id": "4a22159aadc01d16",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "ba47cc8486961e93",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas las propiedades"
+            }
+          },
+          {
+            "id": "f774b750accfbc42",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "parcial/02-puds/casos-de-uso-detalle.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Esquema"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir selector rápido": false,
+      "graph:Abrir vista gráfica": false,
+      "canvas:Crear nuevo lienzo": false,
+      "daily-notes:Abrir la nota de hoy": false,
+      "templates:Insertar plantilla": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Crear nueva base": false
+    }
+  },
+  "active": "fae5a4d505e300f8",
+  "lastOpenFiles": [
+    "parcial/diagramas/_hide_from.ps1",
+    "parcial/diagramas/Examen-parcial-si2.ldb",
+    "parcial/diagramas/Examen-parcial-si2.eapx",
+    "parcial/diagramas",
+    "parcial/Nueva carpeta",
+    "parcial/~$sayAR-Informe-Primer-Parcial.docx",
+    "parcial/02-puds/03-requisitos.md",
+    "parcial/_toc_extract.py",
+    "parcial/~$sayAR-Informe-Primer-Parcial-numerado.docx",
+    "parcial/_fmt_cu.py",
+    "parcial/02-puds/modulos.md",
+    "parcial/02-puds/analisis-diseno.md",
+    "parcial/_tatiana_sample.py",
+    "parcial/02-puds/01-fase-inicio.md",
+    "parcial/02-puds/casos-de-uso-detalle.md",
+    "parcial/02-puds/02-fase-elaboracion.md",
+    "parcial/02-puds/03-fase-construccion.md",
+    "parcial/02-puds/07-pruebas.md",
+    "parcial/02-puds/04-fase-transicion.md",
+    "parcial/01-fundamentacion/01-perfil.md",
+    "parcial/EnsayAR-Informe-Primer-Parcial-numerado.docx",
+    "parcial/00-indice.md",
+    "parcial/01-fundamentacion/02-marco-teorico.md"
+  ]
+}

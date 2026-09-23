@@ -1,402 +1,310 @@
-# Parte 2 — Proceso Unificado: Fase de Elaboración
+# Capítulo 4 — Fase de Elaboración
 
+**Parte II — Proceso Unificado de Desarrollo de Software**  
 **Sistema:** EnsayAR  
-**Hito:** Lifecycle Architecture (baseline arquitectónico)  
-**Fecha de la fase:** 12 de septiembre de 2026  
-**Parte de:** casos de uso críticos UC03, UC07, UC10  
+**Hito de la fase:** arquitectura del ciclo de vida (Lifecycle Architecture)  
+**Fecha de la fase:** 12 de septiembre de 2026, ajustada con el alcance del 19 de septiembre  
 
-La Elaboración no implementa el producto entero. Estabiliza los requisitos que cargan riesgo y deja una arquitectura que Construcción puede llenar de funcionalidad.
+Referencia: Jacobson, I., Booch, G. y Rumbaugh, J. *El proceso unificado de desarrollo de software*.
 
----
+El detalle de cada caso, escrito como comportamiento del sistema, está en `casos-de-uso-detalle.md`. Este capítulo fija el baseline de los casos que cargan la arquitectura.
 
-## 1. Qué se elabora (y qué no)
+**Disciplinas de esta fase:** requisitos (detalle de casos críticos), análisis (secuencias de sistema y modelo de dominio) y diseño (baseline y spikes). La implementación corre en Construcción.
 
-| Se detalla ahora | Sigue en formato breve |
-|------------------|------------------------|
-| UC03 Probador virtual | UC01, UC02, UC04, UC05 |
-| UC07 Venta POS | UC06, UC08, UC09 |
-| UC10 Reporte generativo | |
-
-UC05 (compra en línea) reutiliza el mismo contrato de descuento de stock que UC07. No se expande para no duplicar.
+Los diagramas (secuencia, clases, paquetes) se dibujan en Enterprise Architect y se insertan en este capítulo. El texto de abajo es el modelo que esos diagramas deben respetar.
 
 ---
 
-## 2. UC03 — Usar probador virtual (formato expandido)
+## 4.1 Qué se elabora
+
+| Se detalla en esta fase | Permanece en formato breve (capítulo 3) |
+|-------------------------|------------------------------------------|
+| UC03 Probador virtual | UC01, UC02, UC04, UC06, UC08, UC09 |
+| UC07 Venta en POS | UC12, UC13 |
+| UC10 Reporte | |
+| UC11 Reservar prenda (porque altera el stock) | |
+
+UC05 (compra en línea) **no** se reescribe: usa el mismo contrato de cobro y de descuento que UC07, con canal `en línea` y sin turno de caja. UC12 solo cambia el estado de una reserva ya creada.
+
+---
+
+## 4.2 UC03 — Usar el probador virtual
 
 | Campo | Contenido |
 |-------|-----------|
 | Actor principal | Clienta |
-| Actores de apoyo | Ninguno (la pose corre en el dispositivo) |
-| Precondiciones | Clienta autenticada. Tiene abierta una ficha (UC02) con una **variante** elegida (talla + color) que tiene imagen de overlay. |
-| Postcondición de éxito | La clienta vio la variante sobre su cuerpo (cámara o foto). No se reserva ni se vende nada. |
-| Trigger | Toca “Probarme esto”. |
+| Apoyo | Ninguno. La pose, si existe, se estima en el dispositivo. |
+| Precondiciones | Clienta con sesión. Ficha abierta (UC02) y variante elegida (talla y color) con imagen de overlay. |
+| Postcondición de éxito | La clienta vio esa variante sobre su cuerpo (cámara o anclaje manual). No hay reserva ni venta. |
+| Disparador | Elige “Probar”. |
 
 ### Flujo básico
 
-1. El sistema muestra la variante elegida (nombre, talla, color, miniatura).
-2. La clienta elige **cámara en vivo** (preferido) o **foto de cuerpo completo**.
-3. El sistema pide permiso de cámara si hace falta.
-4. Si es cámara: captura el video, estima la pose (hombros, cadera, torso) en el dispositivo.
+1. El sistema muestra la variante (nombre, talla, color, miniatura).
+2. La clienta elige cámara en vivo o una foto de cuerpo.
+3. Si hace falta, el sistema pide permiso de cámara.
+4. Con cámara: el dispositivo captura el video y, si puede, estima hombros (y cadera si el modelo la da).
 5. Superpone la imagen 2D de la variante sobre el torso, escalada a la distancia entre hombros.
 6. La clienta puede cambiar de color (otra variante del mismo producto y talla) sin salir del probador.
-7. La clienta confirma “así me veo” o vuelve a la ficha. El caso termina.
+7. Vuelve a la ficha. El caso termina.
 
 ### Alternativas
 
-- **3a.** Niega el permiso → se ofrece solo el flujo por foto.
-- **4a.** El dispositivo no estima pose (emulador, gama baja) → fallback foto: elige dos puntos (hombros) o un recuadro; el overlay se ancla ahí.
-- **6a.** La nueva variante no tiene imagen de overlay → mensaje y se mantiene la anterior.
+- **3a.** Niega el permiso de cámara: queda el flujo por foto o por toques.
+- **4a.** El dispositivo no estima la pose (emulador o equipo sin modelo): la clienta marca dos puntos (hombros) o un recuadro, y el overlay se ancla ahí.
+- **6a.** La variante nueva no tiene overlay: se informa y se mantiene la imagen anterior.
 
 ### Excepciones
 
-- **E1.** No hay imagen de overlay en la variante → no se abre el probador; se pide al admin cargar overlay (UC09).
-- **E2.** La cámara falla a mitad → se guarda el último frame y se pasa a modo foto.
+- **E1.** La variante no tiene imagen de overlay: no se abre el probador. El administrador la carga en UC09.
+- **E2.** La cámara falla a mitad: se ofrece el modo foto o toques.
 
 ### Reglas
 
-- El overlay es **2D**. No se deforma tela ni se simula caída.
-- No se envía el video al servidor. Solo se baja la imagen de la variante.
-- El probador no toca stock.
+- El overlay es 2D. No se deforma la tela ni se simula su caída.
+- El video no se envía al servidor. Solo se descarga la imagen de la variante.
+- El probador no modifica stock ni reservas.
 
-### SSD (secuencia de sistema)
+### Mensajes de la secuencia (figura en Enterprise Architect)
 
-```mermaid
-sequenceDiagram
-  actor Clienta
-  participant RN as App móvil
-  participant Pose as Estimador de pose
-  participant API as NestJS
-
-  Clienta->>RN: Probarme esto (varianteId)
-  RN->>API: GET /variantes/{id}/overlay
-  API-->>RN: urlOverlay, talla, color
-  Clienta->>RN: Cámara (o foto)
-  RN->>Pose: frame
-  Pose-->>RN: landmarks torso
-  RN->>RN: anclar overlay a hombros
-  Clienta->>RN: cambiar color
-  RN->>API: GET /variantes/{otra}/overlay
-  API-->>RN: urlOverlay
-```
+1. Clienta → cliente: probar la variante.
+2. Cliente → API: obtener overlay de la variante.
+3. API → cliente: dirección de la imagen, talla y color.
+4. Cliente → estimador local: cuadro de cámara o puntos marcados.
+5. Estimador → cliente: anclaje del torso.
+6. Cliente: dibuja el overlay. Si cambia el color, se repite el paso 2.
 
 ---
 
-## 3. UC07 — Registrar venta POS (formato expandido)
+## 4.3 UC07 — Registrar una venta en el punto de venta
 
 | Campo | Contenido |
 |-------|-----------|
-| Actor principal | Cajero |
-| Actores de apoyo | Pasarela simulada (si el medio es QR) |
-| Precondiciones | Caja **abierta** (UC06). Cajero autenticado. El almacén de la sucursal del turno está definido. |
-| Postcondición de éxito | Existe una `Venta` en estado `cobrada`; cada línea descontó stock de `StockAlmacen(variante, almacén)`; el turno acumula el total. |
-| Trigger | Cajero inicia “Nueva venta”. |
+| Actor principal | Cajero (también puede operar un vendedor o un encargado con permiso de caja) |
+| Apoyo | Pasarela simulada, si el medio es QR |
+| Precondiciones | Turno de caja abierto (UC06). Sesión válida. El almacén del turno está definido. |
+| Postcondición de éxito | Existe una venta cobrada. Cada línea descontó el disponible de esa variante en ese almacén. El turno acumula el total. Queda un movimiento de inventario. |
+| Disparador | El cajero inicia una venta nueva. |
 
 ### Flujo básico
 
-1. El sistema crea un borrador de venta ligado al turno abierto y a su almacén.
-2. El cajero agrega líneas: busca producto, elige variante (talla/color), indica cantidad.
-3. Por cada línea el sistema verifica `stock >= cantidad` en ese almacén.
-4. El cajero elige medio: **efectivo** o **QR simulado**.
-5. Si efectivo: ingresa monto recibido; el sistema calcula vuelto.
-6. Si QR: el sistema pide a la pasarela simulada un cobro de prueba; espera `aprobado`.
-7. El sistema, en **una transacción**:
-   - bloquea las filas de stock de las variantes;
-   - descuenta cantidades;
-   - persiste la venta `cobrada` y sus líneas;
-   - suma el total al turno.
-8. Emite ticket (pantalla + PDF/impresión simple).
-9. El caso termina. La caja sigue abierta.
+1. El sistema asocia el borrador al turno abierto y a su almacén.
+2. El cajero agrega líneas: producto, variante (talla y color) y cantidad. Puede indicar clienta y cupón.
+3. Por cada línea el sistema comprueba que el disponible alcance (`cantidad − reservado`).
+4. El cajero elige medio: efectivo, QR simulado o el medio que el caso académico permita en caja.
+5. Efectivo: ingresa lo recibido; el sistema calcula el vuelto.
+6. QR: la pasarela simulada responde aprobado o rechazado.
+7. En **una transacción** el servidor bloquea las filas de stock, vuelve a comprobar el disponible, descuenta, persiste la venta cobrada y sus líneas, registra el movimiento y suma el total al turno.
+8. Muestra el ticket.
+9. La caja sigue abierta.
 
 ### Alternativas
 
-- **2a.** Sin red: la venta queda en la **cola offline** del navegador con un `uuid` local. Al volver la red se envía a `/ventas` (idempotente por `uuid`). El stock se descuenta **en el servidor** al sincronizar, no dos veces.
-- **4a.** La clienta cancela antes de cobrar → el borrador se descarta; stock intacto.
-- **6a.** QR `rechazado` → se ofrece efectivo o se anula el borrador.
+- **2a. Sin red.** La venta queda en la cola del navegador con un identificador único. Al volver la red se envía el mismo identificador. El stock se descuenta en el servidor una sola vez.
+- **4a.** El cajero descarta el borrador antes de cobrar: no hay venta y el stock no cambia.
+- **6a.** QR rechazado: se ofrece otro medio o se anula el borrador.
 
 ### Excepciones
 
-- **E1.** En el paso 3, `stock < cantidad` → no se agrega la línea; se muestra stock real.
-- **E2.** Entre el paso 3 y el 7 otra venta (web o POS) dejó stock insuficiente → rollback; se informa qué variante falló.
-- **E3.** No hay turno abierto → se obliga UC06.
+- **E1.** En el paso 3 el disponible no alcanza: no se agrega la línea y se muestra el saldo real.
+- **E2.** Entre la consulta y el cobro otra venta dejó stock insuficiente: la transacción se revierte y se indica la variante.
+- **E3.** No hay turno abierto: se exige UC06.
+- **E4.** El mismo identificador de venta llega dos veces: se devuelve la venta ya cobrada y no se descuenta de nuevo.
 
-### Contrato de operación `cobrarVenta`
+### Contrato `cobrarVenta`
 
-- **Pre:** turno abierto; borrador con ≥1 línea; cada línea `cantidad > 0`.
-- **Post:** venta cobrada; ∀ línea, `stock' = stock - cantidad`; `turno.total' = turno.total + venta.total`.
-- **No:** no crea clienta; no abre otra caja; no llama al probador.
+- **Antes:** turno abierto; al menos una línea; cantidades mayores que cero; cada línea cabe en el disponible.
+- **Después:** venta cobrada; el disponible bajó en la cantidad de cada línea; el total del turno subió; hay movimiento de inventario.
+- **No hace:** no abre otra caja, no llama al probador y no ejecuta SQL libre.
 
-### SSD
+### Mensajes de la secuencia (figura en Enterprise Architect)
 
-```mermaid
-sequenceDiagram
-  actor Cajero
-  participant Web as React POS
-  participant API as NestJS
-  participant PG as PostgreSQL
-  participant Pay as QR simulado
-
-  Cajero->>Web: Nueva venta
-  Cajero->>Web: agregar línea (variante, cant)
-  Web->>API: GET /stock?variante&almacen
-  API-->>Web: disponible
-  Cajero->>Web: cobrar QR
-  Web->>API: POST /ventas {uuid, lineas, medio}
-  API->>Pay: cobrar(monto)
-  Pay-->>API: aprobado
-  API->>PG: BEGIN
-  API->>PG: lock stock + UPDATE -cant
-  API->>PG: INSERT venta cobrada
-  API->>PG: COMMIT
-  API-->>Web: ticket
-```
+1. Cajero → POS: nueva venta y líneas.
+2. POS → API: consultar disponible.
+3. Cajero → POS: cobrar (medio e identificador único).
+4. API → pasarela simulada: cobrar, si el medio es QR.
+5. API → base: iniciar transacción, bloquear stock, descontar, insertar venta, confirmar.
+6. API → POS: ticket.
 
 ---
 
-## 4. UC10 — Pedir reporte generativo (formato expandido)
+## 4.4 UC10 — Pedir un reporte
 
 | Campo | Contenido |
 |-------|-----------|
 | Actor principal | Administrador |
-| Actores de apoyo | Servicio de IA |
-| Precondiciones | Admin autenticado. Existen ventas (si no, el resultado es vacío, no error). |
-| Postcondición de éxito | Se muestra una tabla (y opcionalmente un total) que responde la pregunta. Queda un `ReporteEjecucion` de auditoría (pregunta, SQL, filas, timestamp). **Nada se escribe** en ventas ni stock. |
-| Trigger | Admin pulsa el micrófono o envía texto. |
+| Apoyo | Compilador de pregunta y validador de SQL (no un modelo de lenguaje) |
+| Precondiciones | Administrador con sesión. Si no hay ventas, el resultado es una tabla vacía. |
+| Postcondición de éxito | Se muestra una tabla. Queda registro de la pregunta, del SQL aceptado y del momento. Ventas y stock no se modifican. |
+| Disparador | Escribe una pregunta o usa el dictado del navegador. |
 
-### Flujo básico
+Hay dos caminos en la misma pantalla:
 
-1. El admin formula la pregunta (voz → texto, o texto directo). Ejemplo del docente: *ventas de la sucursal X, POS Y, de tal hora a tal hora; a quién y cuánto*.
-2. El sistema envía al servicio de IA: la pregunta + el **esquema permitido** (no el esquema entero de la BD).
-3. La IA devuelve un `SELECT` y un título.
-4. El sistema **valida** el SQL:
-   - una sola sentencia;
-   - empieza por `SELECT`;
-   - solo tablas/vistas de la whitelist (`v_reporte_ventas`);
-   - sin `INSERT/UPDATE/DELETE/DROP/ALTER/COPY`;
-   - `LIMIT` ≤ 200 (se inyecta si falta).
-5. Ejecuta el SELECT con un usuario de BD de **solo lectura**.
-6. Devuelve columnas + filas + el SQL (visible para defensa).
-7. Persiste la auditoría y muestra el resultado.
+- **Reportes fijos:** ventas del día e inventario por sucursal, almacén, SKU, cantidad, reservado y disponible.
+- **Pregunta libre:** el texto se traduce a un `SELECT` y solo se ejecuta si pasa el validador.
+
+### Flujo básico de la pregunta libre
+
+1. El administrador formula la pregunta. Ejemplo de clase: ventas de una sucursal, de un cajero, en un rango, a quién y cuánto.
+2. El compilador produce un `SELECT` candidato usando solo el esquema permitido (la vista de ventas).
+3. El validador exige: una sola sentencia; empieza por `SELECT`; solo la vista permitida; sin `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER` ni `COPY`; límite de filas (como máximo 200).
+4. Se ejecuta esa lectura.
+5. Se muestran columnas, filas y el SQL, para que en la defensa se vea qué corrió.
+6. Se guarda la ejecución (pregunta, SQL, cantidad de filas).
 
 ### Alternativas
 
-- **1a.** Voz no se entiende → se pide texto.
-- **4a.** SQL inválido → se reintenta **una** vez con el error de validación; si falla, mensaje “no pude armar ese reporte” y se sugieren ejemplos.
-- **5a.** Cero filas → tabla vacía, no es excepción.
+- **1a.** El dictado no se entiende: se pide texto.
+- **3a.** El SQL no pasa el validador: no se ejecuta. Mensaje claro y ejemplos de preguntas admitidas.
+- **4a.** Cero filas: tabla vacía. No es un error.
 
 ### Excepciones
 
-- **E1.** La pregunta pide algo fuera del dominio (empleados, contraseñas, otras BDs) → se rechaza antes de llamar a la IA.
-- **E2.** El servicio de IA no responde → error controlado; no se inventa SQL en el cliente.
+- **E1.** La pregunta pide credenciales, otras tablas o modificar datos: se rechaza antes de ejecutar.
+- **E2.** No hay sesión de administrador: no se consulta.
 
-### Esquema permitido (`v_reporte_ventas`)
+### Vista permitida
 
-Columnas: `fecha_hora`, `sucursal_nombre`, `almacen_id`, `caja_turno_id`, `cajero_nombre`, `venta_id`, `cliente_nombre` (nullable), `variante_sku`, `producto_nombre`, `talla`, `color`, `cantidad`, `precio_unitario`, `subtotal`, `medio_pago`.
+`v_reporte_ventas` reúne fecha, sucursal, almacén, turno, cajero, venta, clienta si existe, SKU, producto, talla, color, cantidad, precio, subtotal y medio de pago.
 
-Preguntas legales: ventas por sucursal, por cajero, por rango horario, por prenda, totales. Nada más.
+Preguntas admitidas: ventas por sucursal, por cajero, por rango, por prenda y totales. El inventario fijo no pasa por esta vista: tiene su propio listado.
 
-### SSD
+### Mensajes de la secuencia (figura en Enterprise Architect)
 
-```mermaid
-sequenceDiagram
-  actor Admin
-  participant Web as React Admin
-  participant API as NestJS IaReportes
-  participant IA as Servicio IA
-  participant PG as PostgreSQL RO
-
-  Admin->>Web: voz/texto
-  Web->>API: POST /reportes/generativo {pregunta}
-  API->>IA: pregunta + esquema v_reporte_ventas
-  IA-->>API: SELECT ... LIMIT 200
-  API->>API: validar whitelist
-  API->>PG: ejecutar SELECT
-  PG-->>API: filas
-  API->>PG: INSERT auditoria
-  API-->>Web: columnas, filas, sql
-```
+1. Administrador → web: pregunta.
+2. Web → API: enviar la pregunta.
+3. API: compilar y validar.
+4. API → PostgreSQL: ejecutar el `SELECT` aceptado.
+5. API → web: filas y SQL. Si la validación falla, el paso 4 no ocurre.
 
 ---
 
-## 5. Modelo de dominio
+## 4.5 UC11 — Reservar una prenda
 
-Clases conceptuales (no son tablas todavía; informan el diseño).
+Se elabora aquí porque comparte el stock con UC07. El flujo de atención (UC12) queda breve: el encargado de la sucursal confirma, completa o cancela.
 
-```mermaid
-classDiagram
-  class Producto {
-    nombre
-    descripcion
-    categoria
-    ocasion
-    precioBase
-  }
-  class Variante {
-    talla
-    color
-    sku
-    urlFoto
-    urlOverlay
-  }
-  class Sucursal {
-    nombre
-    ciudad
-  }
-  class Almacen {
-    nombre
-  }
-  class StockAlmacen {
-    cantidad
-  }
-  class Usuario {
-    email
-    rol
-  }
-  class CajaTurno {
-    fondoInicial
-    abiertoEn
-    cerradoEn
-    totalSistema
-    totalDeclarado
-  }
-  class Venta {
-    uuid
-    canal
-    estado
-    medioPago
-    total
-    creadaEn
-  }
-  class LineaVenta {
-    cantidad
-    precioUnitario
-  }
-  class ReporteEjecucion {
-    pregunta
-    sql
-    filas
-    creadaEn
-  }
+| Campo | Contenido |
+|-------|-----------|
+| Actor principal | Clienta |
+| Precondiciones | Sesión de clienta. Variante con disponible en la sucursal elegida. |
+| Postcondición de éxito | Reserva en estado pendiente. Sube la cantidad **reservada** de esa variante en el almacén. La cantidad física no baja todavía. |
+| Disparador | La clienta confirma “reservar” en la ficha o el catálogo. |
 
-  Producto "1" --> "*" Variante
-  Sucursal "1" --> "*" Almacen
-  Variante "1" --> "*" StockAlmacen
-  Almacen "1" --> "*" StockAlmacen
-  Sucursal "1" --> "*" CajaTurno
-  Usuario "1" --> "*" CajaTurno : cajero
-  CajaTurno "1" --> "*" Venta
-  Usuario "0..1" --> "*" Venta : clienta
-  Venta "1" --> "*" LineaVenta
-  Variante "1" --> "*" LineaVenta
-  Usuario "1" --> "*" ReporteEjecucion : admin
-```
+### Regla de disponible
 
-Reglas de dominio:
+`disponible = cantidad − reservado`.
 
-- Una `Variante` es talla × color de un `Producto`. El stock **nunca** vive en el producto.
-- Toda `Venta` (web o POS) descuenta un `StockAlmacen`. El canal se guarda (`online` | `pos`).
-- Un `CajaTurno` pertenece a una sucursal y a un cajero. UC07 exige turno abierto.
-- `ReporteEjecucion` no referencia ventas por FK de negocio; es traza.
+UC07 y UC05 solo pueden vender el disponible. Una reserva no es una venta.
+
+### Al completar o cancelar
+
+- **Completar** (encargado, UC12): se crea la venta correspondiente, se descuenta la cantidad y se libera el reservado, en una transacción.
+- **Cancelar:** baja el reservado y no hay venta.
+
+### Excepciones
+
+- **E1.** Disponible insuficiente: no se crea la reserva.
+- **E2.** La clienta intenta ver o cancelar una reserva ajena: se niega.
 
 ---
 
-## 6. Modelo de datos lógico (baseline)
+## 4.6 Modelo de dominio
 
-Tablas previstas (PostgreSQL):
+Clases conceptuales. La figura de clases se inserta desde Enterprise Architect.
 
-`usuarios`, `sucursales`, `almacenes`, `productos`, `variantes`, `stock_almacen` (PK `variante_id + almacen_id`), `caja_turnos`, `ventas`, `lineas_venta`, `reporte_ejecuciones`.
+| Clase | Responsabilidad |
+|-------|-----------------|
+| Producto | Nombre, ocasión, precio base, categoría. No guarda stock. |
+| Variante | Talla, color, SKU, foto, overlay. Hija de un producto. |
+| Sucursal | Local y ciudad. |
+| Almacén | Depósito de una sucursal. |
+| StockAlmacén | Cantidad y reservado de una variante en un almacén. |
+| Usuario | Correo y rol. |
+| CajaTurno | Fondo, apertura, cierre, totales. Pertenece a sucursal y cajero. |
+| Venta | Identificador único, canal (en línea o POS), estado, medio de pago, total. |
+| LíneaVenta | Cantidad y precio de una variante dentro de la venta. |
+| Reserva | Estado y sucursal. La hace una clienta. |
+| LíneaReserva | Variante y cantidad apartadas. |
+| MovimientoInventario | Historia: venta, reserva, liberación, ajuste, ingreso. |
+| ReporteEjecución | Pregunta, SQL aceptado, filas, momento. No altera ventas. |
 
-Vista `v_reporte_ventas`: join de venta + línea + variante + producto + sucursal + turno + cajero. Es **lo único** que puede leer UC10.
+Reglas:
 
-Índices: `ventas(creada_en)`, `ventas(caja_turno_id)`, `stock_almacen(almacen_id)`, `variantes(producto_id)`.
-
----
-
-## 7. Arquitectura baseline (4+1, vista lógica)
-
-```mermaid
-flowchart TB
-  subgraph Presentacion
-    RN[React Native - catálogo y UC03]
-    WEB[React - admin, POS UC06-08, UC10]
-  end
-  subgraph Aplicacion["NestJS - módulos"]
-    Auth
-    Catalogo
-    Inventario
-    Ventas
-    Caja
-    IaFicha
-    IaReportes
-    Pagos
-  end
-  subgraph Dominio
-    Stock["StockAlmacen.descontar"]
-    Cobro["Venta.cobrar"]
-  end
-  subgraph Infra
-    PG[(PostgreSQL)]
-    IA[Puerto IA]
-    PAY[Puerto QR]
-    RO[(usuario solo lectura)]
-  end
-  RN --> Auth
-  RN --> Catalogo
-  WEB --> Auth
-  WEB --> Ventas
-  WEB --> Caja
-  WEB --> IaReportes
-  Ventas --> Cobro
-  Cobro --> Stock
-  Stock --> PG
-  IaReportes --> IA
-  IaReportes --> RO
-  Pagos --> PAY
-```
-
-**Decisiones de diseño que ya no se discuten en Construcción:**
-
-1. Un solo endpoint `POST /ventas` para UC05 y UC07 (`canal: online | pos`).
-2. Descuento de stock solo en servidor, transaccional, con lock de fila.
-3. Probador 100% en el cliente; API solo sirve `urlOverlay`.
-4. Reportes generativos solo contra `v_reporte_ventas` y usuario RO.
-5. Cola offline: `uuid` de venta + retry; el servidor es idempotente.
+- El stock vive en StockAlmacén, nunca en el producto.
+- Toda venta, sea web o caja, descuenta un StockAlmacén.
+- UC07 exige un CajaTurno abierto. UC05 no.
+- ReporteEjecución es traza de lectura.
 
 ---
 
-## 8. Spikes (pruebas de arquitectura)
+## 4.7 Modelo de datos lógico (baseline)
 
-Cada spike tiene que **correr** antes de llenar pantallas. Si falla, se ajusta el diseño aquí, no a ciegas en Construcción.
+Tablas que el baseline no puede perder: usuarios, sucursales, almacenes, productos, variantes, stock por variante y almacén (clave compuesta), turnos de caja, ventas, líneas de venta, reservas, líneas de reserva, movimientos de inventario, ejecuciones de reporte.
 
-### Spike A — Overlay 2D + pose (R1, R5, UC03)
+Vista `v_reporte_ventas`: es la única fuente de la pregunta libre de UC10.
 
-- App RN mínima: cámara + un PNG de polera.
-- Estimar hombros (MediaPipe o equivalente en dispositivo).
-- Escalar y anclar el PNG. Medir FPS en un teléfono real.
-- **Pasa si:** 15+ FPS y el overlay sigue al torso; si no hay pose, el fallback foto funciona.
-- **Falla si:** solo corre en emulador o pide servidor de video.
+Índices mínimos: ventas por fecha y por turno; stock por almacén; variantes por producto.
 
-### Spike B — Venta que descuenta stock (R3, UC07)
-
-- `POST /ventas` con dos requests paralelos de la misma última unidad.
-- **Pasa si:** una venta `cobrada`, la otra 409/stock insuficiente; `stock` final = 0; el mismo `uuid` dos veces no duplica.
-- **Falla si:** stock negativo o dos ventas cobradas.
-
-### Spike C — Texto → SELECT acotado (R2, UC10)
-
-- Pregunta del docente contra una `v_reporte_ventas` de prueba.
-- Meter a propósito `DROP TABLE` y `SELECT * FROM usuarios`.
-- **Pasa si:** la pregunta legal devuelve tabla; las maliciosas se rechazan sin ejecutar.
-- **Falla si:** sale un SQL que toca otra tabla.
+El esquema físico completo (Prisma) se describe en Construcción. Elaboración fija las claves y la vista, no cada columna comercial añadida después (cupón, favorito, opinión).
 
 ---
 
-## 9. Criterio de éxito de Elaboración
+## 4.8 Arquitectura baseline
 
-El hito Lifecycle Architecture se cumple si:
+Vista lógica. La figura de paquetes se inserta desde Enterprise Architect.
 
-1. UC03, UC07 y UC10 están en formato expandido (este documento).
-2. El modelo de dominio distingue producto / variante / stock por almacén / venta / turno.
-3. Las cinco decisiones de la §7 están escritas.
-4. Los tres spikes tienen criterio pasa/falla. En Construcción se ejecutan primero.
+| Capa | Elementos |
+|------|-----------|
+| Presentación | React Native: catálogo y UC03. React: tienda, POS (UC06–UC08), reportes (UC10), reservas. |
+| Aplicación | Módulos NestJS: autenticación, catálogo, inventario, ventas, caja, reservas, usuarios, proveedores, reportes, pagos simulados, administración. |
+| Dominio | Descontar stock, cobrar venta, apartar y liberar reservado. |
+| Infraestructura | PostgreSQL; puerto de QR simulado; compilador y validador de UC10. |
 
-Construcción implementa el resto de CU sobre este baseline, no rediseña el inventario ni el motor SQL.
+**Decisiones que Construcción no reabre:**
+
+1. Un `POST /ventas` para UC05 y UC07. El canal distingue en línea y POS.
+2. El descuento de stock ocurre solo en el servidor, dentro de una transacción, con bloqueo de fila.
+3. El probador corre en el cliente. La API entrega el overlay.
+4. La pregunta libre solo lee `v_reporte_ventas` después del validador. No hay SQL escrito a mano desde el navegador.
+5. La cola offline guarda el identificador de la venta. El servidor es idempotente.
+6. Reservar sube `reservado`. Vender baja `cantidad` sobre el disponible. Completar una reserva genera la venta y libera el aparto.
+
+---
+
+## 4.9 Spikes de arquitectura
+
+Sirven para aceptar o corregir el baseline antes de dar por cerrada la fase. El resultado de haberlos corrido se cuenta en Construcción.
+
+### Spike A — Overlay (R1, R5, UC03)
+
+Cámara o foto, imagen de la variante, anclaje a hombros o a dos toques. El video no sale del dispositivo.
+
+- **Pasa si** el overlay se ve sobre el torso o sobre los puntos marcados, y el caso no toca stock.
+- **No pasa si** el flujo exige subir el video o solo funciona como una foto de maniquí ajena a la clienta.
+
+### Spike B — Venta concurrente (R3, UC07)
+
+Dos cobros paralelos de la última unidad, y el mismo identificador enviado dos veces.
+
+- **Pasa si** una venta queda cobrada, la otra se rechaza, el stock final no es negativo y el identificador repetido no duplica la venta.
+- **No pasa si** hay stock negativo o dos ventas cobradas de la misma unidad.
+
+### Spike C — SELECT acotado (R2, UC10)
+
+Pregunta permitida, y a propósito una orden de borrado o un `SELECT` sobre usuarios.
+
+- **Pasa si** la pregunta legal devuelve filas (o cero filas) y las maliciosas no se ejecutan.
+- **No pasa si** llega a ejecutarse una sentencia sobre otra tabla.
+
+---
+
+## 4.10 Cierre de la fase
+
+El hito de arquitectura queda cumplido si:
+
+1. UC03, UC07, UC10 y el contrato de UC11 están escritos.
+2. El dominio separa producto, variante, stock, reservado, venta y turno.
+3. Las seis decisiones de la sección 4.8 están aceptadas.
+4. Los spikes A, B y C tienen criterio de pasa y no pasa.
+
+Construcción implementa el resto de casos sobre este baseline. No rediseña el inventario ni abre el SQL del reporte.

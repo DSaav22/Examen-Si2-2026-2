@@ -1,15 +1,15 @@
 ---
 tipo: synthesis
-fuentes: 5
-actualizado: 2026-09-12
+fuentes: 6
+actualizado: 2026-09-23
 tags: [puds, inicio]
 ---
 
 # Fase Inicio (PUDS)
 
-Hito Lifecycle Objective. Escrito el 12 sep. Formal: `docs/parcial/02-puds/01-fase-inicio.md`.
+Hito Lifecycle Objective. Formal: `docs/parcial/02-puds/01-fase-inicio.md` (capítulo 3). Abierto el 12 sep; alcance alineado el 19 sep (reservas, encargado, proveedor entran).
 
-EnsayAR resuelve la expansión cara de la [[Tienda de ropa femenina]] con [[Plataforma omnicanal]] + [[Probador virtual]] (2D+pose) + [[Reportes generativos]] (SQL acotado).
+EnsayAR: [[Plataforma omnicanal]] + [[Probador virtual]] (2D) + [[Reportes generativos]] (SQL acotado). Casos críticos: UC03, UC07, UC10. UC11–UC13 cubren reserva y proveedor.
 
 ## Artefactos
 
@@ -19,4 +19,4 @@ EnsayAR resuelve la expansión cara de la [[Tienda de ropa femenina]] con [[Plat
 
 ## Qué sigue
 
-Hecho: [[Fase Elaboracion]].
+Hecho: [[Fase Elaboracion]]. Diagrama de casos de uso: Enterprise Architect.

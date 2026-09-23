@@ -1,7 +1,7 @@
 ---
 tipo: synthesis
-fuentes: 4
-actualizado: 2026-09-12
+fuentes: 6
+actualizado: 2026-09-23
 tags: [hub, examen, parcial]
 ---
 
@@ -25,7 +25,7 @@ El resto: e-commerce + [[Punto de venta]] + [[Inventario matricial]] + [[Pasarel
 ## Entrega del 23
 
 - Software del [[MVP y alcance]] (esencial y usable).
-- Informe en 3 partes: [[Documento del examen]], documentado 100% con PUDS.
+- Informe en 3 partes: [[Documento del examen]], documentado 100% con PUDS. Checklist: [[Checklist informe EnsayAR]]. Modelos: [[Comparacion informes ejemplo]].
 - Deploy en [[Azure]], no localhost. Nada de CMS e-commerce.
 
 ## Conflictos

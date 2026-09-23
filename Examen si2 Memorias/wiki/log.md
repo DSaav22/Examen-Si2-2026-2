@@ -113,3 +113,40 @@ Fixes previos OK (upsert stock parcial sin FOR UPDATE). Sin críticos de camino 
 ## [2026-09-19] query | Auditoría #4
 
 Fixes #3 OK. Sin críticos auth/IDOR. Altos nuevos: `contra_entrega` sin hold, reservas `almacenes[0]`, sql-seguro bypasseable, movimientos encargado truncados, JWT fallback, Pos hooks, assetUrl Azure, 401, móvil LAN/tunnel.
+
+## [2026-09-22] ingest | Pull merge rama Andres → main
+
+Fast-forward `5c95fc2` → `fad2bb1`. Andrés: Vesta UI, admin/, cliente (favoritos/perfil), 4 migraciones comerciales, cupones, JWT revoke. Fixes Diego de stock/seguridad **sobreviven**. Riesgos: `migrate deploy` local, `demo:catalog` pisa `reservado`, links `?coleccion=` rotos, POS roles ≠ caja, cupón sin `usoMaximo`.
+
+## [2026-09-22] query | Cómo armar el documento del parcial
+
+Canon: [[Documento del examen]] + [[stack-metodologia-parcial]] (3 partes). Artefactos ya en `docs/parcial/` (01–03). Parte 2 = PUDS Inicio→Transición, no diario de commits. Garzón solo nutre investigación Parte 1.
+
+## [2026-09-22] ingest | Contexto completo del proyecto
+
+Fuente: `raw/2026-09-22-contexto-completo-proyecto.md` → [[contexto-completo-proyecto]]. Snapshot código 22 sep (EnsayAR + UI Vesta). Nueva síntesis [[Estado del codigo]]. Actualiza MVP, contradicciones, huecos RF, Construcción, actores, arquitectura, probador/reportes/IA, offline, POS, stack, EnsayAR, index. Acorde al repo; tensión: alcance aspiracional 19 sep vs madurez real (probador/IA no cerrados).
+
+## [2026-09-23] ingest | Ejemplos informe Tatiana + Lozada
+
+PDFs → `raw/2026-09-23-ejemplo-informe-tatiana-autogo.pdf` (172 p.) y `…-lozada-asistencia-mecanica.pdf` (63 p.). Fuentes wiki + [[Comparacion informes ejemplo]] + [[Checklist informe EnsayAR]]. Tatiana = modelo de profundidad; Lozada = CU OK pero incompleto. Ninguno trae Adopción (Parte 3 propia sí). Actualiza [[Documento del examen]] e index.
+
+## [2026-09-23] ingest | Transcripción literal stack/PUD
+
+`raw/2026-09-12-transcripcion-audio-stack-metodologia-parcial.md` → [[transcripcion-audio-stack-metodologia-parcial]]. Misma clase que [[stack-metodologia-parcial]] (notas). Confirma: 3 partes; PUD con fases×disciplinas; ciclo≈sprint; stack Nest/React/RN; 18 sep = Scrum semestre (fuera del parcial). Actualiza [[Proceso Unificado]], [[Cronograma]], stack source, index.
+
+## [2026-09-23] lint | Cuerpo del informe en docs/parcial
+
+Decisión: escribir el Word por capítulos en `docs/parcial/` (no en wiki). Wiki → [[Indice del informe]] + [[Documento del examen]]. Estructura: portada, perfil, marco, 4 fases PUD, pruebas, adopción, cierre. README maestro con tabla. Contenido previo migrado a `02-marco-teorico` y `08-adopcion-capacitacion`.
+
+## [2026-09-23] query | Casos de uso vs código y alcance ampliado
+
+El código ya tenía UC14–UC27 fuera de la primera lista. El informe documenta UC01–UC35 como comportamiento del sistema, con flujo en `docs/parcial/02-puds/casos-de-uso-detalle.md`. El código de UC28–UC35 se alinea después.
+
+## [2026-09-23] query | Índice al estilo Tatiana
+
+El informe suma módulos (`modulos.md`), fichas UC01–UC35 con espacio de diagrama y análisis/diseño (`analisis-diseno.md`). Las fases PUD y la Parte III se mantienen. El Word nuevo quedó en `EnsayAR-Informe-Primer-Parcial-numerado.docx` porque el archivo principal estaba abierto.
+
+## [2026-09-23] query | Índice idéntico al de Tatiana
+
+El Word `docs/parcial/EnsayAR-Informe-Primer-Parcial.docx` sigue el índice de `raw/inbox/Examen SI2 1.pdf`: Parte I perfil 1.1–1.8, Parte II marco 2.1–2.3 (módulos), Parte III requisitos con ciclos, fichas, análisis, diseño, implementación, pruebas, y cierre (conclusión, recomendación, bibliografía, URL y QR). La capacitación quedó en 3.4.4. Dominio y stack siguen siendo EnsayAR.
+

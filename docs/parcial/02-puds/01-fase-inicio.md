@@ -1,251 +1,194 @@
-# Parte 2 — Proceso Unificado: Fase de Inicio
+# Capítulo 3 — Fase de Inicio
 
+**Parte II — Proceso Unificado de Desarrollo de Software**  
 **Sistema:** EnsayAR  
-**Hito:** Lifecycle Objective (objetivos del ciclo de vida acordados)  
-**Fecha de la fase:** 12 de septiembre de 2026  
+**Hito de la fase:** objetivos del ciclo de vida (Lifecycle Objective)  
+**Apertura de la fase:** 12 de septiembre de 2026  
+**Ajuste de alcance:** 19 de septiembre de 2026  
 **Presentación del parcial:** 23 de septiembre de 2026  
 
-Referencia: Jacobson, I., Booch, G. y Rumbaugh, J. *El Proceso Unificado de Desarrollo de Software*.
+Referencia: Jacobson, I., Booch, G. y Rumbaugh, J. *El proceso unificado de desarrollo de software*.
+
+El relato de negocio (problema, objetivos y límites del producto) está en el capítulo 1. Aquí se registran los artefactos de **Inicio**: visión operativa, actores, casos de uso en formato breve, requisitos no funcionales, riesgos y arquitectura candidata. Esta fase no construye el software. La Elaboración detalla los casos críticos y fija el baseline.
+
+**Disciplinas de esta fase:** captura de requisitos (principal); esbozo de análisis y de diseño (arquitectura candidata). Implementación y pruebas quedan para Construcción y para el capítulo de pruebas.
 
 ---
 
-## 1. Propósito de esta fase
+## 3.1 Propósito
 
-En Inicio se responde: ¿hay un problema real, un sistema viable y un alcance que se puede entregar el 23 de septiembre?
-
-Esta fase **no** construye el producto. Produce la visión, los actores, los casos de uso a alto nivel, los riesgos y una arquitectura candidata. La Elaboración detallará los casos de uso críticos y fijará el baseline arquitectónico.
+Inicio responde si hay un problema real, un sistema viable y un alcance que se puede demostrar el 23 de septiembre. El resultado es un acuerdo de equipo: qué entra en el MVP, qué queda fuera y qué tres casos de uso dirigen la arquitectura.
 
 ---
 
-## 2. Visión
+## 3.2 Visión
 
-EnsayAR es una plataforma omnicanal para una cadena nacional de **moda femenina** (prendas, básicos, calzado, carteras, joyería; ocasiones social, casual y trabajo).
+EnsayAR es la plataforma omnicanal de una cadena de moda femenina. Vende en línea y en caja sobre el mismo inventario (producto × talla × color × almacén).
 
-Hoy la marca crece abriendo sucursales. Eso no escala: la clienta tiene que ir al local, el horario corta las ventas, hay más personal y los envíos a ciudades sin tienda (p. ej. Camiri) se complican.
+Frente a un catálogo genérico, el ciclo de vida se justifica con dos capacidades:
 
-EnsayAR vende **24/7 en línea** y **en caja física (POS)** sobre el mismo inventario. Las dos capacidades que justifican el sistema frente a un e-commerce genérico son:
+1. **Probador virtual:** la clienta ve la variante sobre su cuerpo (cámara o foto, overlay 2D), no sobre un maniquí.
+2. **Consulta bajo demanda:** la administración formula una pregunta y obtiene una tabla a partir de un `SELECT` de solo lectura. Los reportes fijos (día e inventario) conviven con esa consulta.
 
-1. **Probador virtual** en el teléfono: la clienta ve la prenda sobre *su* cuerpo, no sobre un maniquí.
-2. **Reportes generativos:** la administración pide información en voz o texto y el sistema arma la consulta en el momento (texto → SQL de solo lectura).
-
-El nombre junta *ensayar* (probarse ropa) y *AR* (realidad aumentada).
+El nombre junta *ensayar* y *AR*. El detalle del problema y de los objetivos está en las secciones 1.2 a 1.4.
 
 ---
 
-## 3. Problema
+## 3.3 Actores
 
-| Pregunta | Respuesta |
-|----------|-----------|
-| ¿Quién lo padece? | La cadena (costos de expansión) y la clienta (tiene que ir a la tienda o compra a ciegas). |
-| ¿Cuál es el problema? | El modelo presencial no atiende demanda 24/7 ni geografía; el e-commerce de ropa falla si no se puede ensayar. |
-| ¿Cuál es el impacto? | Tiendas saturadas, más sucursales, más planilla, ventas perdidas de noche y en provincias; devoluciones si se vende sin prueba. |
-| ¿Qué solución se propone? | EnsayAR: catálogo con variantes, POS, pagos básicos, probador 2D+pose, asistente de ficha e informes bajo demanda. |
+| Actor | Tipo | Quiere |
+|-------|------|--------|
+| Clienta | Primario | Ver el catálogo, ensayar, reservar y comprar con el stock real de la sucursal. |
+| Cajero | Primario | Abrir la caja, cobrar en el local y cerrar el turno. |
+| Encargado de sucursal | Primario | Ver inventario, ventas y reservas de su sucursal. |
+| Administrador | Primario | Mantener catálogo, usuarios y sucursales; pedir reportes. |
+| Proveedor | Primario | Registrar ingresos de inventario de sus productos. |
+| Servicio de consulta | Apoyo | Responder la ficha con datos ya cargados y compilar la pregunta del reporte. No modifica stock. |
+| Pasarela simulada | Apoyo | Aprobar o rechazar un QR de prueba. |
 
-Una polera no es un ítem plano: es un producto con **talla × color**, stock por sucursal/almacén y fotos por color. Sin ese modelo, el inventario miente.
-
----
-
-## 4. Objetivos
-
-### 4.1 General
-
-Desarrollar y desplegar en Azure un MVP omnicanal (web + móvil + API) que permita consultar, ensayar de forma asistida y comprar ropa femenina, y que permita a la tienda vender en caja y consultar ventas en lenguaje natural, aplicando el Proceso Unificado y UML.
-
-### 4.2 Específicos
-
-1. Especificar requisitos funcionales y no funcionales del MVP del 23 de septiembre.
-2. Modelar actores y casos de uso que dirigen el ciclo (catálogo, probador, checkout, POS, reporte generativo).
-3. Diseñar inventario matricial (producto, variante, almacén).
-4. Implementar backend NestJS, web React (admin/POS) y móvil React Native (clienta + cámara).
-5. Integrar un probador por cámara + estimación de pose + overlay 2D de la variante.
-6. Integrar reportes generativos acotados (voz/texto → SQL SELECT).
-7. Desplegar en Microsoft Azure (no localhost).
-8. Documentar el proceso con PUDS y dejar mecanismos de adopción para la clienta, el cajero y el admin.
+El vendedor puede operar el punto de venta con un permiso más acotado que el del cajero. Superadministrador y recursos humanos existen en el modelo de datos y no tienen un módulo propio en este parcial.
 
 ---
 
-## 5. Alcance del parcial
+## 3.4 Alcance acordado para el 23 de septiembre
 
-### 5.1 Entra (MVP)
+### 3.4.1 Entra en el MVP
 
-- Autenticación y roles: clienta, cajero, administrador.
-- Catálogo con filtros (categoría, ocasión, talla, color, precio).
-- Variantes talla × color, fotos por color, stock por sucursal/almacén.
-- Carrito y checkout: **contra entrega** y **QR simulado**.
-- POS: apertura de caja con fondo, venta presencial, cierre/arqueo simple (un turno).
-- Probador: cámara, pose del cuerpo, prenda 2D de la variante sobre el torso; fallback por foto de cuerpo completo.
-- Asistente IA: preguntas sobre la ficha de la prenda visible.
-- Reportes fijos básicos (ventas del día / sucursal) y **un** motor generativo acotado a ventas, sucursal, horario y cajero.
-- Cola offline mínima del POS: registrar venta local y sincronizar al volver la red.
-- Deploy Azure + PostgreSQL.
+- Autenticación y roles: clienta, cajero, encargado, administrador y proveedor.
+- Catálogo con filtros; ficha; variantes talla × color; stock por sucursal y almacén.
+- Temporadas y colecciones como clasificación del catálogo.
+- Carrito y compra en línea con pago simulado (contra entrega o QR).
+- Reservas de prendas y su atención en sucursal.
+- POS: apertura con fondo, venta, cupón, cierre de turno.
+- Cola local del POS si cae la red, con sincronización posterior.
+- Probador: hoy overlay 2D; el **3D entra** y se avanza en lo que el tiempo permita.
+- Bot de tienda: entra; hoy la ficha responde por reglas.
+- Pasarela y factura: simulación (Stripe en modo prueba si hace falta). Sin cobro ni NIT reales.
+- PWA, precio mayorista, transferencia entre almacenes, despacho y devolución: entran; se implementa lo que alcance.
+- API NestJS, clientes React y React Native, PostgreSQL, infraestructura Azure preparada.
 
-### 5.2 No entra
+### 3.4.2 Queda fuera
 
-| Fuera | Motivo |
-|-------|--------|
-| Reservas para probar en vestidor físico | Enunciado de otro docente; no descalifica este parcial. |
-| Pasarela real (Stripe, Libélula, tarjeta bancaria) | Entorno académico; se simula QR y se cobra en caja. |
-| Probador 3D con deformación de tela | Inviable en 11 días; se declara como riesgo aceptado. |
-| PWA completa / modo offline de todo el e-commerce | Solo cola del POS. |
-| Precio mayorista / escalas por volumen | Complejidad de pricing; post-parcial. |
-| Proveedores, temporadas y colecciones como módulo | Se puede etiquetar “temporada” en el producto, sin ERP de compras. |
-| CMS e-commerce (Shopify, Magento, WooCommerce, PrestaShop) | Prohibido. |
-| Flutter, Angular, FastAPI, Spring Boot | No son el stack de este parcial. |
+| Tema | Motivo |
+|------|--------|
+| Cobro bancario real y NIT real | El entorno es académico. La pasarela y la factura se simulan. |
+| CMS (Shopify, Magento, WooCommerce, PrestaShop) | El código es propio. |
+| Spring Boot, Angular, Flutter, FastAPI como backend de este examen | No son el stack del parcial. |
 
 ---
 
-## 6. Stakeholders y actores
+## 3.5 Casos de uso en formato breve
 
-| Actor | Tipo | Objetivo |
-|-------|------|----------|
-| Clienta | Primario | Ver, ensayar y comprar sin ir a la tienda, o comprar en tienda con el mismo stock. |
-| Cajero | Primario | Abrir caja, cobrar en el local, cerrar el turno. |
-| Administrador | Primario | Cargar catálogo, ver inventario, pedir reportes (también por voz). |
-| Servicio de IA | de apoyo | Traducir pregunta de ficha o de reporte; no decide stock. |
-| Pasarela simulada | de apoyo | Confirmar o rechazar un QR de prueba. |
-| Sistema | interno | Descontar stock del almacén correcto. |
+En Inicio cada caso lleva identificador, actor y resultado de éxito. El flujo, las alternativas y las excepciones de los treinta y cinco casos están en `casos-de-uso-detalle.md`. El diagrama UML se inserta desde Enterprise Architect.
 
-El encargado de sucursal y el proveedor (PDF Garzón) no son actores del MVP.
+| ID | Caso de uso | Actor | Éxito | Prioridad |
+|----|-------------|-------|--------|-----------|
+| UC01 | Consultar catálogo | Clienta, Administrador | Lista filtrada con precio y disponibilidad. | Alta |
+| UC02 | Ver ficha y variantes | Clienta | Ve talla, color, fotos y stock de la sucursal. | Alta |
+| UC03 | Usar probador virtual | Clienta | Ve la variante sobre su cuerpo (cámara o anclaje manual). | Crítica |
+| UC04 | Consultar la ficha | Clienta | Recibe precio, talla, color, ocasión o descripción ya cargados. | Media |
+| UC05 | Comprar en línea | Clienta | Venta registrada; pago simulado; stock descontado. | Alta |
+| UC06 | Abrir caja | Cajero | Turno abierto con fondo inicial. | Alta |
+| UC07 | Registrar venta en POS | Cajero | Venta cobrada; stock descontado; ticket. | Crítica |
+| UC08 | Cerrar caja | Cajero | Arqueo del turno (esperado frente a declarado). | Alta |
+| UC09 | Administrar catálogo | Administrador | Alta o edición de producto, variante y stock. | Alta |
+| UC10 | Pedir reporte | Administrador | Tabla de ventas o de inventario; la pregunta libre solo produce un `SELECT` permitido. | Crítica |
+| UC11 | Reservar una prenda | Clienta | Reserva en una sucursal; el saldo reservado sube. | Alta |
+| UC12 | Atender reservas | Encargado | Cambia el estado de la reserva de su sucursal. | Alta |
+| UC13 | Ingresar mercadería | Proveedor | Movimiento de ingreso asociado a sus productos. | Media |
+| UC14 | Registrarse | Clienta | Cuenta creada. | Alta |
+| UC15 | Iniciar y cerrar sesión | Todos | Sesión con token, o token revocado al salir. | Alta |
+| UC16 | Cambiar clave | Usuario | La clave anterior deja de servir. | Media |
+| UC17 | Gestionar favoritos | Clienta | El producto queda marcado o se quita. | Media |
+| UC18 | Perfil y direcciones | Clienta | Datos y direcciones guardados. | Media |
+| UC19 | Ver historial | Clienta, cajero, encargado | Lista de sus ventas. | Alta |
+| UC20 | Opinar un producto | Clienta | Opinión registrada, sujeta a moderación. | Media |
+| UC21 | Pedir alerta de producto | Clienta | Alerta guardada. | Baja |
+| UC22 | Aplicar cupón | Clienta, cajero | El total de la venta refleja el descuento válido. | Media |
+| UC23 | Gestionar usuarios | Administrador | Alta o cambio de usuario y rol. | Alta |
+| UC24 | Sucursales, temporadas y colecciones | Administrador | Esos catálogos quedan actualizados. | Media |
+| UC25 | Ajustar inventario | Encargado, administrador | Kardex con el saldo nuevo. | Alta |
+| UC26 | Moderar y auditar | Administrador | Opinión moderada o evento de auditoría visible. | Media |
+| UC27 | Simular un pago | Cajero, clienta | El medio queda aprobado o rechazado sin cobrar de verdad. | Alta |
+| UC28 | Probador 3D | Clienta | Ve la prenda con volumen, en el avance que exista. | Alta |
+| UC29 | Hablar con el bot | Clienta | Respuesta de asistencia más allá de la ficha fija. | Alta |
+| UC30 | Precio mayorista | Administrador, clienta mayorista | Precio distinto según el tipo de compra. | Media |
+| UC31 | Transferir stock | Encargado | El saldo sale de un almacén y entra en otro. | Media |
+| UC32 | Despachar pedido | Encargado | El pedido queda enviado. | Media |
+| UC33 | Devolver una venta | Cajero, clienta | El stock vuelve y la venta queda devuelta. | Media |
+| UC34 | Comprobante simulado | Cajero, administración | Documento de prueba, sin NIT real. | Media |
+| UC35 | Tienda instalable (PWA) | Clienta, cajero | La web sigue usable sin red en lo ya previsto. | Media |
 
----
-
-## 7. Modelo de casos de uso (Inicio)
-
-En Inicio los casos de uso van **en formato breve**: nombre, actor, éxito. El texto expandido y las secuencias son de Elaboración.
-
-### 7.1 Diagrama
-
-```mermaid
-flowchart TB
-  subgraph EnsayAR["EnsayAR"]
-    UC01[UC01 Consultar catálogo]
-    UC02[UC02 Ver ficha y variantes]
-    UC03[UC03 Usar probador virtual]
-    UC04[UC04 Consultar ficha con IA]
-    UC05[UC05 Comprar en línea]
-    UC06[UC06 Abrir caja]
-    UC07[UC07 Registrar venta POS]
-    UC08[UC08 Cerrar caja]
-    UC09[UC09 Administrar catálogo]
-    UC10[UC10 Pedir reporte generativo]
-  end
-
-  Clienta((Clienta)) --> UC01
-  Clienta --> UC02
-  Clienta --> UC03
-  Clienta --> UC04
-  Clienta --> UC05
-  Cajero((Cajero)) --> UC06
-  Cajero --> UC07
-  Cajero --> UC08
-  Admin((Administrador)) --> UC09
-  Admin --> UC10
-  Admin --> UC01
-
-  UC03 -.-> UC02
-  UC05 -.-> UC02
-  UC07 -.-> UC02
-```
-
-### 7.2 Casos de uso breves
-
-| ID | Caso de uso | Actor | Éxito |
-|----|-------------|-------|--------|
-| UC01 | Consultar catálogo | Clienta, Admin | Lista filtrada de prendas con precio y disponibilidad. |
-| UC02 | Ver ficha y variantes | Clienta | Ve colores, tallas, fotos y stock de la sucursal elegida. |
-| UC03 | Usar probador virtual | Clienta | Ve la variante superpuesta sobre su cuerpo (cámara o foto). |
-| UC04 | Consultar ficha con IA | Clienta | Recibe respuesta sobre material, cuidado o combinación a partir de la ficha. |
-| UC05 | Comprar en línea | Clienta | Pedido creado; pago contra entrega o QR simulado; stock descontado. |
-| UC06 | Abrir caja | Cajero | Turno abierto con fondo inicial. |
-| UC07 | Registrar venta POS | Cajero | Venta cobrada (efectivo/QR); stock descontado; ticket. |
-| UC08 | Cerrar caja | Cajero | Arqueo: esperado vs declarado. |
-| UC09 | Administrar catálogo | Administrador | Alta/edición de producto, variantes, fotos y stock por almacén. |
-| UC10 | Pedir reporte generativo | Administrador | Pregunta en voz o texto → tabla de ventas (SQL SELECT acotado). |
-
-**Casos de uso críticos para la arquitectura (dirigen Elaboración):** UC03, UC07, UC10. Son los que concentran riesgo técnico (cámara/pose, consistencia de stock, SQL generado).
+**Dirigen la Elaboración** (riesgo de arquitectura): UC03 (cámara y overlay), UC07 (stock y caja en una transacción; la compra en línea UC05 reutiliza ese contrato) y UC10 (consulta acotada).
 
 ---
 
-## 8. Especificación complementaria (RNF)
+## 3.6 Requisitos no funcionales
 
-| ID | Requisito | Criterio |
-|----|-----------|----------|
-| RNF01 | Seguridad | Contraseñas hasheadas; JWT; el motor SQL solo ejecuta SELECT sobre vistas/tablas permitidas. |
-| RNF02 | Disponibilidad | API y web en Azure; el POS no se detiene si cae internet (cola local). |
-| RNF03 | Usabilidad | Web responsive; móvil para clienta y cámara. |
-| RNF04 | Rendimiento | Catálogo usable con cientos de variantes; el overlay del probador debe sentirse en tiempo real en un teléfono medio. |
-| RNF05 | Escalabilidad | Nuevas sucursales = filas de almacén, no un redeploy. |
-| RNF06 | Mantenibilidad | Módulos NestJS; apps web y móvil separadas. |
-| RNF07 | Integración | API REST. IA y pagos simulados detrás de puertos. |
-| RNF08 | Compatibilidad | Móvil = React Native (no Flutter). |
-| RNF09 | Pagos académicos | QR y contra entrega en entorno de prueba; sin cobro real. |
-| RNF10 | Legal / prohibiciones | Sin CMS e-commerce. Código propio. |
-
----
-
-## 9. Glosario
-
-| Término | Definición |
-|---------|------------|
-| EnsayAR | Nombre de la plataforma. |
-| Variante | Combinación vendible talla × color de un producto; tiene su propio stock y fotos. |
-| Almacén | Depósito de stock de una sucursal (o bodega). Toda venta descuenta de uno. |
-| POS | Punto de venta físico: caja, turno, ticket. |
-| Arqueo | Comparar el efectivo/QR del turno con lo que el sistema espera. |
-| Probador 2D+pose | Cámara + puntos del cuerpo + imagen de la prenda encima; no simula tela 3D. |
-| Reporte generativo | Informe no prediseñado, armado en el momento a partir de voz/texto. |
-| SQL acotado | Solo SELECT; whitelist de tablas/columnas; límite de filas. |
-| Cola offline | Ventas POS guardadas en el dispositivo hasta que hay red. |
-| Omnicanal | Un inventario; dos canales (web/móvil y caja). |
+| ID | Requisito | Criterio de Inicio |
+|----|-----------|-------------------|
+| RNF01 | Seguridad | Contraseña con hash; JWT; la consulta generativa solo ejecuta `SELECT` sobre el conjunto permitido. |
+| RNF02 | Disponibilidad del POS | Si cae la red, la venta de caja queda en cola local y se sincroniza después. |
+| RNF03 | Usabilidad | Web usable en escritorio; móvil para la clienta y la cámara. |
+| RNF04 | Consistencia | Dos ventas de la misma variante y almacén no dejan el stock en negativo. |
+| RNF05 | Escalabilidad de sucursales | Una sucursal nueva es un dato, no un redespliegue. |
+| RNF06 | Mantenibilidad | Módulos en la API; web y móvil como clientes distintos. |
+| RNF07 | Integración | API REST. Pago simulado y consulta detrás de un contrato, no mezclados con el stock. |
+| RNF08 | Pagos académicos | QR, efectivo y contra entrega de prueba. Sin cobro bancario. |
+| RNF09 | Código propio | Sin CMS de comercio electrónico. |
 
 ---
 
-## 10. Riesgos (Inicio)
+## 3.7 Glosario
 
-| # | Riesgo | Impacto | Mitigación |
-|---|--------|---------|------------|
-| R1 | El probador 3D “de catálogo” no entra en 11 días | Alto | Alcance explícito: 2D+pose + fallback foto. Se documenta la limitación. |
-| R2 | SQL generado escribe o lee de más | Alto | Whitelist, SELECT, usuario de BD de solo lectura, tope de filas. |
-| R3 | Stock se descuenta dos veces (web + POS) | Alto | Transacción por variante+almacén; pruebas de UC05 y UC07. |
-| R4 | Azure o cuenta estudiantil bloquea el deploy | Medio | Subir API + web en la primera semana de construcción, no el día 22. |
-| R5 | Cámara/pose no corre en emulador | Medio | Probar en teléfono físico; fallback foto. |
-| R6 | Alcance se hincha (reservas, mayorista, PWA) | Alto | Lista 5.2; cualquier extra queda post-parcial. |
-| R7 | Sin rúbrica formal de defensa | Bajo | El audio ya fijó las dos innovaciones como lo evaluable. |
-
-Hito de Inicio cumplido si R1, R2 y R6 quedan aceptados por el equipo (esta versión los acepta).
-
----
-
-## 11. Arquitectura candidata
-
-Stack obligatorio del parcial: NestJS + TypeScript, React, React Native, PostgreSQL, Azure.
-
-```mermaid
-flowchart LR
-  RN[React Native - Clienta] --> API[NestJS API]
-  WEB[React - Admin y POS] --> API
-  API --> PG[(PostgreSQL)]
-  API --> IA[Servicio IA]
-  API --> PAY[Pasarela simulada]
-  RN --> CAM[Cámara + pose + overlay]
-  WEB --> OFF[Cola local POS]
-  API --> AZ[Azure App Service / Container Apps]
-  PG --> AZDB[Azure Database for PostgreSQL]
-```
-
-Módulos previstos del API: `Auth`, `Catalogo`, `Inventario`, `Ventas`, `Caja`, `IaFicha`, `IaReportes`, `Pagos`.
-
-El baseline se prueba en Elaboración con tres spikes: overlay de pose, venta que descuenta stock, texto → SELECT.
+| Término | Definición en EnsayAR |
+|---------|------------------------|
+| Variante | Combinación vendible de talla y color. Tiene stock y puede tener overlay. |
+| Almacén | Depósito de una sucursal. La venta descuenta de un almacén. |
+| Reservado | Unidades apartadas por una reserva; no están libres para otra venta. |
+| POS | Punto de venta: turno, ticket y medios simulados. |
+| Arqueo | Comparar lo declarado en caja con el total que calculó el sistema. |
+| Probador 2D | Overlay de la variante anclado al torso. No simula tela en 3D. |
+| Reporte generativo | Pregunta no prediseñada que se compila a un `SELECT` validado. |
+| Cola offline | Ventas de caja guardadas en el navegador hasta que hay red. |
+| Omnicanal | Un inventario; canal en línea y canal de caja. |
 
 ---
 
-## 12. Criterio de éxito del 23 de septiembre
+## 3.8 Riesgos aceptados en Inicio
 
-Se considera alcanzado el Lifecycle Objective (y el parcial, a nivel Inicio) si:
+| ID | Riesgo | Impacto | Mitigación acordada |
+|----|--------|---------|---------------------|
+| R1 | El 3D no alcanza a cerrarse para la defensa | Alto | Se muestra el 2D que ya existe y se dice qué falta del 3D. |
+| R2 | Una pregunta arma SQL que escribe o lee de más | Alto | Solo `SELECT`, vista o conjunto permitido, tope de filas. |
+| R3 | Web y POS descuentan dos veces la misma unidad | Alto | Una transacción por variante y almacén; prueba de UC05 y UC07. |
+| R4 | La cuenta de Azure no alcanza a provisionarse antes de la defensa | Medio | La infraestructura queda descrita; la demo puede apoyarse en el entorno local si el alta de nube no está lista, y se dice con claridad. |
+| R5 | La pose no corre en el emulador | Medio | Prueba en teléfono; si no hay pose, anclaje por toques. |
+| R6 | Se presenta como terminado lo que solo está empezado (3D, bot, PWA, mayorista, despacho) | Alto | En la defensa se distingue alcance de lo que ya corre. |
+| R7 | El pago simulado se cuenta como pasarela real | Medio | Stripe, si se usa, es modo prueba. Factura y NIT simulados. |
 
-1. Hay visión, alcance y no-alcance escritos (este documento).
-2. Los diez casos de uso breves cubren las dos innovaciones y el POS.
-3. Los riesgos R1–R6 tienen dueño (el equipo) y mitigación.
-4. La arquitectura candidata usa solo el stack del docente.
+Inicio se considera cerrado cuando R1, R2, R3 y R6 quedan aceptados. Esta versión los acepta.
 
-La Elaboración parte de UC03, UC07 y UC10.
+---
+
+## 3.9 Arquitectura candidata
+
+Clientes **React Native** (clienta y cámara) y **React** (tienda, POS y administración) hablan con una API **NestJS**. Los datos viven en **PostgreSQL**. El pago simulado y la consulta acotada son puertos del monolito, no servicios desplegados aparte. El overlay se calcula en el cliente; el servidor solo entrega la imagen de la variante.
+
+Módulos previstos de la API: autenticación, catálogo, inventario, ventas, caja, reservas, usuarios, proveedores, reportes, pagos simulados y administración.
+
+La figura de arquitectura candidata se elabora en Enterprise Architect y se inserta en este capítulo. El baseline se contrasta en Elaboración con tres spikes: overlay, venta concurrente que descuenta stock, y pregunta que solo produce un `SELECT` permitido.
+
+---
+
+## 3.10 Criterio de cierre de la fase
+
+Inicio queda cumplido si:
+
+1. Visión, alcance y exclusiones están escritos y coinciden con el capítulo 1.
+2. Los casos UC01–UC35 cubren lo que el código ya hace y lo que el 23 sep a la noche se decidió construir en la medida de lo posible.
+3. UC03, UC07 y UC10 están marcados como críticos para Elaboración.
+4. Los riesgos R1–R6 tienen mitigación.
+5. La arquitectura candidata usa el stack del curso.
+
+La fase siguiente parte de esos tres casos críticos y del modelo de dominio del inventario matricial.
