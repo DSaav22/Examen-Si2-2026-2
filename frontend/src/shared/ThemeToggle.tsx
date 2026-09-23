@@ -1,0 +1,2 @@
+import { useEffect, useState } from 'react'
+export function ThemeToggle() { const [dark, setDark] = useState(() => localStorage.getItem('ensayar_theme') === 'dark'); useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.setItem('ensayar_theme', dark ? 'dark' : 'light') }, [dark]); return <button className="theme-toggle" type="button" aria-label={dark ? 'Usar modo claro' : 'Usar modo oscuro'} onClick={() => setDark((value) => !value)}>{dark ? 'Claro' : 'Oscuro'}</button> }

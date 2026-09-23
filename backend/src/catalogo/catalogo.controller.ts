@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   ForbiddenException,
   Get,
@@ -38,26 +39,51 @@ export class CatalogoController {
 
   @Get('productos')
   listar(
+    @Query('q') busqueda?: string,
+    @Query('sku') sku?: string,
     @Query('categoria') categoria?: string,
     @Query('ocasion') ocasion?: string,
     @Query('talla') talla?: string,
     @Query('color') color?: string,
+    @Query('material') material?: string,
+    @Query('estilo') estilo?: string,
+    @Query('ajuste') ajuste?: string,
     @Query('precioMin') precioMin?: string,
     @Query('precioMax') precioMax?: string,
     @Query('temporadaId') temporadaId?: string,
     @Query('coleccionId') coleccionId?: string,
     @Query('sucursalId') sucursalId?: string,
+    @Query('descuento') descuento?: string,
+    @Query('ordenar')
+    ordenar?:
+      | 'relevancia'
+      | 'precio-asc'
+      | 'precio-desc'
+      | 'novedades'
+      | 'popularidad'
+      | 'descuento',
+    @Query('pagina') pagina?: string,
+    @Query('limite') limite?: string,
   ) {
     return this.catalogo.listarProductos({
+      busqueda,
+      sku,
       categoria,
       ocasion,
       talla,
       color,
+      material,
+      estilo,
+      ajuste,
       precioMin: precioMin ? Number(precioMin) : undefined,
       precioMax: precioMax ? Number(precioMax) : undefined,
       temporadaId,
       coleccionId,
       sucursalId,
+      descuento: descuento === 'true',
+      ordenar,
+      pagina: pagina ? Number(pagina) : undefined,
+      limite: limite ? Number(limite) : undefined,
     });
   }
 
@@ -71,12 +97,62 @@ export class CatalogoController {
     return this.catalogo.obtenerProducto(id);
   }
 
+  @Get('productos/:id/complementarios')
+  async complementarios(@Param('id') id: string) {
+    const producto = await this.catalogo.obtenerProducto(id);
+    const items = await this.catalogo.listarProductos({ ocasion: producto.ocasion });
+    const list = Array.isArray(items) ? items : items.items;
+    return list.filter(item => item.id !== id && item.categoria !== producto.categoria).slice(0, 4);
+  }
+
+  @Get('productos/:id/interno')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO)
+  obtenerInterno(@Param('id') id: string) {
+    return this.catalogo.obtenerProducto(id, true);
+  }
+
   @Get('sucursales')
   sucursales() {
     return this.catalogo.sucursales();
   }
 
+  @Get('categorias')
+  async categorias() {
+    const categorias = await this.prisma.categoria.findMany({ where: { activa: true }, orderBy: { nombre: 'asc' } });
+    if (categorias.length) return categorias;
+    const legacy = await this.prisma.producto.findMany({ distinct: ['categoria'], select: { categoria: true }, orderBy: { categoria: 'asc' } });
+    return legacy.map(item => ({ id: item.categoria, nombre: item.categoria, activa: true, origen: 'compatibilidad' }));
+  }
+
+  @Get('productos/:id/opiniones')
+  async opiniones(@Param('id') productoId: string) {
+    const items = await this.prisma.opinion.findMany({ where: { productoId, moderada: true }, orderBy: { creadaEn: 'desc' }, include: { usuario: { select: { nombre: true } } } });
+    const promedio = items.length ? items.reduce((sum, item) => sum + item.puntuacion, 0) / items.length : 0;
+    return { promedio: Number(promedio.toFixed(2)), cantidad: items.length, items };
+  }
+
+  @Post('productos/:id/opiniones')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.CLIENTA)
+  async crearOpinion(@Param('id') productoId: string, @CurrentUser() user: JwtPayload, @Body() body: { puntuacion?: number; comentario?: string; imagenUrl?: string }) {
+    const puntuacion = Number(body.puntuacion);
+    if (!Number.isInteger(puntuacion) || puntuacion < 1 || puntuacion > 5) throw new BadRequestException('La puntuación debe estar entre 1 y 5');
+    const compra = await this.prisma.venta.count({ where: { clientaId: user.sub, lineas: { some: { variante: { productoId } } } } });
+    return this.prisma.opinion.upsert({ where: { productoId_usuarioId: { productoId, usuarioId: user.sub } }, update: { puntuacion, comentario: body.comentario ?? '', imagenUrl: body.imagenUrl ?? '', verificada: compra > 0, moderada: false }, create: { productoId, usuarioId: user.sub, puntuacion, comentario: body.comentario ?? '', imagenUrl: body.imagenUrl ?? '', verificada: compra > 0, moderada: false } });
+  }
+
+  @Post('productos/:id/alertas')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.CLIENTA)
+  alertar(@Param('id') productoId: string, @CurrentUser() user: JwtPayload, @Body() body: { tipo?: string }) {
+    const tipo = body.tipo === 'precio' ? 'precio' : 'reposicion';
+    return this.prisma.alertaProducto.upsert({ where: { productoId_usuarioId_tipo: { productoId, usuarioId: user.sub, tipo } }, update: { activa: true }, create: { productoId, usuarioId: user.sub, tipo } });
+  }
+
   @Get('stock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
   stock(@Query('almacenId') almacenId?: string) {
     return this.catalogo.listarStock(almacenId);
   }
@@ -101,7 +177,11 @@ export class CatalogoController {
   )
   subir(
     @UploadedFile()
-    archivo: { filename: string; mimetype: string; originalname: string },
+    archivo: {
+      filename: string;
+      mimetype: string;
+      originalname: string;
+    },
   ) {
     return this.imagenes.desdeDisco(archivo);
   }

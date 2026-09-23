@@ -12,6 +12,7 @@ export function leerCarrito(): LineaCarrito[] {
 
 export function guardarCarrito(lineas: LineaCarrito[]) {
   localStorage.setItem(CLAVE, JSON.stringify(lineas))
+  window.dispatchEvent(new CustomEvent('ensayar_carrito_actualizado', { detail: lineas }))
 }
 
 export function agregarAlCarrito(linea: Omit<LineaCarrito, 'cantidad'>) {

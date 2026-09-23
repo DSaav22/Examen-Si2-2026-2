@@ -1,4 +1,4 @@
-import { ChangeEvent, MouseEvent, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { assetUrl } from '../asset'

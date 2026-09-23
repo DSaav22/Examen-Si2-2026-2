@@ -1,0 +1,98 @@
+:root {
+  --vesta-font-primary: Arial, Helvetica, sans-serif;
+  --vesta-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  --vesta-weight-regular: 400;
+  --vesta-weight-medium: 600;
+  --vesta-weight-bold: 700;
+  --vesta-weight-extra-bold: 800;
+  --vesta-text-2xs: 9px;
+  --vesta-text-xs: 10px;
+  --vesta-text-sm: 11px;
+  --vesta-text-product: 12px;
+  --vesta-text-body: 14px;
+  --vesta-text-body-large: 16px;
+  --vesta-text-price: 19px;
+  --vesta-text-pos-title: 22px;
+  --vesta-text-logo: 23px;
+  --vesta-text-dialog-title: 24px;
+  --vesta-text-metric: 26px;
+  --vesta-text-section-title: 32px;
+  --vesta-text-look-title: 36px;
+  --vesta-text-page-title: 40px;
+  --vesta-text-hero-mobile: 46px;
+  --vesta-text-hero-desktop: 72px;
+  --vesta-leading-tightest: 0.96;
+  --vesta-leading-tight: 1.05;
+  --vesta-leading-heading: 1.1;
+  --vesta-leading-normal: 1.4;
+  --vesta-leading-relaxed: 1.5;
+  --vesta-tracking-tight: -2px;
+  --vesta-tracking-normal: 0;
+  --vesta-tracking-button: 0.6px;
+  --vesta-tracking-wide: 1.2px;
+  --vesta-tracking-wider: 1.5px;
+  --vesta-tracking-editorial: 2px;
+  --vesta-tracking-logo: 5px;
+}
+
+html, body, button, input, select, textarea { font-family: var(--vesta-font-primary); }
+body { font-size: var(--vesta-text-body); font-weight: var(--vesta-weight-regular); line-height: var(--vesta-leading-normal); }
+
+.vesta-logo { margin: 0; font-size: var(--vesta-text-logo); font-weight: var(--vesta-weight-extra-bold); line-height: 1; letter-spacing: var(--vesta-tracking-logo); text-transform: uppercase; white-space: nowrap; }
+.vesta-hero-title { margin: 0; font-size: clamp(var(--vesta-text-hero-mobile), 6vw, var(--vesta-text-hero-desktop)); font-weight: var(--vesta-weight-bold); line-height: var(--vesta-leading-tightest); letter-spacing: var(--vesta-tracking-tight); }
+.vesta-hero-eyebrow { margin: 0 0 10px; font-size: var(--vesta-text-body); font-weight: var(--vesta-weight-bold); line-height: 1.2; letter-spacing: var(--vesta-tracking-editorial); text-transform: uppercase; }
+.vesta-eyebrow { margin: 0; font-size: var(--vesta-text-sm); font-weight: var(--vesta-weight-regular); line-height: 1.2; letter-spacing: var(--vesta-tracking-editorial); text-transform: uppercase; }
+.vesta-section-title { margin: 7px 0 0; font-size: clamp(28px, 3vw, var(--vesta-text-section-title)); font-weight: var(--vesta-weight-bold); line-height: var(--vesta-leading-heading); letter-spacing: var(--vesta-tracking-normal); }
+.vesta-page-title { margin: 0; font-size: clamp(var(--vesta-text-section-title), 4vw, var(--vesta-text-page-title)); font-weight: var(--vesta-weight-bold); line-height: var(--vesta-leading-heading); }
+.vesta-product-title { margin: 0; font-size: clamp(28px, 3vw, var(--vesta-text-section-title)); font-weight: var(--vesta-weight-bold); line-height: var(--vesta-leading-tight); }
+.vesta-product-name { overflow: hidden; margin: 0; font-size: var(--vesta-text-product); font-weight: var(--vesta-weight-bold); line-height: 1.25; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.vesta-price { font-size: var(--vesta-text-body); font-weight: var(--vesta-weight-bold); line-height: 1.25; }
+.vesta-price-large { font-size: var(--vesta-text-price); font-weight: var(--vesta-weight-extra-bold); line-height: 1.2; }
+.vesta-old-price { font-size: var(--vesta-text-sm); font-weight: var(--vesta-weight-regular); line-height: 1.25; text-decoration: line-through; }
+.vesta-body { margin: 0; font-size: var(--vesta-text-body); font-weight: var(--vesta-weight-regular); line-height: var(--vesta-leading-relaxed); }
+.vesta-secondary { margin: 0; font-size: var(--vesta-text-body); font-weight: var(--vesta-weight-regular); line-height: var(--vesta-leading-normal); opacity: .7; }
+.vesta-navigation-text { font-size: var(--vesta-text-sm); font-weight: var(--vesta-weight-regular); line-height: 1; letter-spacing: var(--vesta-tracking-wide); text-transform: uppercase; }
+.vesta-button-text { font-size: var(--vesta-text-product); font-weight: var(--vesta-weight-bold); line-height: 1; letter-spacing: var(--vesta-tracking-button); text-transform: uppercase; }
+.vesta-badge-text { font-size: var(--vesta-text-2xs); font-weight: var(--vesta-weight-bold); line-height: 1; text-transform: uppercase; }
+.vesta-dialog-title { margin: 0; font-size: var(--vesta-text-dialog-title); font-weight: var(--vesta-weight-extra-bold); line-height: var(--vesta-leading-heading); }
+.vesta-pos-title { margin: 0; font-size: var(--vesta-text-pos-title); font-weight: var(--vesta-weight-extra-bold); line-height: var(--vesta-leading-heading); }
+.vesta-metric-value { margin: 0; font-size: var(--vesta-text-metric); font-weight: var(--vesta-weight-extra-bold); line-height: 1.1; }
+.vesta-metric-label { margin: 0; font-size: var(--vesta-text-xs); font-weight: var(--vesta-weight-regular); line-height: 1.2; letter-spacing: var(--vesta-tracking-wide); text-transform: uppercase; }
+.vesta-monospace { font-family: var(--vesta-font-mono); font-variant-numeric: tabular-nums; }
+.vesta-editorial-title { margin: 0; font-size: clamp(34px, 4vw, 42px); font-weight: var(--vesta-weight-bold); line-height: 1; }
+.vesta-editorial-copy { margin: 0; font-size: var(--vesta-text-body-large); font-weight: var(--vesta-weight-regular); line-height: var(--vesta-leading-relaxed); }
+.vesta-text-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vesta-text-two-lines { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+/* Aplicación tipográfica a las clases que ya existen en la aplicación. */
+.brand-mark { font-family: var(--vesta-font-primary); font-size: var(--vesta-text-logo) !important; font-weight: var(--vesta-weight-extra-bold); line-height: 1; letter-spacing: var(--vesta-tracking-logo) !important; }
+.hero-copy h1 { font-size: clamp(var(--vesta-text-hero-mobile), 6vw, var(--vesta-text-hero-desktop)); font-weight: var(--vesta-weight-bold); line-height: var(--vesta-leading-tightest); letter-spacing: var(--vesta-tracking-tight); }
+.hero-copy .eyebrow { font-size: var(--vesta-text-body); font-weight: var(--vesta-weight-bold); line-height: 1.2; letter-spacing: var(--vesta-tracking-editorial); }
+.page-head h2 { font-size: clamp(28px, 3vw, var(--vesta-text-page-title)); font-weight: var(--vesta-weight-bold); line-height: var(--vesta-leading-heading); }
+.product h3 { font-size: var(--vesta-text-product); font-weight: var(--vesta-weight-bold); line-height: 1.25; text-transform: uppercase; }
+.price { font-size: var(--vesta-text-body); font-weight: var(--vesta-weight-bold); line-height: 1.25; }
+.topbar nav a, .shell-link, .branch-selector, .shell-logout, .hero-cta, .ui-button { font-family: var(--vesta-font-primary); }
+.topbar nav a, .shell-link { font-size: var(--vesta-text-sm); line-height: 1; letter-spacing: var(--vesta-tracking-wide); text-transform: uppercase; }
+.hero-cta, .ui-button { font-size: var(--vesta-text-product); font-weight: var(--vesta-weight-bold); line-height: 1; letter-spacing: var(--vesta-tracking-button); text-transform: uppercase; }
+.promo-strip, .campaign-strip { font-size: var(--vesta-text-xs); font-weight: var(--vesta-weight-bold); letter-spacing: var(--vesta-tracking-wider); }
+.discount-badge, .stock-indicator, .connection-indicator { font-size: var(--vesta-text-2xs); font-weight: var(--vesta-weight-bold); line-height: 1; }
+.modal-header h2, .side-panel h2 { font-size: var(--vesta-text-dialog-title); font-weight: var(--vesta-weight-extra-bold); line-height: var(--vesta-leading-heading); }
+.shell-search-form label, .panel-note, .feedback { font-size: var(--vesta-text-body); line-height: var(--vesta-leading-relaxed); }
+.shell-search-input input, input, select, textarea { font-size: var(--vesta-text-body); }
+.shell-status-row { font-size: var(--vesta-text-xs); }
+
+/* Identificadores técnicos: aplicar .vesta-monospace cuando el componente los exponga. */
+code, kbd, pre, .sku, .counter, .technical-id { font-family: var(--vesta-font-mono); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 699px) {
+  .vesta-hero-title { font-size: var(--vesta-text-hero-mobile); }
+  .hero-copy h1 { font-size: var(--vesta-text-hero-mobile); }
+  .vesta-page-title { font-size: var(--vesta-text-section-title); }
+  .vesta-section-title { font-size: 28px; }
+  .vesta-editorial-title { font-size: 34px; }
+}
+
+@media (max-width: 360px) {
+  .vesta-hero-title { font-size: 40px; letter-spacing: -1px; }
+  .vesta-page-title { font-size: 29px; }
+}
