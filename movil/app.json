@@ -12,7 +12,9 @@
         {
           "cameraPermission": "EnsayAR usa la cámara solo para el probador virtual. El video no se sube."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ],
     "ios": {
       "infoPlist": {
@@ -20,7 +22,13 @@
       }
     },
     "android": {
-      "permissions": ["CAMERA"]
+      "package": "bo.ensayar.vesta",
+      "versionCode": 1,
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "CAMERA",
+        "INTERNET"
+      ]
     }
   }
 }

@@ -108,7 +108,7 @@ resource api 'Microsoft.Web/sites@2024-04-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'NODE|20-lts'
-      appCommandLine: 'bash startup.sh'
+      appCommandLine: 'mkdir -p /node_modules && tar -I zstd -xf node_modules.tar.zst -C /node_modules && NODE_PATH=/node_modules /node_modules/.bin/prisma migrate deploy && NODE_PATH=/node_modules node dist/src/main.js'
       appSettings: concat([
         {
           name: 'DATABASE_URL'
