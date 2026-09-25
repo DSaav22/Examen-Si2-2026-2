@@ -1,3 +1,6 @@
+import Constants from 'expo-constants'
+import { Platform } from 'react-native'
+
 export const colors = {
   ink: '#111111',
   paper: '#f5f2ec',
@@ -13,4 +16,29 @@ export const colors = {
   white: '#ffffff',
 }
 
-export const API_POR_DEFECTO = 'http://10.253.6.26:3000'
+/**
+ * IP LAN del packager Expo → Nest en :3000.
+ * Emulador Android sin host LAN: 10.0.2.2 apunta al host.
+ */
+export function apiPorDefecto(): string {
+  const hostUri =
+    Constants.expoConfig?.hostUri ??
+    Constants.experienceUrl ??
+    (Constants as { linkingUri?: string }).linkingUri
+  if (typeof hostUri === 'string' && hostUri.length) {
+    const host = hostUri
+      .replace(/^[a-z]+:\/\//i, '')
+      .split('/')[0]
+      ?.split(':')[0]
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return `http://${host}:3000`
+    }
+  }
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:3000'
+  }
+  return 'http://localhost:3000'
+}
+
+/** @deprecated usar apiPorDefecto() — se mantiene por compatibilidad */
+export const API_POR_DEFECTO = apiPorDefecto()

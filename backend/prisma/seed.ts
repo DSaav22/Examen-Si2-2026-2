@@ -8,12 +8,20 @@ const CLAVE = 'diego';
 
 async function main() {
   await prisma.reporteEjecucion.deleteMany();
+  await prisma.auditoria.deleteMany();
+  await prisma.devolucionLinea.deleteMany();
+  await prisma.devolucion.deleteMany();
+  await prisma.pedido.deleteMany();
   await prisma.pagoSimulado.deleteMany();
   await prisma.movimientoInventario.deleteMany();
   await prisma.lineaReserva.deleteMany();
   await prisma.reserva.deleteMany();
   await prisma.lineaVenta.deleteMany();
   await prisma.venta.deleteMany();
+  await prisma.alertaProducto.deleteMany();
+  await prisma.opinion.deleteMany();
+  await prisma.favorito.deleteMany();
+  await prisma.direccionCliente.deleteMany();
   await prisma.stockAlmacen.deleteMany();
   await prisma.cajaTurno.deleteMany();
   await prisma.variante.deleteMany();
@@ -73,6 +81,13 @@ async function main() {
         passwordHash,
       },
       {
+        id: SPIKE_UUIDS.superadmin,
+        email: 'superadmin@ensayar.bo',
+        nombre: 'Superadmin EnsayAR',
+        rol: Rol.SUPERADMIN,
+        passwordHash,
+      },
+      {
         id: SPIKE_UUIDS.cajero,
         email: 'cajero@ensayar.bo',
         nombre: 'Cajero Central',
@@ -104,6 +119,15 @@ async function main() {
         passwordHash,
       },
     ],
+  });
+
+  await prisma.direccionCliente.create({
+    data: {
+      usuarioId: SPIKE_UUIDS.clienta,
+      etiqueta: 'Trabajo',
+      detalle: 'Av. San Martín 120',
+      ciudad: 'Santa Cruz',
+    },
   });
 
   await prisma.producto.create({
@@ -228,6 +252,109 @@ async function main() {
     },
   });
 
+  const ventaDemo = await prisma.venta.create({
+    data: {
+      uuid: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      canal: 'pos',
+      estado: 'cobrada',
+      medioPago: 'efectivo',
+      total: 89.9,
+      almacenId: SPIKE_UUIDS.almacen,
+      clientaId: SPIKE_UUIDS.clienta,
+      cajaTurnoId: SPIKE_UUIDS.turno,
+      lineas: {
+        create: {
+          varianteId: SPIKE_UUIDS.variante,
+          cantidad: 1,
+          precioUnitario: 89.9,
+        },
+      },
+    },
+  });
+
+  await prisma.venta.create({
+    data: {
+      uuid: 'ffffffff-ffff-ffff-ffff-ffffffffff01',
+      canal: 'pos',
+      estado: 'cobrada',
+      medioPago: 'qr',
+      total: 269.1,
+      almacenId: SPIKE_UUIDS.almacen,
+      clientaId: SPIKE_UUIDS.clienta,
+      cajaTurnoId: SPIKE_UUIDS.turno,
+      lineas: {
+        create: {
+          varianteId: SPIKE_UUIDS.variante,
+          cantidad: 3,
+          precioUnitario: 89.7,
+        },
+      },
+    },
+  });
+
+  await prisma.venta.create({
+    data: {
+      uuid: 'ffffffff-ffff-ffff-ffff-ffffffffff02',
+      canal: 'online',
+      estado: 'cobrada',
+      medioPago: 'tarjeta',
+      total: 149.5,
+      almacenId: SPIKE_UUIDS.almacenLp,
+      clientaId: SPIKE_UUIDS.clienta,
+      lineas: {
+        create: {
+          varianteId: SPIKE_UUIDS.variante,
+          cantidad: 1,
+          precioUnitario: 149.5,
+        },
+      },
+    },
+  });
+
+  await prisma.venta.create({
+    data: {
+      uuid: 'ffffffff-ffff-ffff-ffff-ffffffffff03',
+      canal: 'pos',
+      estado: 'cobrada',
+      medioPago: 'efectivo',
+      total: 45,
+      almacenId: SPIKE_UUIDS.almacenLp,
+      lineas: {
+        create: {
+          varianteId: SPIKE_UUIDS.variante,
+          cantidad: 1,
+          precioUnitario: 45,
+        },
+      },
+    },
+  });
+
+  await prisma.auditoria.create({
+    data: {
+      accion: 'venta_creada',
+      recurso: ventaDemo.id,
+      detalle: 'pos',
+      usuarioId: SPIKE_UUIDS.cajero,
+    },
+  });
+
+  await prisma.opinion.createMany({
+    data: [
+      {
+        puntuacion: 5,
+        comentario: 'La tela se siente premium y el talle M me quedó perfecto.',
+        verificada: true,
+        moderada: false,
+        productoId: SPIKE_UUIDS.producto,
+        usuarioId: SPIKE_UUIDS.clienta,
+      },
+    ],
+  });
+
+  // Segunda opinión pendiente (usuario distinto): usamos un id sintético vía update skip —
+  // unique (producto, usuario) limita a una por clienta; dejamos también una publicada de ejemplo
+  // creando opinión en otro producto tras el seed de catálogo demo.
+
   await prisma.cupon.upsert({
     where: { codigo: 'VESTA10' },
     update: { porcentaje: 10, activo: true, usoMaximo: 50 },
@@ -235,6 +362,33 @@ async function main() {
   });
 
   execSync('npx ts-node scripts/seed-catalogo-demo.ts', { stdio: 'inherit' });
+
+  const otroProducto = await prisma.producto.findFirst({
+    where: { id: { not: SPIKE_UUIDS.producto } },
+    select: { id: true },
+  });
+  if (otroProducto) {
+    await prisma.opinion.create({
+      data: {
+        puntuacion: 4,
+        comentario: 'Buen corte, pediría un color más claro la próxima.',
+        verificada: false,
+        moderada: false,
+        productoId: otroProducto.id,
+        usuarioId: SPIKE_UUIDS.clienta,
+      },
+    });
+    await prisma.opinion.create({
+      data: {
+        puntuacion: 5,
+        comentario: 'Ya la usé en oficina: cómoda todo el día.',
+        verificada: true,
+        moderada: true,
+        productoId: SPIKE_UUIDS.producto,
+        usuarioId: SPIKE_UUIDS.admin,
+      },
+    });
+  }
 }
 
 main()

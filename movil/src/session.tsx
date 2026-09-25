@@ -125,9 +125,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setFavs(favoritos)
       if (suc) setSucursalId(suc)
       if (tok && usuario) {
-        setToken(tok)
-        setUser(usuario)
-        setStack([{ name: 'inicio' }])
+        try {
+          const me = await api<{
+            id: string
+            email: string
+            nombre: string
+            rol: string
+            sucursalId?: string | null
+          }>('/auth/me', tok)
+          const next = {
+            ...usuario,
+            id: me.id,
+            email: me.email,
+            nombre: me.nombre,
+            rol: me.rol,
+            sucursalId: me.sucursalId ?? usuario.sucursalId,
+          }
+          setToken(tok)
+          setUser(next)
+          await AsyncStorage.setItem('ensayar_user', JSON.stringify(next))
+          setStack([{ name: 'inicio' }])
+        } catch {
+          await AsyncStorage.multiRemove(['ensayar_token', 'ensayar_user'])
+          setToken(null)
+          setUser(null)
+          setStack([{ name: 'login' }])
+        }
       }
       try {
         await cargarSucursales(suc ?? undefined)

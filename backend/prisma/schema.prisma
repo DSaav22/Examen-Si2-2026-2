@@ -13,8 +13,6 @@ enum Rol {
   ADMIN
   ENCARGADO
   PROVEEDOR
-  VENDEDOR
-  RRHH
   SUPERADMIN
 }
 
@@ -88,7 +86,9 @@ model Usuario {
   favoritos     Favorito[]
   lealtad       CuentaLealtad?
   pedidos       Pedido[]
+  notificaciones Notificacion[]
   empleado      Empleado?
+  avatarUrl     String              @default("") @map("avatar_url")
 
   @@map("usuarios")
 }
@@ -517,6 +517,21 @@ model Auditoria {
   usuarioId String?  @map("usuario_id")
   @@index([usuarioId, creadoEn])
   @@map("auditoria")
+}
+
+model Notificacion {
+  id        String   @id @default(uuid())
+  usuarioId String   @map("usuario_id")
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo      String
+  titulo    String
+  cuerpo    String
+  enlace    String   @default("")
+  leida     Boolean  @default(false)
+  creadaEn  DateTime @default(now()) @map("creada_en")
+
+  @@index([usuarioId, leida, creadaEn])
+  @@map("notificaciones")
 }
 
 model Opinion {

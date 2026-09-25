@@ -16,9 +16,34 @@ class PreguntaDto {
 
 @Controller('reportes')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Rol.ADMIN)
+@Roles(Rol.ADMIN, Rol.SUPERADMIN)
 export class ReportesController {
   constructor(private readonly reportes: ReportesService) {}
+
+  @Get('contexto')
+  contexto() {
+    return this.reportes.contexto();
+  }
+
+  /** Rankings y KPIs de negocio listos para el admin (sin SQL). */
+  @Get('panel')
+  panel(
+    @CurrentUser() user: JwtPayload,
+    @Query('periodo') periodo?: string,
+    @Query('sucursal') sucursal?: string,
+  ) {
+    return this.reportes.panel(user.sub, periodo, sucursal);
+  }
+
+  @Get('negocio')
+  negocio(
+    @CurrentUser() user: JwtPayload,
+    @Query('tipo') tipo = 'sucursales',
+    @Query('periodo') periodo?: string,
+    @Query('sucursal') sucursal?: string,
+  ) {
+    return this.reportes.negocio(tipo, periodo, sucursal, user.sub);
+  }
 
   @Get('dia')
   delDia(

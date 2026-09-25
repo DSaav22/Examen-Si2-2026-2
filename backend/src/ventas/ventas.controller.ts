@@ -1,9 +1,13 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
+  NotFoundException,
+  Param,
   Post,
   UseGuards,
   UnprocessableEntityException,
@@ -14,6 +18,7 @@ import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CrearVentaDto } from './dto/crear-venta.dto';
 import {
@@ -29,6 +34,7 @@ export class VentasController {
   constructor(
     private readonly ventas: VentasService,
     private readonly prisma: PrismaService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   @Get('historial')
@@ -42,7 +48,7 @@ export class VentasController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Rol.ENCARGADO, Rol.ADMIN, Rol.CAJERO, Rol.SUPERADMIN)
   async deSucursal(@CurrentUser() user: JwtPayload) {
-    if (user.rol === Rol.ADMIN) {
+    if (user.rol === Rol.ADMIN || user.rol === Rol.SUPERADMIN) {
       return this.ventas.ventasDeSucursal(undefined);
     }
     const u = await this.prisma.usuario.findUniqueOrThrow({
@@ -52,10 +58,43 @@ export class VentasController {
     return this.ventas.ventasDeSucursal(u.sucursalId);
   }
 
+  @Post(':id/enviar-factura')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.CAJERO, Rol.ADMIN, Rol.ENCARGADO, Rol.SUPERADMIN, Rol.CLIENTA)
+  async enviarFactura(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body?: { email?: string },
+  ) {
+    const venta = await this.prisma.venta.findUnique({
+      where: { id },
+      select: { id: true, clientaId: true },
+    });
+    if (!venta) throw new NotFoundException({ codigo: 'VENTA_NO' });
+    if (user.rol === Rol.CLIENTA && venta.clientaId !== user.sub) {
+      throw new ForbiddenException({ codigo: 'NO_ES_TU_VENTA' });
+    }
+    try {
+      return await this.notificaciones.enviarFacturaVenta(id, body?.email);
+    } catch (err) {
+      const codigo =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { codigo?: string } }).response?.codigo
+          : undefined;
+      if (codigo === 'CLIENTA_SIN_CORREO') {
+        throw new BadRequestException({
+          codigo: 'CLIENTA_SIN_CORREO',
+          message: 'Indicá un correo válido para enviar la factura.',
+        });
+      }
+      throw err;
+    }
+  }
+
   @Post()
   @HttpCode(201)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.CAJERO, Rol.ADMIN, Rol.CLIENTA, Rol.VENDEDOR, Rol.ENCARGADO)
+  @Roles(Rol.CAJERO, Rol.ADMIN, Rol.CLIENTA, Rol.ENCARGADO, Rol.SUPERADMIN)
   async crear(@CurrentUser() user: JwtPayload, @Body() dto: CrearVentaDto) {
     if (user.rol === Rol.CLIENTA) {
       dto.canal = Canal.online;

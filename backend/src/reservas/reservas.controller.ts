@@ -71,9 +71,9 @@ export class ReservasController {
   }
 
   @Get('sucursal')
-  @Roles(Rol.ENCARGADO, Rol.ADMIN)
+  @Roles(Rol.ENCARGADO, Rol.ADMIN, Rol.SUPERADMIN)
   async deSucursal(@CurrentUser() user: JwtPayload) {
-    if (user.rol === Rol.ADMIN) {
+    if (user.rol === Rol.ADMIN || user.rol === Rol.SUPERADMIN) {
       return this.prisma.reserva.findMany({
         where: { estado: { in: ['pendiente', 'preparada', 'en_atencion'] } },
         include: {
@@ -92,11 +92,11 @@ export class ReservasController {
   }
 
   @Get(':id')
-  @Roles(Rol.CLIENTA, Rol.ENCARGADO, Rol.ADMIN)
+  @Roles(Rol.CLIENTA, Rol.ENCARGADO, Rol.ADMIN, Rol.SUPERADMIN)
   async una(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     const r = await this.reservas.obtener(id);
     if (!r) throw new NotFoundException({ codigo: 'RESERVA_NO' });
-    if (user.rol === Rol.ADMIN) return r;
+    if (user.rol === Rol.ADMIN || user.rol === Rol.SUPERADMIN) return r;
     if (user.rol === Rol.CLIENTA) {
       if (r.clientaId !== user.sub) {
         throw new ForbiddenException({ codigo: 'NO_ES_TU_RESERVA' });
@@ -119,7 +119,7 @@ export class ReservasController {
   }
 
   @Patch(':id/estado')
-  @Roles(Rol.CLIENTA, Rol.ENCARGADO, Rol.ADMIN)
+  @Roles(Rol.CLIENTA, Rol.ENCARGADO, Rol.ADMIN, Rol.SUPERADMIN)
   async estado(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,

@@ -4,6 +4,7 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import { leerCarrito, vaciarCarrito } from '../carrito'
 import type { LineaCarrito, Sucursal } from '../types'
+import { homePorRol } from '../roles'
 
 type Reserva = {
   id: string
@@ -40,7 +41,7 @@ export function Reservas() {
     setHorario(d.toISOString().slice(0, 16))
   }, [])
 
-  if (user?.rol !== 'CLIENTA') return <Navigate to="/catalogo" replace />
+  if (user?.rol !== 'CLIENTA') return <Navigate to={user ? homePorRol(user.rol) : '/login'} replace />
 
   async function crear(e: FormEvent) {
     e.preventDefault()

@@ -40,7 +40,7 @@ export class MetaController {
 
   @Post('temporadas')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   crearTemporada(@Body() dto: NombreDto) {
     return this.prisma.temporada.create({ data: { nombre: dto.nombre } });
   }
@@ -52,7 +52,7 @@ export class MetaController {
 
   @Post('colecciones')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   crearColeccion(@Body() dto: NombreDto) {
     return this.prisma.coleccion.create({ data: { nombre: dto.nombre } });
   }
@@ -67,7 +67,7 @@ export class MetaController {
 
   @Post('sucursales')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   crearSucursal(@Body() dto: SucursalDto) {
     return this.prisma.sucursal.create({
       data: {
@@ -81,7 +81,7 @@ export class MetaController {
 
   @Patch('sucursales/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   patchSucursal(@Param('id') id: string, @Body() dto: SucursalDto) {
     return this.prisma.sucursal.update({
       where: { id },

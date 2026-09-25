@@ -24,7 +24,27 @@ export class PedidosController {
       where: { estado: 'pendiente' },
       include: {
         usuario: { select: { nombre: true, email: true } },
-        venta: { select: { id: true, canal: true, estado: true } },
+        venta: {
+          select: {
+            id: true,
+            canal: true,
+            estado: true,
+            medioPago: true,
+            lineas: {
+              select: {
+                cantidad: true,
+                variante: {
+                  select: {
+                    talla: true,
+                    color: true,
+                    sku: true,
+                    producto: { select: { nombre: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: { creadoEn: 'asc' },
     });

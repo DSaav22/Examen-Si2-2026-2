@@ -16,6 +16,7 @@ Espacio para el código QR (pegar o generar cuando exista la URL pública de la 
 
 | Rol | Correo |
 |-----|--------|
+| Superusuario | superadmin@ensayar.bo |
 | Administración | admin@ensayar.bo |
 | Caja | cajero@ensayar.bo |
 | Encargado de sucursal | encargado@ensayar.bo |

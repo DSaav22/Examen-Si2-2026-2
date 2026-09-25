@@ -34,6 +34,19 @@ export class CrearProductoDto {
   descuentoPct?: number;
 
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  precioMayorista?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minimoMayorista?: number;
+
+  @IsOptional()
   @IsString()
   temporadaId?: string;
 

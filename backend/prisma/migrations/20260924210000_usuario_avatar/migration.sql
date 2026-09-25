@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "usuarios" ADD COLUMN IF NOT EXISTS "avatar_url" TEXT NOT NULL DEFAULT '';

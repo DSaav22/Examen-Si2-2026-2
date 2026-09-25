@@ -28,12 +28,24 @@ function Root() {
       </View>
     )
   }
-  if (s.screen.name === 'probar') return <ProbadorScreen />
-  const conNav = s.screen.name !== 'login' && s.screen.name !== 'registro'
+  if (s.screen.name === 'probar') {
+    return (
+      <View style={styles.app}>
+        <StatusBar style="light" />
+        {s.error ? <Text style={styles.error}>{s.error}</Text> : null}
+        {s.aviso ? <Text style={styles.ok}>{s.aviso}</Text> : null}
+        <View style={styles.body}>
+          <ProbadorScreen />
+        </View>
+      </View>
+    )
+  }
+  const esAuth = s.screen.name === 'login' || s.screen.name === 'registro'
+  const conNav = !esAuth
   return (
     <View style={styles.app}>
       <StatusBar style="light" />
-      <Header />
+      {!esAuth ? <Header /> : null}
       {s.error ? <Text style={styles.error}>{s.error}</Text> : null}
       {s.aviso ? <Text style={styles.ok}>{s.aviso}</Text> : null}
       <View style={styles.body}>

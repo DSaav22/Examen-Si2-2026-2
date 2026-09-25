@@ -11,14 +11,10 @@
             "id": "a6d26e16a241f0eb",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "wiki/concepts/Stack del parcial.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Stack del parcial"
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Vista gráfica"
             }
           }
         ]
@@ -187,6 +183,10 @@
   },
   "active": "a6d26e16a241f0eb",
   "lastOpenFiles": [
+    "wiki/sources/codigo-24-sep-movil-web.md",
+    "Bienvenido.md",
+    "AGENTS.md",
+    "wiki/concepts/Stack del parcial.md",
     "wiki/sources/codigo-23-sep.md",
     "raw/inbox/Examen SI2 1.pdf.crswap",
     "raw/inbox/Examen SI2 1.pdf",
@@ -205,14 +205,12 @@
     "raw/_join_tatiana_toc.py",
     "raw/_extract-toc-examen-si2-1.txt",
     "raw/_extract-collapsed-examen-si2-1.txt",
-    "AGENTS.md",
     "raw/inbox/Contexto completo del proyecto.md",
     "wiki/log.md",
     "wiki/index.md",
     "wiki/concepts/Arquitectura candidata.md",
     "wiki/concepts/Actores.md",
     "wiki/concepts/UC10 Reporte generativo.md",
-    "Bienvenido.md",
     "wiki/concepts/Plataforma omnicanal.md",
     "wiki/synthesis/Fase Construccion.md",
     "wiki/sources/stack-metodologia-parcial.md",
@@ -220,8 +218,6 @@
     "wiki/concepts/UC07 Venta POS.md",
     "wiki/concepts/UC03 Probador.md",
     "wiki/synthesis/Fase Elaboracion.md",
-    "wiki/entities/EnsayAR.md",
-    "wiki/concepts/Riesgos.md",
-    "wiki/concepts/Glosario.md"
+    "wiki/entities/EnsayAR.md"
   ]
 }

@@ -1,17 +1,17 @@
 ---
 tipo: synthesis
-fuentes: 2
-actualizado: 2026-09-23
-tags: [codigo, demo, informe]
+fuentes: 3
+actualizado: 2026-09-25
+tags: [codigo, demo, informe, movil]
 ---
 
-# Estado del código (23 sep, tarde)
+# Estado del código (25 sep, madrugada)
 
-Canon de *qué hay hoy* en el working tree. La foto del 22 sep quedó vieja: decía que no había chatbot, 3D, transferencias ni deploy. Fuente de este corte: [[codigo-23-sep]].
+Canon de *qué hay hoy* en el working tree. El corte del 23 sep ([[codigo-23-sep]]) sigue valiendo para UC28–UC35 y bot. Este corte suma paridad móvil Vesta, probador sin cámara y scroll web: [[codigo-24-sep-movil-web]].
 
 ## Frase segura para el examen
 
-> Plataforma omnicanal: catálogo Vesta, venta web y POS, inventario por almacén con transferencia, reservas, despacho simulado y devolución. React + Expo + NestJS + Prisma + PostgreSQL. Pagos, NIT y seguimiento son de prueba. El probador es 2D y, si la variante tiene modelo, volumen en el dispositivo. El bot y el reporte generativo llaman a Azure OpenAI en local. El sitio publicado todavía no tiene este corte.
+> Plataforma omnicanal: catálogo Vesta (web + Expo), venta web y POS, inventario por almacén con transferencia, reservas, despacho simulado y devolución. React + Expo + NestJS + Prisma + PostgreSQL. Pagos, NIT y seguimiento son de prueba. El probador es 2D (cámara, foto o silueta) y, si la variante tiene modelo, volumen CSS en la web; en móvil hay vista realista por IA (`POST /ia/probar`) con foto subida o demo cuando no hay cámara. El bot y el reporte generativo llaman a Azure OpenAI en local. El sitio publicado todavía no tiene este corte.
 
 ## Hecho y demoable en local
 
@@ -19,24 +19,30 @@ Auth y roles, catálogo de 40 prendas demo, ficha, favoritos, carrito, cupón `V
 
 | Caso | Qué hace el código |
 |------|--------------------|
-| UC03 / UC28 | `/probar/:id`. 2D (cámara o toques). 3D CSS si `urlModelo` no está vacío. El blazer `VESTA-DEMO-001` ya lo trae. No cambia stock. |
+| UC03 / UC28 | Web `/probar/:id`: 2D + 3D CSS si `urlModelo`. Móvil: cámara **o** subir foto **o** silueta demo → Vista realista IA. No cambia stock. |
 | UC10 | `POST /reportes/generativo`. El modelo arma el SQL; solo pasa si `validarSelect` lo acepta. |
-| UC29 | `POST /ia/bot` con JWT de CLIENTA. Stock, tallas y pedidos de esa clienta. |
-| UC30 | `precioMayorista` + `minimoMayorista` + cuenta `mayorista`. El precio lo fija el servidor al cobrar. |
-| UC31 | `POST /inventario/transferencias`. Mismo almacén o sin stock: no mueve. |
-| UC32 | Pedido al cobrar en línea. `/despacho` marca enviado y guarda `VESTA-…`. La clienta lo ve en `/historial`. |
-| UC33 | `POST /devoluciones`. Repone stock. Si el pago simulado estaba aprobado, queda `reembolsado`. |
-| UC34 / UC35 | Ticket de prueba. Manifest + service worker. |
+| UC29 | `POST /ia/bot` con JWT de CLIENTA. En web sí; móvil aún sin bot integrado. |
+| UC30–UC35 | Igual que [[codigo-23-sep]] (mayorista, transferencia, despacho, devolución, ticket, PWA). |
 
-Azure ya tiene un proyecto aparte: web `ensayar-web-2xhvsljjqvilk` y API `ensayar-api-2xhvsljjqvilk` en Brazil South, PostgreSQL B1ms, plan F1. La cuenta OpenAI `ensayar-openai` y el deployment `gpt-4.1-mini` existen. Esas variables ya están en el App Service de la API.
+### Móvil (24–25 sep)
+
+Expo 53 en `movil/`. Pantallas alineadas a Vesta: inicio, catálogo, ficha, bolsa, cuenta, asistente, drawer y bottom nav. Se demoable en **Expo web** (`http://localhost:8081`) sin emulador. API → Nest `:3000`.
+
+### Web (24–25 sep)
+
+Scroll de documento nativo; full-bleed sin `100vw` (antes desbordaba horizontalmente al lado de la scrollbar).
+
+### Backend (24–25 sep)
+
+`ignoreDeprecations: "6.0"` quitado del `tsconfig` (rompe tsc 5.9).
 
 ## Qué falta
 
-- **Publicar este corte.** El sitio de Azure no tiene el bot, el 3D, mayorista, transferencia, despacho, devolución ni las 40 prendas hasta el próximo deploy de la API y de la web. No está commiteado.
-- **Móvil** (`movil/`, Expo 53, TypeScript, React Native 0.79). Sigue en login, catálogo, probador **solo 2D**, carrito, compra y reserva. No tiene bot, volumen 3D, mayorista, historial con seguimiento ni devolución. El total del carrito lo calcula el teléfono con precio de detalle.
-- **Foto generada.** Cuota de imagen en 0 en las regiones que la suscripción de estudiante deja usar. No hay endpoint de imagen.
-- Siguen fuera del alcance: pago bancario real, envío real, NIT ante impuestos, almacén central, RRHH completo, CI/CD y pruebas E2E.
+- **Publicar este corte.** Azure sigue en un deploy anterior. No está todo commiteado.
+- **Móvil** aún sin: bot UC29, volumen 3D, mayorista, historial con seguimiento, devolución. El total del carrito en algunos flujos lo arma el cliente.
+- **Foto generada / Flux:** depende de cuota en Azure AI Services (`FLUX.2-pro`).
+- Fuera de alcance: pago bancario real, envío real, NIT ante impuestos, RRHH completo, CI/CD y E2E.
 
 ## Cómo consultarlo
 
-Preguntar por el estado del código, por un UC28–UC35, por el bot o por el móvil. Esta página manda sobre [[contexto-completo-proyecto]] y sobre la matriz del 22 sep en [[Huecos locales vs examen]].
+Estado del código, UC03/móvil, scroll web o cómo levantar los 3 servicios → esta página manda sobre [[contexto-completo-proyecto]] y sobre la matriz vieja en [[Huecos locales vs examen]]. Fuente del corte: [[codigo-24-sep-movil-web]].

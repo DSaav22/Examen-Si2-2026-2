@@ -1,5 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
+import { FluxClient } from './flux.client';
 import { responderFicha } from './ficha';
 import { ModeloClient } from './modelo.client';
 
@@ -16,6 +19,7 @@ export class IaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly modelo: ModeloClient,
+    private readonly flux: FluxClient,
   ) {}
 
   async ficha(productoId: string, pregunta: string) {
@@ -29,10 +33,18 @@ export class IaService {
     return responderFicha(producto, pregunta);
   }
 
-  async bot(clientaId: string, mensaje: string, productoId?: string, historial: Turno[] = []) {
+  async bot(clientaId: string | null, mensaje: string, productoId?: string, historial: Turno[] = []) {
     if (pideReporteDeEmpresa(mensaje)) {
       return {
         respuesta: 'Eso corresponde a administración. Desde tu cuenta te digo tallas, disponibilidad y el estado de tus pedidos.',
+        fuente: 'reglas' as const,
+      };
+    }
+
+    if (!clientaId && /\b(pedido|pedidos|compra|compras|factura|env[ií]o)\b/i.test(mensaje)) {
+      return {
+        respuesta:
+          'Para ver tus pedidos necesitás una cuenta. Mientras tanto puedo ayudarte con tallas y stock del catálogo.',
         fuente: 'reglas' as const,
       };
     }
@@ -54,7 +66,83 @@ export class IaService {
     };
   }
 
-  private async contexto(clientaId: string, mensaje: string, productoId?: string) {
+  /** Vista IA: edita la foto de la clienta con FLUX.2-pro (no toca stock). */
+  async probar(varianteId: string, imagenPersonaBase64: string) {
+    if (!this.flux.configurado()) {
+      throw new ServiceUnavailableException({
+        codigo: 'FLUX_NO_CONFIG',
+        message:
+          'Falta AZURE_AI_ENDPOINT / AZURE_AI_API_KEY. Usá el overlay 2D mientras tanto.',
+      });
+    }
+    if (!imagenPersonaBase64 || imagenPersonaBase64.length < 80) {
+      throw new BadRequestException({ codigo: 'SIN_FOTO' });
+    }
+    // ~4 MB base64 ≈ foto razonable
+    if (imagenPersonaBase64.length > 6_000_000) {
+      throw new BadRequestException({ codigo: 'FOTO_GRANDE' });
+    }
+
+    const variante = await this.prisma.variante.findUnique({
+      where: { id: varianteId },
+      include: { producto: true },
+    });
+    if (!variante) throw new NotFoundException({ codigo: 'VARIANTE_NO' });
+
+    const prendaB64 = await this.cargarImagenComoB64(variante.urlFoto);
+    const prompt = [
+      'Fashion e-commerce virtual try-on preview.',
+      `Put this garment on the person in the first photo: ${variante.producto.nombre},`,
+      `shade ${variante.color}, size ${variante.talla}, category ${variante.producto.categoria}.`,
+      prendaB64
+        ? 'The second reference image is the garment product photo; match fabric color and style.'
+        : 'Keep a realistic boutique fit for women apparel.',
+      'Preserve the person face, body pose and scene. Soft natural lighting. No logos, no watermarks, no text overlay.',
+    ].join(' ');
+
+    const out = await this.flux.probarPrenda({
+      prompt,
+      imagenPersonaB64: imagenPersonaBase64,
+      imagenPrendaB64: prendaB64 ?? undefined,
+    });
+    if (!out) {
+      throw new ServiceUnavailableException({
+        codigo: 'FLUX_FALLO',
+        message: 'No se pudo generar la vista. Probá el overlay 2D o otra foto.',
+      });
+    }
+    return {
+      url: out.url,
+      modelo: out.modelo,
+      varianteId,
+      producto: variante.producto.nombre,
+      talla: variante.talla,
+      color: variante.color,
+      aviso: 'Vista aproximada generada por IA. No es prueba física ni modifica stock.',
+    };
+  }
+
+  private async cargarImagenComoB64(urlFoto: string | null | undefined): Promise<string | null> {
+    if (!urlFoto?.trim()) return null;
+    try {
+      if (/^https?:\/\//i.test(urlFoto)) {
+        const res = await fetch(urlFoto, { signal: AbortSignal.timeout(15_000) });
+        if (!res.ok) return null;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length < 100 || buf.length > 4_000_000) return null;
+        return buf.toString('base64');
+      }
+      const rel = urlFoto.replace(/^\//, '').replace(/^uploads\//, 'uploads/');
+      const path = join(process.cwd(), 'public', rel.startsWith('uploads') ? rel : join('uploads', rel));
+      const buf = await readFile(path);
+      if (buf.length < 100 || buf.length > 4_000_000) return null;
+      return buf.toString('base64');
+    } catch {
+      return null;
+    }
+  }
+
+  private async contexto(clientaId: string | null, mensaje: string, productoId?: string) {
     const tokens = mensaje
       .toLowerCase()
       .split(/[^a-záéíóúñ0-9]+/i)
@@ -76,26 +164,35 @@ export class IaService {
         },
       },
     });
-    const ventas = await this.prisma.venta.findMany({
-      where: { clientaId },
-      orderBy: { creadaEn: 'desc' },
-      take: 6,
-      include: {
-        pago: { select: { estado: true } },
-        lineas: { include: { variante: { include: { producto: { select: { nombre: true } } } } } },
-      },
-    });
-    const reservas = await this.prisma.reserva.findMany({
-      where: { clientaId },
-      orderBy: { creadaEn: 'desc' },
-      take: 4,
-      include: {
-        sucursal: { select: { nombre: true } },
-        lineas: { include: { variante: { include: { producto: { select: { nombre: true } } } } } },
-      },
-    });
+    const ventas = clientaId
+      ? await this.prisma.venta.findMany({
+          where: { clientaId },
+          orderBy: { creadaEn: 'desc' },
+          take: 6,
+          include: {
+            pago: { select: { estado: true } },
+            lineas: {
+              include: { variante: { include: { producto: { select: { nombre: true } } } } },
+            },
+          },
+        })
+      : [];
+    const reservas = clientaId
+      ? await this.prisma.reserva.findMany({
+          where: { clientaId },
+          orderBy: { creadaEn: 'desc' },
+          take: 4,
+          include: {
+            sucursal: { select: { nombre: true } },
+            lineas: {
+              include: { variante: { include: { producto: { select: { nombre: true } } } } },
+            },
+          },
+        })
+      : [];
 
     return {
+      invitada: !clientaId,
       prendaAbierta: productoId ?? null,
       prendas: productos.map((producto) => ({
         nombre: producto.nombre,

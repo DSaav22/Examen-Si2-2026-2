@@ -4,6 +4,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -17,6 +18,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { InventarioService } from '../inventario/inventario.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VentasService } from '../ventas/ventas.service';
 
@@ -28,14 +30,17 @@ class SimularDto {
 @Controller('pagos')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PagosController {
+  private readonly log = new Logger(PagosController.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventario: InventarioService,
     private readonly ventas: VentasService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   @Get(':id')
-  @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.VENDEDOR)
+  @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
   async uno(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     const pago = await this.prisma.pagoSimulado.findUnique({
       where: { id },
@@ -52,7 +57,7 @@ export class PagosController {
   }
 
   @Post(':id/simular')
-  @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.VENDEDOR)
+  @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
   async simular(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
@@ -177,6 +182,16 @@ export class PagosController {
         where: { id },
         include: { venta: { include: { lineas: true } } },
       });
+    }).then((resultado) => {
+      if (dto.resultado === 'aprobado' && resultado.venta.clientaId) {
+        const enviarCorreo = resultado.venta.canal === 'online';
+        void this.notificaciones
+          .notificarTrasCobro(resultado.venta.id, { enviarCorreo })
+          .catch((err) => {
+            this.log.warn(`No se notificó pago ${id}: ${err}`);
+          });
+      }
+      return resultado;
     });
   }
 }

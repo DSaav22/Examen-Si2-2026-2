@@ -154,3 +154,7 @@ El Word `docs/parcial/EnsayAR-Informe-Primer-Parcial.docx` sigue el índice de `
 
 Fuente [[codigo-23-sep]] (working tree, sin archivo en `raw/`). Canon nuevo: [[Estado del codigo]]. Local: bot `POST /ia/bot`, reportes con modelo + `validarSelect`, probador 3D CSS si hay `urlModelo`, mayorista, transferencia, despacho `VESTA-`, devolución con reembolso simulado, PWA y NIT de prueba. Falta: deploy de este corte, móvil (sigue 2D y sin bot), imagen generada (cuota 0), commit. Actualiza casos de uso, asistente, probador, reportes, Azure, React Native, huecos e índice.
 
+## [2026-09-25] ingest | Móvil Vesta + probador sin cámara + scroll web
+
+Fuente [[codigo-24-sep-movil-web]] (working tree). Paridad pantallas/nav Expo con storefront Vesta; demo en Expo web `:8081`. Probador: SUBIR FOTO / SILUETA DEMO cuando no hay cámara; HUD con contraste. Frontend: full-bleed sin `100vw` (scroll horizontal arreglado). Backend: quitado `ignoreDeprecations: "6.0"` (tsc 5.9). Canon: [[Estado del codigo]]. Actualiza [[UC03 Probador]], [[Probador virtual]], [[React Native]], [[Huecos locales vs examen]], índice.
+

@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'crypto';
 import { InventarioService } from '../inventario/inventario.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockInsuficienteError } from './errores-venta';
 import { VentasService } from './ventas.service';
@@ -14,7 +15,19 @@ const enabled = process.env.SPIKE_B === '1';
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      providers: [PrismaService, InventarioService, VentasService],
+      providers: [
+        PrismaService,
+        InventarioService,
+        VentasService,
+        {
+          provide: NotificacionesService,
+          useValue: {
+            enviarFacturaVenta: async () => ({ ok: true, modo: 'simulado', destino: '' }),
+            avisarVentaCobrada: async () => null,
+            crear: async () => null,
+          },
+        },
+      ],
     }).compile();
     prisma = moduleRef.get(PrismaService);
     ventas = moduleRef.get(VentasService);

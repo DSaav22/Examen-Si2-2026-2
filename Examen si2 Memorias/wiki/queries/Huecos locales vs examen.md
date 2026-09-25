@@ -1,25 +1,26 @@
 ---
 tipo: query
-fuentes: 7
-actualizado: 2026-09-23
+fuentes: 8
+actualizado: 2026-09-25
 tags: [examen, huecos, garzon, rf]
 ---
 
 # ¿Qué falta frente a Garzón RF/RNF?
 
-Canon dominio: PDF Garzón RF01–RF25 + RNF. Stack: Nest/React/RN ([[stack-metodologia-parcial]]). Madurez código: [[Estado del codigo]] (23 sep, tarde). La matriz de abajo es la del 22 sep; estas filas quedaron viejas:
+Canon dominio: PDF Garzón RF01–RF25 + RNF. Stack: Nest/React/RN ([[stack-metodologia-parcial]]). Madurez código: [[Estado del codigo]] (25 sep). La matriz de abajo es la del 22 sep; estas filas quedaron viejas:
 
-- RF13 vestidor: en la web hay 2D y volumen CSS si hay modelo. El móvil sigue en prototipo 2D.
+- RF13 vestidor: web 2D + volumen CSS si hay modelo; móvil con foto/demo + vista IA (24–25 sep). Aún no es RA 3D de tela. [[codigo-24-sep-movil-web]]
+- RF07 catálogo móvil: paridad Vesta en Expo (pantallas + nav); falta bot y algunos flujos post-compra.
 - RF20: ya hay transferencia entre almacenes (`POST /inventario/transferencias`).
 - RF24 / RF25: el reporte generativo y el bot llaman a `gpt-4.1-mini` en local. El SQL sigue pasando por `validarSelect`.
-- Deploy: hay sitio en Azure, pero no incluye el corte del 23 sep por la tarde.
+- Deploy: hay sitio en Azure, pero no incluye el corte del 23–25 sep.
 
 ## Matriz RF01–RF25 (revisada 22 sep)
 
 | RF | Estado | Nota |
 |----|--------|------|
 | 01 Registro clienta | OK | `POST /auth/registro` |
-| 02 Usuarios/roles | OK | varios roles; SUPERADMIN/RRHH débiles |
+| 02 Usuarios/roles | OK | 6 roles; SUPERADMIN = bitácora; ADMIN sin bitácora |
 | 03 Multi ciudad/sucursal | OK | SC + LP seed |
 | 04–05 Productos / talla-color-temp | OK | catálogo + meta |
 | 06 Proveedores | OK | portal básico |

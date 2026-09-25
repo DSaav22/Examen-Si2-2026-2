@@ -115,6 +115,7 @@ Esta sección forma parte de la implementación: el docente pide que el usuario 
 
 | Rol | Correo |
 |-----|--------|
+| Superusuario | superadmin@ensayar.bo |
 | Administración | admin@ensayar.bo |
 | Caja | cajero@ensayar.bo |
 | Encargado de sucursal | encargado@ensayar.bo |

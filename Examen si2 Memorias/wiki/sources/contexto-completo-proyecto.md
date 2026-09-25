@@ -19,7 +19,7 @@ Snapshot del **código inspeccionado al 22 sep 2026**. No es rúbrica del docent
 - **No presentar como terminado:** pagos reales, envíos, pedidos completos, transferencias, RRHH, chatbot LLM, [[Probador virtual]] robusto, PWA, CI/CD, Azure en producción.
 - [[Reportes generativos]] y `IaModule`: reglas + SQL acotado / ficha determinística. **Sin OpenAI ni LLM.**
 - Probador: prototipo cámara+overlay (`/probar`, Expo). Clasificar como experimental.
-- Roles reales en modelo: CLIENTA, CAJERO, VENDEDOR, ENCARGADO, ADMIN, SUPERADMIN, PROVEEDOR, RRHH (este último sin módulo completo).
+- Roles del modelo: CLIENTA, CAJERO, ENCARGADO, ADMIN, SUPERADMIN, PROVEEDOR. Bitácora solo SUPERADMIN.
 - Seed académico: `*@ensayar.bo` / `diego`.
 
 ## Qué toca en la wiki

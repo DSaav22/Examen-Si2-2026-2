@@ -17,8 +17,8 @@ export function guardarCarrito(lineas: LineaCarrito[]) {
 
 export function agregarAlCarrito(linea: Omit<LineaCarrito, 'cantidad'>) {
   const actual = leerCarrito()
-  const i = actual.findIndex((l) => l.varianteId === linea.varianteId)
-  if (i >= 0) actual[i] = { ...actual[i], cantidad: actual[i].cantidad + 1 }
+  const i = actual.findIndex(l => l.varianteId === linea.varianteId)
+  if (i >= 0) actual[i] = { ...actual[i], ...linea, cantidad: actual[i].cantidad + 1 }
   else actual.push({ ...linea, cantidad: 1 })
   guardarCarrito(actual)
   return actual

@@ -1,6 +1,6 @@
 ---
 tipo: index
-actualizado: 2026-09-23
+actualizado: 2026-09-25
 tags: [index]
 ---
 
@@ -13,8 +13,9 @@ Portal compilado. En cada query, empezar aquí.
 - [[Mapa del examen]] — qué hay que entregar y qué es canónico
 - [[Contradicciones entre fuentes]] — audio vs Garzón vs stack vs código
 - [[MVP y alcance]] — esencial vs complemento
-- [[Estado del codigo]] — snapshot 23 sep tarde (qué hay en local, qué falta publicar y en el móvil)
-- [[codigo-23-sep]] — fuente de ese corte
+- [[Estado del codigo]] — snapshot **25 sep** (móvil Vesta, probador sin cámara, scroll web)
+- [[codigo-24-sep-movil-web]] — fuente de ese corte
+- [[codigo-23-sep]] — corte anterior UC28–UC35 / bot
 - [[Comparacion informes ejemplo]] — Tatiana vs Lozada (calidad documental)
 - [[Checklist informe EnsayAR]] — puntos a poner en el PDF del parcial
 - [[Indice del informe]] — docs/parcial = cuerpo; wiki = memoria
@@ -29,7 +30,7 @@ Portal compilado. En cada query, empezar aquí.
 ## Conceptos
 
 - [[Plataforma omnicanal]] — e-commerce + POS
-- [[Probador virtual]] — innovación 1 (RA); prototipo en código
+- [[Probador virtual]] — innovación 1 (RA); móvil con foto/demo + IA
 - [[Reportes generativos]] — innovación 2 (pregunta → SQL acotado)
 - [[Inventario matricial]] — producto × talla × color × almacén
 - [[Punto de venta]] — caja, turnos, arqueo
@@ -59,15 +60,16 @@ Portal compilado. En cada query, empezar aquí.
 - [[examen1-garzon-fashionstore]] — PDF otro docente (RF, actores, reservas)
 - [[stack-metodologia-parcial]] — **canon** resumido (misma clase que el audio de arriba)
 - [[correccion-alcance-parcial]] — solo el parcial; fecha 23 sep
-- [[contexto-completo-proyecto]] — snapshot código 22 sep (Andrés merge); superado por [[codigo-23-sep]]
+- [[contexto-completo-proyecto]] — snapshot código 22 sep (Andrés merge); superado por [[codigo-23-sep]] / [[codigo-24-sep-movil-web]]
 - [[codigo-23-sep]] — working tree 23 sep tarde (UC28–UC35, bot, Azure viejo)
+- [[codigo-24-sep-movil-web]] — working tree 24–25 sep (paridad móvil, probador sin cámara, scroll, tsconfig)
 - [[ejemplo-informe-tatiana-autogo]] — modelo de profundidad (172 p.)
 - [[ejemplo-informe-lozada-asistencia-mecanica]] — parcial más corto (63 p.)
 
 ## Queries archivadas
 
 - [[Factibilidad documentacion y producto]] — Inicio sí; RA 3D no entra
-- [[Huecos locales vs examen]] — RF vs madurez real (revisado 22 sep)
+- [[Huecos locales vs examen]] — RF vs madurez real (revisado 25 sep)
 
 ## Cómo usar
 

@@ -45,6 +45,10 @@ export class CrearVentaDto {
   @IsString()
   cuponCodigo?: string;
 
+  @IsOptional()
+  @IsString()
+  direccionId?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

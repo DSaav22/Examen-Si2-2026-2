@@ -107,7 +107,7 @@ export class CatalogoController {
 
   @Get('productos/:id/interno')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO)
+  @Roles(Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
   obtenerInterno(@Param('id') id: string) {
     return this.catalogo.obtenerProducto(id, true);
   }
@@ -164,7 +164,7 @@ export class CatalogoController {
 
   @Post('imagenes')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   @UseInterceptors(
     FileInterceptor('archivo', {
       dest: (() => {
@@ -188,28 +188,28 @@ export class CatalogoController {
 
   @Post('productos')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   crear(@Body() dto: CrearProductoDto) {
     return this.catalogo.crearProducto(dto);
   }
 
   @Patch('productos/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   actualizar(@Param('id') id: string, @Body() dto: ActualizarProductoDto) {
     return this.catalogo.actualizarProducto(id, dto);
   }
 
   @Post('productos/:id/variantes')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   crearVariante(@Param('id') id: string, @Body() dto: CrearVarianteDto) {
     return this.catalogo.crearVariante(id, dto);
   }
 
   @Patch('variantes/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   actualizarVariante(
     @Param('id') id: string,
     @Body() dto: ActualizarVarianteDto,
@@ -219,7 +219,7 @@ export class CatalogoController {
 
   @Put('stock')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN, Rol.ENCARGADO)
+  @Roles(Rol.ADMIN, Rol.ENCARGADO, Rol.SUPERADMIN)
   async upsertStock(
     @CurrentUser() user: JwtPayload,
     @Body() dto: UpsertStockDto,

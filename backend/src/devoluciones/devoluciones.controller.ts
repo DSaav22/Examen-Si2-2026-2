@@ -133,20 +133,22 @@ export class DevolucionesController {
       );
       const estado = completa ? 'devuelta' : 'devuelta_parcial';
       await tx.venta.update({ where: { id: venta.id }, data: { estado } });
-      if (completa) {
-        await tx.pedido.updateMany({
-          where: { ventaId: venta.id, estado: { not: 'enviado' } },
-          data: { estado: 'devuelto' },
-        });
-      }
+      await tx.pedido.updateMany({
+        where: { ventaId: venta.id },
+        data: { estado: completa ? 'devuelto' : 'devuelto_parcial' },
+      });
 
       let pagoEstado = venta.pago?.estado ?? null;
-      if (completa && venta.pago?.estado === 'aprobado') {
-        await tx.pagoSimulado.update({
-          where: { id: venta.pago.id },
-          data: { estado: 'reembolsado' },
-        });
-        pagoEstado = 'reembolsado';
+      if (venta.pago?.estado === 'aprobado') {
+        if (completa) {
+          await tx.pagoSimulado.update({
+            where: { id: venta.pago.id },
+            data: { estado: 'reembolsado' },
+          });
+          pagoEstado = 'reembolsado';
+        } else {
+          pagoEstado = 'aprobado';
+        }
       }
       if (venta.cajaTurnoId && venta.cajaTurno && !venta.cajaTurno.cerradoEn) {
         const bruto = venta.lineas.reduce(

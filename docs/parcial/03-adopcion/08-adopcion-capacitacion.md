@@ -9,6 +9,7 @@ Las cuentas siguientes sirven únicamente en el laboratorio. La clave de todas e
 
 | Rol | Correo |
 |-----|--------|
+| Superusuario | superadmin@ensayar.bo |
 | Administración | admin@ensayar.bo |
 | Caja | cajero@ensayar.bo |
 | Encargado de sucursal | encargado@ensayar.bo |

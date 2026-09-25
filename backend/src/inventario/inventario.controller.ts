@@ -64,7 +64,7 @@ export class InventarioController {
   ) {}
 
   @Get('movimientos')
-  @Roles(Rol.ADMIN, Rol.ENCARGADO)
+  @Roles(Rol.ADMIN, Rol.ENCARGADO, Rol.SUPERADMIN)
   async movimientos(
     @CurrentUser() user: JwtPayload,
     @Query('almacenId') almacenId?: string,
@@ -90,7 +90,7 @@ export class InventarioController {
   }
 
   @Post('ajuste')
-  @Roles(Rol.ADMIN, Rol.ENCARGADO)
+  @Roles(Rol.ADMIN, Rol.ENCARGADO, Rol.SUPERADMIN)
   async ajustar(@CurrentUser() user: JwtPayload, @Body() dto: AjusteDto) {
     if (user.rol === Rol.ENCARGADO) {
       const u = await this.prisma.usuario.findUniqueOrThrow({
@@ -111,7 +111,7 @@ export class InventarioController {
   }
 
   @Post('ingreso')
-  @Roles(Rol.ADMIN, Rol.PROVEEDOR, Rol.ENCARGADO)
+  @Roles(Rol.ADMIN, Rol.PROVEEDOR, Rol.ENCARGADO, Rol.SUPERADMIN)
   async ingreso(@CurrentUser() user: JwtPayload, @Body() dto: IngresoDto) {
     if (user.rol === Rol.ENCARGADO) {
       const u = await this.prisma.usuario.findUniqueOrThrow({
@@ -148,7 +148,17 @@ export class InventarioController {
 
   @Post('transferencias')
   @Roles(Rol.ENCARGADO, Rol.ADMIN, Rol.SUPERADMIN)
-  transferir(@CurrentUser() user: JwtPayload, @Body() dto: TransferenciaDto) {
+  async transferir(@CurrentUser() user: JwtPayload, @Body() dto: TransferenciaDto) {
+    if (user.rol === Rol.ENCARGADO) {
+      const u = await this.prisma.usuario.findUniqueOrThrow({
+        where: { id: user.sub },
+      });
+      if (!u.sucursalId) {
+        throw new ForbiddenException({ codigo: 'ENCARGADO_SIN_SUCURSAL' });
+      }
+      await this.assertAlmacenDeSucursal(dto.origenId, u.sucursalId);
+      await this.assertAlmacenDeSucursal(dto.destinoId, u.sucursalId);
+    }
     return this.inventario.transferir(
       dto.varianteId,
       dto.origenId,

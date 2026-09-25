@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { Rol } from '@prisma/client';
+import { CurrentUser } from '../auth/current-user';
+import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -53,8 +55,27 @@ export class AdminController {
     ]);
     return { periodo: inicio.toISOString(), ventas: { total: Number(ventas._sum.total ?? 0), operaciones: ventas._count, online: ventasOnline, pos: ventasPos }, catalogo: { productos, variantes }, sucursales, usuarios, turnosAbiertos: turnos, inventarioBajo: stockBajo, alertas: stockBajo + turnos };
   }
+  /** Solo superusuario: bitácora del sistema (ADMIN gestiona sin ver auditoría). */
   @Get('auditoria')
-  auditoria() { return this.prisma.auditoria.findMany({ orderBy: { creadoEn: 'desc' }, take: 100 }); }
+  @Roles(Rol.SUPERADMIN)
+  async auditoria() {
+    const events = await this.prisma.auditoria.findMany({
+      orderBy: { creadoEn: 'desc' },
+      take: 150,
+    })
+    const ids = [...new Set(events.map(e => e.usuarioId).filter((id): id is string => Boolean(id)))]
+    const users = ids.length
+      ? await this.prisma.usuario.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, nombre: true, email: true, rol: true },
+        })
+      : []
+    const byId = Object.fromEntries(users.map(u => [u.id, u]))
+    return events.map(e => ({
+      ...e,
+      usuario: e.usuarioId ? byId[e.usuarioId] ?? null : null,
+    }))
+  }
 
   @Get('modulos')
   async modulos() {
@@ -65,16 +86,53 @@ export class AdminController {
     return { pedidos, cupones, opiniones, empleados, eventos, sync };
   }
 
+  @Get('opiniones/resumen')
+  async opinionesResumen() {
+    const [pendientes, publicadas, agg] = await Promise.all([
+      this.prisma.opinion.count({ where: { moderada: false } }),
+      this.prisma.opinion.count({ where: { moderada: true } }),
+      this.prisma.opinion.aggregate({
+        where: { moderada: true },
+        _avg: { puntuacion: true },
+      }),
+    ])
+    return {
+      pendientes,
+      publicadas,
+      promedioPublicadas: Number(agg._avg.puntuacion ?? 0),
+    }
+  }
+
   @Get('opiniones/pendientes')
-  opinionesPendientes() { return this.prisma.opinion.findMany({ where: { moderada: false }, include: { producto: { select: { nombre: true } }, usuario: { select: { nombre: true, email: true } } }, orderBy: { creadaEn: 'asc' } }); }
+  opinionesPendientes() {
+    return this.prisma.opinion.findMany({
+      where: { moderada: false },
+      include: {
+        producto: { select: { nombre: true } },
+        usuario: { select: { nombre: true, email: true } },
+      },
+      orderBy: { creadaEn: 'asc' },
+    })
+  }
 
   @Patch('opiniones/:id/moderacion')
-  async moderarOpinion(@Param('id') id: string, @Body() body: { aprobar?: boolean }) {
+  async moderarOpinion(
+    @Param('id') id: string,
+    @Body() body: { aprobar?: boolean },
+    @CurrentUser() user: JwtPayload,
+  ) {
     const aprobar = body.aprobar === true
     const opinion = aprobar
       ? await this.prisma.opinion.update({ where: { id }, data: { moderada: true } })
       : await this.prisma.opinion.delete({ where: { id } })
-    await this.prisma.auditoria.create({ data: { accion: aprobar ? 'opinion_publicada' : 'opinion_rechazada', recurso: id, detalle: 'moderacion' } })
+    await this.prisma.auditoria.create({
+      data: {
+        accion: aprobar ? 'opinion_publicada' : 'opinion_rechazada',
+        recurso: id,
+        detalle: 'moderacion',
+        usuarioId: user.sub,
+      },
+    })
     return opinion
   }
 }

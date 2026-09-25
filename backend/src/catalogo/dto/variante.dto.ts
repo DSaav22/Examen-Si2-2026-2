@@ -17,6 +17,10 @@ export class CrearVarianteDto {
   @IsOptional()
   @IsString()
   urlOverlay?: string;
+
+  @IsOptional()
+  @IsString()
+  urlModelo?: string;
 }
 
 export class ActualizarVarianteDto {

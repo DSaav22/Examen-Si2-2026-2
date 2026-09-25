@@ -1,7 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { Canal, EstadoVenta, Prisma, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventarioService } from '../inventario/inventario.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CrearVentaDto } from './dto/crear-venta.dto';
 import {
   StockInsuficienteError,
@@ -21,9 +22,12 @@ type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class VentasService {
+  private readonly log = new Logger(VentasService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventario: InventarioService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   historialClienta(clientaId: string) {
@@ -93,7 +97,7 @@ export class VentasService {
     }
     const pendientePago = dto.medioPago === 'qr' || dto.medioPago === 'tarjeta';
 
-    return this.prisma.$transaction(async (tx) => {
+    const creada = await this.prisma.$transaction(async (tx) => {
       if (dto.canal === Canal.pos && dto.cajaTurnoId) {
         await this.validarTurnoEnTx(
           tx,
@@ -254,6 +258,7 @@ export class VentasService {
           id: venta.id,
           clientaId: dto.clientaId,
           total,
+          direccionId: dto.direccionId,
         });
       }
 
@@ -262,6 +267,19 @@ export class VentasService {
         include: { lineas: true, pago: true },
       });
     });
+
+    if (creada.estado === 'cobrada' && creada.clientaId) {
+      // Online: aviso in-app + correo automático (estilo BioFarm).
+      // POS/caja: solo aviso in-app; el correo sale al pulsar "Enviar al correo".
+      const enviarCorreo = creada.canal === Canal.online;
+      void this.notificaciones
+        .notificarTrasCobro(creada.id, { enviarCorreo })
+        .catch((err) => {
+          this.log.warn(`No se notificó venta ${creada.id}: ${err}`);
+        });
+    }
+
+    return creada;
   }
 
   private async validarTurnoEnTx(
@@ -375,14 +393,23 @@ export class VentasService {
 
   async abrirPedido(
     tx: Tx,
-    venta: { id: string; clientaId: string; total: Prisma.Decimal | number },
+    venta: {
+      id: string;
+      clientaId: string;
+      total: Prisma.Decimal | number;
+      direccionId?: string;
+    },
   ) {
     const existe = await tx.pedido.findUnique({ where: { ventaId: venta.id } });
     if (existe) return existe;
-    const direccion = await tx.direccionCliente.findFirst({
-      where: { usuarioId: venta.clientaId },
-      orderBy: { id: 'desc' },
-    });
+    const direccion = venta.direccionId
+      ? await tx.direccionCliente.findFirst({
+          where: { id: venta.direccionId, usuarioId: venta.clientaId },
+        })
+      : await tx.direccionCliente.findFirst({
+          where: { usuarioId: venta.clientaId },
+          orderBy: { id: 'desc' },
+        });
     return tx.pedido.create({
       data: {
         usuarioId: venta.clientaId,

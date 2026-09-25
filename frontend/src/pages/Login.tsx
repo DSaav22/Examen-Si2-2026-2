@@ -1,33 +1,101 @@
-import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { useMemo, useState, type FormEvent } from 'react'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { homePorRol } from '../types'
+import { homePorRol } from '../roles'
 import { Button } from '../shared/Button'
 import { FormField } from '../shared/FormField'
 import { ThemeToggle } from '../shared/ThemeToggle'
 
+function safeNext(raw: string | null) {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return null
+  if (raw.startsWith('/login') || raw.startsWith('/registro')) return null
+  return raw
+}
+
+/** Clienta: cualquier next seguro. Admin: solo el probador (para probar IA). */
+function puedeSeguirNext(rol: string, next: string | null) {
+  if (!next) return false
+  if (rol === 'CLIENTA') return true
+  if ((rol === 'ADMIN' || rol === 'SUPERADMIN') && next.startsWith('/probar/')) return true
+  return false
+}
+
 export function Login() {
   const { user, login } = useAuth()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const next = useMemo(() => safeNext(params.get('next')), [params])
   const [email, setEmail] = useState('clienta@ensayar.bo')
   const [password, setPassword] = useState('diego')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  if (user) return <Navigate to={homePorRol(user.rol)} replace />
+
+  if (user) return <Navigate to={next && puedeSeguirNext(user.rol, next) ? next : homePorRol(user.rol)} replace />
+
   async function onSubmit(e: FormEvent) {
-    e.preventDefault(); setError(''); setLoading(true)
-    try { const u = await login(email, password); navigate(homePorRol(u.rol)) }
-    catch { setError('Correo o clave incorrectos.') }
-    finally { setLoading(false) }
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const u = await login(email, password)
+      navigate(next && puedeSeguirNext(u.rol, next) ? next : homePorRol(u.rol))
+    } catch {
+      setError('Correo o clave incorrectos.')
+    } finally {
+      setLoading(false)
+    }
   }
-  return <div className="login-screen"><form className="card login-card" onSubmit={onSubmit}>
-    <div className="login-toolbar"><span className="eyebrow">Plataforma omnicanal</span><ThemeToggle /></div>
-    <h1>EnsayAR</h1><p className="muted">Clienta, cajero, encargado, admin o proveedor.</p>
-    <FormField label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-    <FormField label="Clave" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-    {error ? <p className="error" role="alert">{error}</p> : null}
-    <Button type="submit" disabled={loading}>{loading ? 'Entrando…' : 'Entrar'}</Button>
-    <p className="hint"><Link to="/registro">Crear cuenta clienta</Link></p>
-    <p className="hint">admin · cajero · encargado · proveedor · clienta @ensayar.bo — clave <code>diego</code></p>
-  </form></div>
+
+  const registroTo = next ? `/registro?next=${encodeURIComponent(next)}` : '/registro'
+
+  return (
+    <div className="login-screen auth-screen">
+      <form className="card login-card auth-card" onSubmit={onSubmit}>
+        <div className="login-toolbar">
+          <Link className="auth-brand" to="/inicio">
+            VESTA
+          </Link>
+          <ThemeToggle />
+        </div>
+        <p className="eyebrow">Tu cuenta</p>
+        <h1>Entrar</h1>
+        <p className="muted">
+          {next === '/carrito'
+            ? 'Entrá para confirmar tu pedido. Tu bolsa se mantiene.'
+            : 'Clienta de la tienda u operación EnsayAR.'}
+        </p>
+        <FormField
+          label="Correo"
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          required
+        />
+        <FormField
+          label="Clave"
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          required
+        />
+        {error ? (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Entrando…' : 'Entrar'}
+        </Button>
+        <p className="hint">
+          ¿Primera vez? <Link to={registroTo}>Crear cuenta</Link>
+        </p>
+        <p className="hint auth-demo">
+          Demo tienda: <code>clienta@ensayar.bo</code> / <code>diego</code>
+        </p>
+        <Link className="auth-back" to="/inicio">
+          ← Seguir mirando la tienda
+        </Link>
+      </form>
+    </div>
+  )
 }

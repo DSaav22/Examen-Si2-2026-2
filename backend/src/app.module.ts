@@ -17,6 +17,8 @@ import { UsuariosModule } from './usuarios/usuarios.module';
 import { VentasModule } from './ventas/ventas.module';
 import { AdminModule } from './admin/admin.module';
 import { PedidosModule } from './pedidos/pedidos.module';
+import { NotificacionesModule } from './notificaciones/notificaciones.module';
+import { CorreoModule } from './correo/correo.module';
 import { DevolucionesModule } from './devoluciones/devoluciones.module';
 
 @Module({
@@ -38,6 +40,8 @@ import { DevolucionesModule } from './devoluciones/devoluciones.module';
     AdminModule,
     PedidosModule,
     DevolucionesModule,
+    CorreoModule,
+    NotificacionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

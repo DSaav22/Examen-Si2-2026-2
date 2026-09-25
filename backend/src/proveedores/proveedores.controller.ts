@@ -119,7 +119,7 @@ export class ProveedoresController {
   }
 
   @Get()
-  @Roles(Rol.ADMIN, Rol.PROVEEDOR)
+  @Roles(Rol.ADMIN, Rol.PROVEEDOR, Rol.SUPERADMIN)
   listar() {
     return this.prisma.proveedor.findMany({
       include: { productos: true },
@@ -128,7 +128,7 @@ export class ProveedoresController {
   }
 
   @Post()
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   crear(@Body() dto: ProveedorDto) {
     return this.prisma.proveedor.create({
       data: { nombre: dto.nombre, contacto: dto.contacto ?? '' },
@@ -136,7 +136,7 @@ export class ProveedoresController {
   }
 
   @Patch(':id')
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   actualizar(@Param('id') id: string, @Body() dto: ProveedorDto) {
     return this.prisma.proveedor.update({
       where: { id },

@@ -1,4 +1,4 @@
-export type Rol = 'ADMIN' | 'CAJERO' | 'CLIENTA' | 'ENCARGADO' | 'PROVEEDOR' | 'VENDEDOR' | 'RRHH' | 'SUPERADMIN'
+export type Rol = 'ADMIN' | 'CAJERO' | 'CLIENTA' | 'ENCARGADO' | 'PROVEEDOR' | 'SUPERADMIN'
 
 export type User = {
   id: string
@@ -8,6 +8,7 @@ export type User = {
   sucursalId?: string | null
   proveedorId?: string | null
   mayorista?: boolean
+  avatarUrl?: string
 }
 
 export type Variante = {
@@ -81,14 +82,7 @@ export type LineaCarrito = {
   talla: string
   color: string
   cantidad: number
-}
-
-export function homePorRol(rol: Rol) {
-  if (rol === 'CAJERO') return '/pos'
-  if (rol === 'ENCARGADO') return '/encargado'
-  if (rol === 'PROVEEDOR') return '/proveedor'
-  if (rol === 'ADMIN') return '/admin'
-  return '/inicio'
+  urlFoto?: string
 }
 
 /** El backend oculta cantidades al cliente y expone solo disponibilidad/estado. */

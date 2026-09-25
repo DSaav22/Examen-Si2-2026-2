@@ -1,12 +1,13 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import { IsArray, IsIn, IsOptional, IsString, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import type { Request } from 'express';
 import { Rol } from '@prisma/client';
-import { CurrentUser } from '../auth/current-user';
 import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { TokenService } from '../auth/token.service';
 import { IaService } from './ia.service';
 
 class PreguntaFichaDto {
@@ -43,19 +44,50 @@ class BotDto {
   historial?: TurnoDto[];
 }
 
+class ProbarDto {
+  @IsString()
+  varianteId!: string;
+
+  /** data URL o base64 puro de la foto de la clienta */
+  @IsString()
+  @MinLength(80)
+  imagenBase64!: string;
+}
+
 @Controller('ia')
 export class IaController {
-  constructor(private readonly ia: IaService) {}
+  constructor(
+    private readonly ia: IaService,
+    private readonly tokens: TokenService,
+  ) {}
 
   @Post('ficha')
   ficha(@Body() dto: PreguntaFichaDto) {
     return this.ia.ficha(dto.productoId, dto.pregunta);
   }
 
+  /** Público: invitadas preguntan por catálogo; con sesión CLIENTA también ve pedidos. */
   @Post('bot')
+  bot(@Req() request: Request, @Body() dto: BotDto) {
+    let clientaId: string | null = null;
+    const header = request.headers.authorization;
+    const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+    if (token) {
+      try {
+        const payload = this.tokens.verify(token) as JwtPayload;
+        if (payload.rol === Rol.CLIENTA) clientaId = payload.sub;
+      } catch {
+        /* invitada */
+      }
+    }
+    return this.ia.bot(clientaId, dto.mensaje.trim(), dto.productoId, dto.historial ?? []);
+  }
+
+  /** Try-on con FLUX (Azure AI). Solo clienta; la foto no se reutiliza fuera de esta petición. */
+  @Post('probar')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.CLIENTA)
-  bot(@CurrentUser() user: JwtPayload, @Body() dto: BotDto) {
-    return this.ia.bot(user.sub, dto.mensaje.trim(), dto.productoId, dto.historial ?? []);
+  @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.SUPERADMIN)
+  probar(@Body() dto: ProbarDto) {
+    return this.ia.probar(dto.varianteId, dto.imagenBase64);
   }
 }

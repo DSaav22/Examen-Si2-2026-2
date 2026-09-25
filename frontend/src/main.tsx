@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './styles/vesta-typography.css'
+import './styles/ops.css'
 import App from './App.tsx'
 
 if ('serviceWorker' in navigator) {

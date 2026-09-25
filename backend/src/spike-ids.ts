@@ -8,6 +8,7 @@ export const SPIKE_UUIDS = {
   cajero: '55555555-5555-5555-5555-555555555555',
   turno: '66666666-6666-6666-6666-666666666666',
   admin: '77777777-7777-7777-7777-777777777777',
+  superadmin: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
   clienta: '88888888-8888-8888-8888-888888888888',
   encargado: '99999999-9999-9999-9999-999999999999',
   proveedorUser: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',

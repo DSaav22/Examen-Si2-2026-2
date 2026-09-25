@@ -260,6 +260,8 @@ export class CatalogoService {
         ocasion: dto.ocasion,
         precioBase: dto.precioBase,
         descuentoPct: dto.descuentoPct ?? 0,
+        precioMayorista: dto.precioMayorista,
+        minimoMayorista: dto.minimoMayorista ?? 0,
         temporadaId: dto.temporadaId,
         coleccionId: dto.coleccionId,
         proveedorId: dto.proveedorId,
@@ -311,6 +313,7 @@ export class CatalogoService {
         sku: dto.sku,
         urlFoto: dto.urlFoto ?? '',
         urlOverlay: dto.urlOverlay ?? '',
+        urlModelo: dto.urlModelo ?? '',
       },
     });
   }

@@ -1,7 +1,7 @@
 ---
 tipo: concept
-fuentes: 3
-actualizado: 2026-09-23
+fuentes: 4
+actualizado: 2026-09-25
 tags: [innovacion, ra, mvp]
 ---
 
@@ -36,7 +36,7 @@ MVP = cámara + pose + overlay **2D** de la variante; fallback foto de cuerpo co
 
 Web: overlay 2D (MediaPipe o toques, o foto de cuerpo) y, si la variante tiene `urlModelo`, volumen CSS con giro, color y botón para volver al 2D. No es un archivo GLB ni Three.js. El blazer demo `VESTA-DEMO-001` ya trae modelo. El admin lo activa desde el probador. [[codigo-23-sep]]
 
-Expo sigue solo en 2D. No vender el móvil como probador 3D. [[Estado del codigo]]
+Expo: overlay 2D si hay PNG; si no, o sin cámara, **subir foto / silueta demo** → `POST /ia/probar`. No vender el móvil como probador 3D (eso es web + `urlModelo`). [[codigo-24-sep-movil-web]] · [[Estado del codigo]]
 
 ## Relacionado
 

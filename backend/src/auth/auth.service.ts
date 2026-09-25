@@ -52,7 +52,9 @@ export class AuthService {
     if (!ok) {
       throw new UnauthorizedException({ codigo: 'CREDENCIALES' });
     }
-    await this.prisma.auditoria.create({ data: { accion: 'login', recurso: 'auth', detalle: usuario.id } });
+    await this.prisma.auditoria.create({
+      data: { accion: 'login', recurso: 'auth', detalle: usuario.email, usuarioId: usuario.id },
+    });
     const payload: JwtPayload = {
       sub: usuario.id,
       email: usuario.email,
@@ -74,6 +76,7 @@ export class AuthService {
         rol: true,
         sucursalId: true,
         proveedorId: true,
+        avatarUrl: true,
       },
     });
   }
@@ -100,6 +103,7 @@ export class AuthService {
     sucursalId?: string | null;
     proveedorId?: string | null;
     mayorista?: boolean;
+    avatarUrl?: string | null;
   }) {
     return {
       id: usuario.id,
@@ -109,6 +113,7 @@ export class AuthService {
       sucursalId: usuario.sucursalId ?? null,
       proveedorId: usuario.proveedorId ?? null,
       mayorista: usuario.mayorista ?? false,
+      avatarUrl: usuario.avatarUrl ?? '',
     };
   }
 }

@@ -1,7 +1,7 @@
 ---
 tipo: entity
-fuentes: 1
-actualizado: 2026-09-23
+fuentes: 2
+actualizado: 2026-09-25
 tags: [movil]
 ---
 
@@ -9,4 +9,10 @@ tags: [movil]
 
 App del cliente final. TypeScript, Expo 53, React Native 0.79, en `movil/`. No Flutter. [[stack-metodologia-parcial]]
 
-23 sep: login, catálogo, probador solo 2D (cámara y toques), carrito, compra contra entrega o QR, y reserva. No tiene bot, volumen 3D, precio mayorista, historial con seguimiento ni devolución. La API por defecto es `localhost:3000` (o el host de Expo en el puerto 3000). [[Estado del codigo]]
+## Madurez (25 sep)
+
+Paridad visual con storefront Vesta: inicio, catálogo, ficha, bolsa, cuenta, asistente, menú lateral y bottom nav. Demo preferida en **Expo web** (`localhost:8081`) para no usar emulador. [[codigo-24-sep-movil-web]]
+
+Probador: cámara, o sin cámara **SUBIR FOTO** / **SILUETA DEMO** → Vista realista IA (`POST /ia/probar`). Aún **no** tiene: bot UC29, volumen 3D, mayorista, historial con seguimiento, devolución.
+
+API por defecto: `http://localhost:3000` (o host Expo / `10.0.2.2` en emulador Android). [[Estado del codigo]]

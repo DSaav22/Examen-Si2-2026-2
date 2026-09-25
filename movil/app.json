@@ -13,6 +13,12 @@
           "cameraPermission": "EnsayAR usa la cámara solo para el probador virtual. El video no se sube."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "EnsayAR necesita acceso a tus fotos para el probador sin cámara."
+        }
+      ],
       "expo-asset",
       "expo-font"
     ],

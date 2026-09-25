@@ -10,7 +10,7 @@ import { AbrirCajaDto, CerrarCajaDto } from './dto/caja.dto';
 
 @Controller('caja')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Rol.CAJERO, Rol.ADMIN)
+@Roles(Rol.CAJERO, Rol.ADMIN, Rol.SUPERADMIN)
 export class CajaController {
   constructor(private readonly caja: CajaService) {}
 

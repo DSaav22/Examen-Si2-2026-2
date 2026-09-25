@@ -15,7 +15,7 @@ Construcción entregó una versión operativa. Transición no agrega casos de us
 
 ## 6.1 Qué se pone en manos del usuario
 
-El entorno de defensa usa la semilla académica: varias sucursales, un catálogo de demostración y las cuentas `admin@ensayar.bo`, `cajero@ensayar.bo`, `encargado@ensayar.bo`, `proveedor@ensayar.bo` y `clienta@ensayar.bo`, todas con la clave de laboratorio. Esas claves no salen del aula.
+El entorno de defensa usa la semilla académica: varias sucursales, un catálogo de demostración y las cuentas `superadmin@ensayar.bo`, `admin@ensayar.bo`, `cajero@ensayar.bo`, `encargado@ensayar.bo`, `proveedor@ensayar.bo` y `clienta@ensayar.bo`, todas con la clave de laboratorio. Esas claves no salen del aula.
 
 Quien recibe el sistema no lee el código. Recibe tres cosas: la aplicación web, la aplicación móvil en modo prototipo, y el capítulo 8, que explica qué tocar según el rol. El mecanismo de adopción que pidió el docente es ese manual más un recorrido guiado de unos quince minutos.
 
