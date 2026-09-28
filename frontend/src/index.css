@@ -4670,6 +4670,53 @@ body.has-catalog-compare .assistant {
   overflow: hidden;
   perspective: 900px;
 }
+.tryon-three-video,
+.tryon-three-source {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scaleX(-1);
+  background: #0d0b0a;
+}
+.tryon-three-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.tryon-three-status {
+  position: absolute;
+  z-index: 3;
+  top: 0.85rem;
+  left: 0.85rem;
+  padding: 0.42rem 0.68rem;
+  border-radius: 999px;
+  background: rgb(20 12 8 / 78%);
+  color: #fff;
+  font-size: 0.72rem;
+}
+.tryon-three-status.is-error { background: #852331; }
+.tryon-three-empty {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: 390px;
+  padding: 2rem;
+  color: var(--ink);
+  text-align: center;
+}
+.uc28-scene .uc28-giro {
+  position: relative;
+  z-index: 4;
+  align-self: end;
+  padding: 0.45rem;
+  border-radius: var(--vesta-radius-sm, 6px);
+  background: rgb(247 241 234 / 88%);
+}
 .uc28-stage3d {
   position: relative;
   width: 220px;

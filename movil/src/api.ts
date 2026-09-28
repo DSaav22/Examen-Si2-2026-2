@@ -113,6 +113,9 @@ export async function api<T>(
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()
+  // Nest puede devolver 200 sin payload (por ejemplo, cuando no existe un turno abierto).
+  // Para una respuesta exitosa eso equivale a `undefined`, no a un JSON inválido.
+  if (res.ok && !text.trim()) return undefined as T
   let body: unknown
   try {
     body = text ? (JSON.parse(text) as unknown) : undefined

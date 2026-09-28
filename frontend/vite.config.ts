@@ -20,6 +20,12 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      // Los GLB se sirven desde backend/public/models. Sin este proxy Vite
+      // responde el index.html y GLTFLoader no puede interpretar el archivo.
+      '/models': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
   },
 })

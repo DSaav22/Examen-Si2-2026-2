@@ -135,8 +135,14 @@ export function RegistroScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [cargando, setCargando] = useState(false)
+  const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  const claveSegura = password.length >= 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) && !/\s/.test(password)
 
   async function submit() {
+    if (nombre.trim().length < 2 || !emailValido || !claveSegura) {
+      s.setError('Revisá nombre, correo y clave segura antes de continuar.')
+      return
+    }
     setCargando(true)
     s.setError('')
     try {
@@ -189,16 +195,22 @@ export function RegistroScreen() {
           secureTextEntry
           value={password}
           onChangeText={setPassword}
-          placeholder="Mínimo 4 caracteres"
+          placeholder="8+ caracteres, mayúscula, minúscula y número"
           placeholderTextColor={colors.taupe}
         />
+        <Text style={[styles.authHint, email.length ? (emailValido ? styles.validHint : styles.invalidHint) : undefined]}>
+          {email.length ? (emailValido ? '✓ Correo válido' : '× Revisá el formato del correo') : 'Ingresá un correo válido.'}
+        </Text>
+        <Text style={[styles.authHint, password.length ? (claveSegura ? styles.validHint : styles.invalidHint) : undefined]}>
+          {password.length ? (claveSegura ? '✓ Clave segura' : '× Usá 8+ caracteres, mayúscula, minúscula y número, sin espacios.') : 'La clave se valida antes de crear la cuenta.'}
+        </Text>
 
         <View style={styles.authActions}>
           <Btn
             label="CREAR CUENTA"
             onPress={() => void submit()}
             loading={cargando}
-            disabled={nombre.length < 2 || password.length < 4}
+            disabled={nombre.trim().length < 2 || !emailValido || !claveSegura}
           />
           <Btn label="YA TENGO CUENTA" ghost onPress={s.back} />
         </View>
@@ -534,6 +546,7 @@ export function FichaScreen() {
   const [talla, setTalla] = useState('')
   const [opiniones, setOpiniones] = useState<{ promedio: number; cantidad: number; items: { id: string; puntuacion: number; comentario?: string; usuario?: { nombre: string } }[] } | null>(null)
   const [comentario, setComentario] = useState('')
+  const [puntuacion, setPuntuacion] = useState(5)
 
   useEffect(() => {
     if (!id) return
@@ -630,6 +643,20 @@ export function FichaScreen() {
             <Text style={styles.linkish}>Preguntar al asistente</Text>
           </Pressable>
         </View>
+        {s.user?.rol === 'CLIENTA' ? (
+          <View style={styles.fichaSecondary}>
+            <Pressable onPress={() => {
+              void api(`/catalogo/productos/${p.id}/alertas`, s.token, {
+                method: 'POST', body: JSON.stringify({ tipo: 'reposicion' }),
+              }).then(() => s.setAviso('Te avisaremos cuando haya reposición.')).catch((e: unknown) => s.setError(e instanceof Error ? e.message : 'No se activó la alerta'))
+            }}><Text style={styles.linkish}>Avisarme si se agota mi talla</Text></Pressable>
+            <Pressable onPress={() => {
+              void api(`/catalogo/productos/${p.id}/alertas`, s.token, {
+                method: 'POST', body: JSON.stringify({ tipo: 'precio' }),
+              }).then(() => s.setAviso('Te avisaremos ante un cambio de precio.')).catch((e: unknown) => s.setError(e instanceof Error ? e.message : 'No se activó la alerta'))
+            }}><Text style={styles.linkish}>Avisarme si baja de precio</Text></Pressable>
+          </View>
+        ) : null}
       </View>
 
       {p.material ? <Text style={styles.metaLine}>Material · {p.material}</Text> : null}
@@ -653,6 +680,14 @@ export function FichaScreen() {
       )}
       {s.user?.rol === 'CLIENTA' ? (
         <>
+          <Text style={styles.label}>Tu puntuación</Text>
+          <View style={styles.chips}>
+            {[1, 2, 3, 4, 5].map(n => (
+              <Pressable key={n} style={[styles.chip, puntuacion === n && styles.chipOn]} onPress={() => setPuntuacion(n)}>
+                <Text style={[styles.chipText, puntuacion === n && styles.chipTextOn]}>{'★'.repeat(n)}</Text>
+              </Pressable>
+            ))}
+          </View>
           <TextInput
             style={[input, { marginTop: 8 }]}
             placeholder="Tu comentario"
@@ -666,7 +701,7 @@ export function FichaScreen() {
             onPress={() => {
               void api(`/catalogo/productos/${p.id}/opiniones`, s.token, {
                 method: 'POST',
-                body: JSON.stringify({ puntuacion: 5, comentario }),
+                body: JSON.stringify({ puntuacion, comentario }),
               })
                 .then(() => {
                   s.setAviso('Opinión publicada')
@@ -972,6 +1007,7 @@ export function ReservasScreen() {
 export function HistorialScreen() {
   const s = useSession()
   const [ventas, setVentas] = useState<Venta[]>([])
+  const [ocupada, setOcupada] = useState('')
 
   function cargar() {
     return api<Venta[]>('/ventas/historial', s.token).then(setVentas)
@@ -980,6 +1016,21 @@ export function HistorialScreen() {
   useEffect(() => {
     void cargar().catch((e: unknown) => s.setError(e instanceof Error ? e.message : 'Sin historial'))
   }, [s])
+
+  async function devolver(v: Venta) {
+    if (!s.token || !v.lineas.length) return
+    setOcupada(v.id)
+    try {
+      await api('/devoluciones', s.token, {
+        method: 'POST',
+        body: JSON.stringify({ ventaId: v.id, lineas: v.lineas.map(l => ({ lineaId: l.id, cantidad: l.cantidad })) }),
+      })
+      s.setAviso('Devolución registrada. El stock fue restituido según las reglas del sistema.')
+      await cargar()
+    } catch (e) {
+      s.setError(e instanceof Error ? e.message : 'No se pudo registrar la devolución')
+    } finally { setOcupada('') }
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.pad}>
@@ -1022,6 +1073,23 @@ export function HistorialScreen() {
                     s.setError(e instanceof Error ? e.message : 'Pago no confirmado'),
                   )
               }}
+            />
+          ) : null}
+          <Btn
+            label="ENVIAR COMPROBANTE"
+            ghost
+            onPress={() => {
+              void api(`/ventas/${v.id}/enviar-factura`, s.token, { method: 'POST' })
+                .then(() => s.setAviso('Comprobante enviado a tu correo.'))
+                .catch((e: unknown) => s.setError(e instanceof Error ? e.message : 'No se pudo enviar el comprobante'))
+            }}
+          />
+          {['cobrada', 'devuelta_parcial'].includes(v.estado) ? (
+            <Btn
+              label={ocupada === v.id ? 'REGISTRANDO DEVOLUCIÓN…' : 'SOLICITAR DEVOLUCIÓN TOTAL'}
+              ghost
+              disabled={ocupada === v.id}
+              onPress={() => void devolver(v)}
             />
           ) : null}
         </View>
@@ -1086,6 +1154,13 @@ export function CuentaScreen() {
         <Text style={styles.lookName}>Asistente Vesta</Text>
         <Text style={styles.hint}>Tallas, stock y pedidos</Text>
       </Pressable>
+
+      {s.user?.rol !== 'CLIENTA' ? (
+        <Pressable style={styles.accountCard} onPress={() => s.push({ name: 'operaciones' })}>
+          <Text style={styles.lookName}>Operaciones</Text>
+          <Text style={styles.hint}>Herramientas habilitadas para tu rol: {s.user?.rol}</Text>
+        </Pressable>
+      ) : null}
 
       {cupones.length ? (
         <View style={styles.block}>
@@ -1637,6 +1712,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 10,
   },
+  validHint: { color: colors.ok },
+  invalidHint: { color: colors.error },
   eyebrow: { letterSpacing: 2, color: colors.taupe, fontSize: 11, marginTop: 8 },
   h1: { fontSize: 32, fontWeight: '600', color: colors.ink, lineHeight: 36 },
   h2: { fontSize: 22, fontWeight: '600', color: colors.ink, marginTop: 8 },

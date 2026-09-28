@@ -352,6 +352,14 @@ export function Capas() {
                 hint={s.user?.email ?? 'Perfil'}
                 onPress={() => go(() => s.goTab('cuenta'))}
               />
+              {s.user?.rol !== 'CLIENTA' ? (
+                <MenuRow
+                  label="Operaciones"
+                  hint={`Panel ${s.user?.rol ?? ''}`}
+                  accent
+                  onPress={() => go(() => s.push({ name: 'operaciones' }))}
+                />
+              ) : null}
 
               <Pressable
                 style={styles.menuBranch}

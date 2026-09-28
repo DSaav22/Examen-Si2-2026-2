@@ -10,6 +10,9 @@ import {
   crearPose,
   type CajaOverlay,
 } from '../pose'
+import { TryOn3DOverlay } from '../features/tryon3d/TryOn3DOverlay'
+import { poseFromMediaPipe } from '../features/tryon3d/mediapipePoseAdapter'
+import type { TryOnPose } from '../features/tryon3d/domain'
 import type { Producto } from '../types'
 
 type Overlay = {
@@ -19,27 +22,6 @@ type Overlay = {
   urlOverlay: string
   producto: string
   urlModelo: string
-}
-
-const COLORES_TELA: { nombre: string; hex: string }[] = [
-  { nombre: 'Vino', hex: '#6b2b3a' },
-  { nombre: 'Negro', hex: '#1a1a1a' },
-  { nombre: 'Arena', hex: '#c4b5a0' },
-  { nombre: 'Marfil', hex: '#ebe4d8' },
-  { nombre: 'Azul', hex: '#2c3e5a' },
-]
-
-function colorHex(nombre: string): string {
-  const n = nombre.trim().toLocaleLowerCase()
-  const known = COLORES_TELA.find(c => c.nombre.toLocaleLowerCase() === n)
-  if (known) return known.hex
-  if (n.includes('vino') || n.includes('bordeaux') || n.includes('rojo')) return '#6b2b3a'
-  if (n.includes('negro') || n.includes('black')) return '#1a1a1a'
-  if (n.includes('blanco') || n.includes('marfil') || n.includes('ivory')) return '#ebe4d8'
-  if (n.includes('beige') || n.includes('arena') || n.includes('camel')) return '#c4b5a0'
-  if (n.includes('azul') || n.includes('navy')) return '#2c3e5a'
-  if (n.includes('verde')) return '#3d5a45'
-  return '#6b2b3a'
 }
 
 function soportaTransform3d(): boolean {
@@ -69,10 +51,9 @@ export function Probador() {
   const [generandoIa, setGenerandoIa] = useState(false)
   const [vista3d, setVista3d] = useState(false)
   const [rotacion, setRotacion] = useState(0)
-  const [colorTela, setColorTela] = useState('#6b2b3a')
   const [adminMsg, setAdminMsg] = useState('')
-  const [guardandoModelo, setGuardandoModelo] = useState(false)
   const [sinCamara, setSinCamara] = useState(false)
+  const [poseEnVivo, setPoseEnVivo] = useState<TryOnPose | null>(null)
   const puede3d = useMemo(() => soportaTransform3d(), [])
   const esAdmin = user?.rol === 'ADMIN' || user?.rol === 'SUPERADMIN'
   const tieneModelo = Boolean(overlay?.urlModelo?.trim())
@@ -96,7 +77,6 @@ export function Probador() {
       .then(data => {
         const next = { ...data, urlModelo: data.urlModelo ?? '' }
         setOverlay(next)
-        setColorTela(colorHex(next.color))
         if (next.urlModelo?.trim() && soportaTransform3d()) setVista3d(true)
         setModo('Elegí una foto o usá la cámara')
       })
@@ -121,7 +101,10 @@ export function Probador() {
   }, [varianteId])
 
   useEffect(() => {
-    if (fotoCuerpo || vista3d || vistaIa) return
+    // La cámara sigue activa en modo 3D: MediaPipe alimenta el anclaje del GLB.
+    // Una foto conserva el flujo 2D/IA; al abrir 3D volvemos a la cámara
+    // porque el seguimiento de MediaPipe debe recibir video en vivo.
+    if (vistaIa || (fotoCuerpo && !vista3d)) return
     let stream: MediaStream | undefined
     let alive = true
     let raf = 0
@@ -144,11 +127,14 @@ export function Probador() {
             const res = pose.detectForVideo(video, performance.now())
             const lm = res.landmarks[0]
             if (lm) {
+              setPoseEnVivo(poseFromMediaPipe(lm))
               const next = cajaDesdeLandmarks(lm)
               if (next) {
                 setCaja(next)
                 setModo('Hombros detectados · overlay activo')
               }
+            } else {
+              setPoseEnVivo(null)
             }
             raf = requestAnimationFrame(tick)
           }
@@ -159,6 +145,7 @@ export function Probador() {
       })
       .catch(() => {
         setSinCamara(true)
+        setPoseEnVivo(null)
         setAviso('Sin cámara en este equipo. Subí una foto o usá la silueta demo.')
         setModo('Esperando tu foto')
       })
@@ -288,30 +275,13 @@ export function Probador() {
     }
   }
 
-  async function toggleModelo3d() {
-    if (!overlay || !varianteId) return
-    const siguiente = tieneModelo ? '' : 'vesta-volumen'
-    setGuardandoModelo(true)
-    setAdminMsg('')
-    try {
-      await api(`/catalogo/variantes/${varianteId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ urlModelo: siguiente }),
-      })
-      setOverlay({ ...overlay, urlModelo: siguiente })
-      if (siguiente && puede3d) {
-        setVista3d(true)
-        setModo('Modelo 3D activo')
-      } else {
-        setVista3d(false)
-        setModo(siguiente && !puede3d ? 'Sin soporte 3D' : 'Overlay 2D')
-      }
-      setAdminMsg(siguiente ? 'Modelo 3D activado.' : 'Modelo 3D quitado.')
-    } catch {
-      setAdminMsg('No se pudo actualizar el modelo.')
-    } finally {
-      setGuardandoModelo(false)
+  function toggleModelo3d() {
+    if (!tieneModelo) {
+      setAdminMsg('Esta variante todavía no tiene un archivo GLB asociado.')
+      return
     }
+    setVista3d(actual => !actual)
+    setModo(mostrando3d ? 'Vista 2D' : 'Probador 3D activo')
   }
 
   function usarDemo() {
@@ -356,25 +326,16 @@ export function Probador() {
         <div className="tryon-stage-wrap">
           {mostrando3d ? (
             <div className="uc28-scene" aria-label="Probador 3D">
-              <div className="uc28-stage3d" style={{ transform: `rotateY(${rotacion}deg)` }}>
-                <div className="uc28-torso">
-                  <div className="uc28-cuello" />
-                  <div className="uc28-pecho" />
-                  <div className="uc28-brazo uc28-brazo--izq" />
-                  <div className="uc28-brazo uc28-brazo--der" />
+              {sinCamara ? (
+                <div className="tryon-three-empty">
+                  Activá el permiso de cámara para probar la prenda en movimiento.
                 </div>
-                <div
-                  className="uc28-prenda uc28-prenda--caida"
-                  style={{ ['--tela' as string]: colorTela }}
-                >
-                  <div className="uc28-prenda-cara uc28-prenda-frente" />
-                  <div className="uc28-prenda-cara uc28-prenda-atras" />
-                  <div className="uc28-prenda-cara uc28-prenda-izq" />
-                  <div className="uc28-prenda-cara uc28-prenda-der" />
-                  <div className="uc28-manga uc28-manga--izq" />
-                  <div className="uc28-manga uc28-manga--der" />
-                </div>
-              </div>
+              ) : (
+                <video ref={videoRef} className="tryon-three-video" autoPlay muted playsInline />
+              )}
+              {overlay?.urlModelo ? (
+                <TryOn3DOverlay modelUrl={overlay.urlModelo} pose={poseEnVivo} rotation={rotacion} />
+              ) : null}
               <label className="uc28-giro">
                 Girar
                 <input
@@ -385,19 +346,6 @@ export function Probador() {
                   onChange={e => setRotacion(Number(e.target.value))}
                 />
               </label>
-              <div className="uc28-colores row-form">
-                {COLORES_TELA.map(c => (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    className={`ui-button ui-button--secondary${colorTela === c.hex ? ' is-active' : ''}`}
-                    style={{ borderColor: c.hex }}
-                    onClick={() => setColorTela(c.hex)}
-                  >
-                    {c.nombre}
-                  </button>
-                ))}
-              </div>
             </div>
           ) : vistaIa ? (
             <div className="stage stage--ia" aria-label="Vista realista">
@@ -555,14 +503,14 @@ export function Probador() {
               <button
                 type="button"
                 className="ui-button ui-button--secondary"
-                disabled={guardandoModelo || !overlay}
-                onClick={() => void toggleModelo3d()}
+                disabled={!overlay}
+                onClick={toggleModelo3d}
               >
-                {guardandoModelo
-                  ? 'Guardando…'
-                  : tieneModelo
-                    ? 'Quitar modelo 3D'
-                    : 'Activar modelo 3D'}
+                {tieneModelo
+                  ? mostrando3d
+                    ? 'Ocultar visor 3D'
+                    : 'Abrir visor 3D'
+                  : 'Sin modelo GLB'}
               </button>
             </div>
           ) : null}

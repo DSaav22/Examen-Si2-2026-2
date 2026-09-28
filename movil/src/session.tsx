@@ -26,6 +26,7 @@ export type Screen =
   | { name: 'reservas' }
   | { name: 'historial' }
   | { name: 'asistente'; productoId?: string }
+  | { name: 'operaciones' }
 
 const TABS = new Set(['inicio', 'catalogo', 'favoritos', 'bolsa', 'cuenta'])
 

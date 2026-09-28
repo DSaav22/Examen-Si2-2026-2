@@ -14,6 +14,7 @@ import {
   RegistroScreen,
   ReservasScreen,
 } from './src/screens'
+import { OperacionesScreen } from './src/operaciones'
 import { SessionProvider, useSession } from './src/session'
 import { colors } from './src/theme'
 import { BottomNav, Capas, Header } from './src/ui'
@@ -60,6 +61,7 @@ function Root() {
         {s.screen.name === 'reservas' ? <ReservasScreen /> : null}
         {s.screen.name === 'historial' ? <HistorialScreen /> : null}
         {s.screen.name === 'asistente' ? <AsistenteScreen /> : null}
+        {s.screen.name === 'operaciones' ? <OperacionesScreen /> : null}
       </View>
       {conNav ? <BottomNav /> : null}
       <Capas />
