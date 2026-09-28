@@ -5,6 +5,7 @@ import { assetUrl } from '../asset'
 import { useAuth } from '../auth'
 import type { Producto, Sucursal, Variante } from '../types'
 import { precioEfectivo, stockCapacidad, stockDisponible } from '../types'
+import { catalogLabel } from '../text'
 import { OpsActions, OpsBtn, OpsEmpty, OpsField, OpsPage, OpsPanel, OpsStatus } from '../shared/ops/OpsUi'
 
 function available(variant: Variante) {
@@ -230,9 +231,11 @@ export function FichaOps() {
     <OpsPage
       eyebrow="Catálogo operativo"
       title={product.nombre}
-      description={`${product.categoria} · ${product.ocasion} · ${product.variantes.length} variantes · ${totalStock} uds. en stock`}
+      descriptionChips
+      description={`${catalogLabel(product.categoria)} · ${catalogLabel(product.ocasion)} · ${product.variantes.length} variantes · ${totalStock} uds. en stock`}
       actions={
-        <OpsActions>
+        <div className="ops-ficha-head-actions">
+          <OpsActions>
           <Link className="ops-text-link" to="/catalogo">
             ← Catálogo
           </Link>
@@ -245,7 +248,8 @@ export function FichaOps() {
           <OpsBtn type="button" variant="secondary" onClick={() => void load()}>
             Actualizar
           </OpsBtn>
-        </OpsActions>
+          </OpsActions>
+        </div>
       }
     >
       {error ? <p className="error">{error}</p> : null}
@@ -259,7 +263,7 @@ export function FichaOps() {
             </div>
             <div className="ops-ficha-summary">
               <p className="eyebrow">
-                {product.categoria} · {product.ocasion}
+                {catalogLabel(product.categoria)} · {catalogLabel(product.ocasion)}
               </p>
               <h2>{product.nombre}</h2>
               <code>{selectedVariant?.sku ?? 'Sin SKU'}</code>

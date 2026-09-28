@@ -8,6 +8,7 @@ import type { CatalogPage, Producto, Sucursal, Variante } from '../types'
 import { precioEfectivo, stockCapacidad, stockDisponible } from '../types'
 import { catalogBannerImage } from '../shared/vestaAssets'
 import { useStorefront } from '../storefront'
+import { catalogLabel } from '../text'
 import { OpsActions, OpsBtn, OpsEmpty, OpsField, OpsPage, OpsPanel, OpsStatus } from '../shared/ops/OpsUi'
 
 type Sort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'novedades' | 'popularidad' | 'descuento'
@@ -163,7 +164,7 @@ function ProductCard({
       </div>
       <div className="catalog-product-info">
         <Link to={`/ficha/${product.id}`} className="catalog-product-name">{product.nombre}</Link>
-        <span className="catalog-product-meta">{product.categoria} · {product.ocasion}</span>
+        <span className="catalog-product-meta">{catalogLabel(product.categoria)} · {catalogLabel(product.ocasion)}</span>
         <span className="catalog-product-sku">SKU {variant?.sku ?? 'No disponible'}</span>
         <div className="catalog-price-row">
           <b>Bs {precioEfectivo(product).toFixed(2)}</b>
@@ -238,8 +239,8 @@ function CatalogEditorialFilters({
         >
           <option value="">Cualquiera</option>
           {MATERIALES.map(item => (
-            <option key={item} value={item}>
-              {item}
+          <option key={item} value={item}>
+              {catalogLabel(item)}
             </option>
           ))}
         </select>
@@ -252,8 +253,8 @@ function CatalogEditorialFilters({
         >
           <option value="">Cualquiera</option>
           {ESTILOS.map(item => (
-            <option key={item} value={item}>
-              {item}
+          <option key={item} value={item}>
+              {catalogLabel(item)}
             </option>
           ))}
         </select>
@@ -266,8 +267,8 @@ function CatalogEditorialFilters({
         >
           <option value="">Cualquiera</option>
           {AJUSTES.map(item => (
-            <option key={item} value={item}>
-              {item}
+          <option key={item} value={item}>
+              {catalogLabel(item)}
             </option>
           ))}
         </select>
@@ -294,6 +295,7 @@ function ComparePanel({ products, onClose }: { products: Producto[]; onClose: ()
         <h2 id="compare-title">Comparar productos</h2>
         <div className="catalog-compare-table">
           <div className="catalog-compare-labels">
+            <span>Imagen</span>
             <span>Producto</span>
             <span>Precio</span>
             <span>Categoría</span>
@@ -303,12 +305,23 @@ function ComparePanel({ products, onClose }: { products: Producto[]; onClose: ()
           </div>
           {products.map(product => (
             <div className="catalog-compare-column" key={product.id}>
+              {product.variantes[0]?.urlFoto ? (
+                <img
+                  className="catalog-compare-image"
+                  src={assetUrl(product.variantes[0].urlFoto)}
+                  alt={product.nombre}
+                />
+              ) : (
+                <div className="catalog-compare-image catalog-compare-image--empty" role="img" aria-label={`Sin foto de ${product.nombre}`}>
+                  VESTA
+                </div>
+              )}
               <strong>{product.nombre}</strong>
               <span>Bs {precioEfectivo(product).toFixed(2)}</span>
-              <span>{product.categoria}</span>
-              <span>{product.ocasion}</span>
-              <span>{product.material || 'No especificado'}</span>
-              <span>{product.ajuste || 'No especificado'}</span>
+              <span>{catalogLabel(product.categoria)}</span>
+              <span>{catalogLabel(product.ocasion)}</span>
+              <span>{catalogLabel(product.material) || 'No especificado'}</span>
+              <span>{catalogLabel(product.ajuste) || 'No especificado'}</span>
               <Link className="ui-button ui-button--secondary" to={`/ficha/${product.id}`}>
                 Ver detalle
               </Link>
@@ -382,7 +395,7 @@ function AdminCreate({
             <select value={category} onChange={event => setCategory(event.target.value)} required>
               {(categorias.length ? categorias : CATEGORIAS_FALLBACK).map(c => (
                 <option key={c} value={c}>
-                  {c}
+                  {catalogLabel(c)}
                 </option>
               ))}
             </select>
@@ -391,7 +404,7 @@ function AdminCreate({
             <select value={occasion} onChange={event => setOccasion(event.target.value)} required>
               {OCASIONES.map(o => (
                 <option key={o} value={o}>
-                  {o}
+                  {catalogLabel(o)}
                 </option>
               ))}
             </select>
@@ -526,8 +539,8 @@ function OpsCatalog({
             >
               <option value="">Todas</option>
               {categorias.map(c => (
-                <option key={c} value={c}>
-                  {c}
+              <option key={c} value={c}>
+                  {catalogLabel(c)}
                 </option>
               ))}
             </select>
@@ -539,8 +552,8 @@ function OpsCatalog({
             >
               <option value="">Todas</option>
               {OCASIONES.map(o => (
-                <option key={o} value={o}>
-                  {o}
+              <option key={o} value={o}>
+                  {catalogLabel(o)}
                 </option>
               ))}
             </select>
@@ -702,7 +715,7 @@ export function Catalogo() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [mobileFilters, setMobileFilters] = useState(false)
-  const [density, setDensity] = useState<'regular' | 'compact'>('regular')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [compare, setCompare] = useState<Producto[]>([])
   const [compareOpen, setCompareOpen] = useState(false)
   const [quickView, setQuickView] = useState<Producto | null>(null)
@@ -714,6 +727,11 @@ export function Catalogo() {
     }
   })
   const [categorias, setCategorias] = useState<string[]>(CATEGORIAS_FALLBACK)
+
+  useEffect(() => {
+    document.body.classList.toggle('has-catalog-compare', compare.length > 0)
+    return () => document.body.classList.remove('has-catalog-compare')
+  }, [compare.length])
 
   useEffect(() => {
     api<{ id: string; nombre: string }[]>('/catalogo/categorias')
@@ -898,18 +916,18 @@ export function Catalogo() {
           <button
             type="button"
             className="catalog-density"
-            aria-label="Vista regular"
-            aria-pressed={density === 'regular'}
-            onClick={() => setDensity('regular')}
+            aria-label="Vista de cuadrícula"
+            aria-pressed={viewMode === 'grid'}
+            onClick={() => setViewMode('grid')}
           >
             ▦
           </button>
           <button
             type="button"
             className="catalog-density"
-            aria-label="Vista compacta"
-            aria-pressed={density === 'compact'}
-            onClick={() => setDensity('compact')}
+            aria-label="Vista en filas"
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
           >
             ▤
           </button>
@@ -938,7 +956,7 @@ export function Catalogo() {
               void load(next)
             }}
           >
-            {item}
+            {catalogLabel(item)}
           </button>
         ))}
         {recentSearches.map(item => (
@@ -952,7 +970,7 @@ export function Catalogo() {
               void load(next)
             }}
           >
-            {item}
+            {catalogLabel(item)}
           </button>
         ))}
       </div>
@@ -1005,7 +1023,7 @@ export function Catalogo() {
                 <option value="">Todas</option>
                 {categorias.map(item => (
                   <option key={item} value={item}>
-                    {item}
+                    {catalogLabel(item)}
                   </option>
                 ))}
               </select>
@@ -1020,7 +1038,7 @@ export function Catalogo() {
                 <option value="">Todas</option>
                 {OCASIONES.map(item => (
                   <option key={item} value={item}>
-                    {item}
+                    {catalogLabel(item)}
                   </option>
                 ))}
               </select>
@@ -1190,7 +1208,7 @@ export function Catalogo() {
               <div className="catalog-skeleton" />
             </div>
           ) : (
-            <div className={`catalog-grid${density === 'compact' ? ' is-compact' : ''}`}>
+            <div className={`catalog-grid${viewMode === 'list' ? ' is-list' : ''}`}>
               {products.map(product => (
                 <ProductCard
                   key={product.id}
@@ -1273,7 +1291,7 @@ export function Catalogo() {
           </section>
         </div>
       ) : null}
-      {message ? (
+      {message && !message.toLocaleLowerCase().includes('bolsa') ? (
         <p className="ok catalog-message" role="status">
           {message}
         </p>

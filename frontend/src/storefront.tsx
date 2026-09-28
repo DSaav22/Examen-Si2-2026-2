@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LineaCarrito, Producto } from './types'
 import { useAuth } from './auth'
 import { api } from './api'
@@ -22,12 +22,14 @@ function writeCart(lineas: LineaCarrito[]) {
 
 type StorefrontContextValue = {
   cart: LineaCarrito[]
+  cartNotice: LineaCarrito | null
   favorites: string[]
   recent: string[]
   addToCart: (line: Omit<LineaCarrito, 'cantidad'>, maxStock?: number) => boolean
   setCartQuantity: (id: string, quantity: number) => void
   removeFromCart: (id: string) => void
   clearCart: () => void
+  dismissCartNotice: () => void
   toggleFavorite: (id: string) => void
   rememberProduct: (id: string) => void
   clearRecent: () => void
@@ -38,6 +40,8 @@ const StorefrontContext = createContext<StorefrontContextValue | null>(null)
 export function StorefrontProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [cart, setCart] = useState<LineaCarrito[]>(() => read(CART_KEY, []))
+  const [cartNotice, setCartNotice] = useState<LineaCarrito | null>(null)
+  const noticeTimer = useRef<number | undefined>(undefined)
   const [favorites, setFavorites] = useState<string[]>(() => read(FAVORITES_KEY, []))
   const [recent, setRecent] = useState<string[]>(() => read(RECENT_KEY, []))
 
@@ -57,6 +61,8 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
     window.addEventListener('ensayar_carrito_actualizado', sync)
     return () => window.removeEventListener('ensayar_carrito_actualizado', sync)
   }, [])
+
+  useEffect(() => () => window.clearTimeout(noticeTimer.current), [])
 
   /** Carritos guardados antes de urlFoto: completar fotos desde el catálogo. */
   useEffect(() => {
@@ -101,6 +107,7 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StorefrontContextValue>(
     () => ({
       cart,
+      cartNotice,
       favorites,
       recent,
       addToCart: (line, maxStock) => {
@@ -108,10 +115,14 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
         const i = next.findIndex(item => item.varianteId === line.varianteId)
         const quantity = (i >= 0 ? next[i].cantidad : 0) + 1
         if (maxStock !== undefined && quantity > maxStock) return false
-        if (i >= 0) next[i] = { ...next[i], ...line, cantidad: quantity }
-        else next.push({ ...line, cantidad: 1 })
+        const added = { ...line, cantidad: quantity }
+        if (i >= 0) next[i] = { ...next[i], ...added }
+        else next.push(added)
         setCart(next)
         writeCart(next)
+        setCartNotice(added)
+        window.clearTimeout(noticeTimer.current)
+        noticeTimer.current = window.setTimeout(() => setCartNotice(null), 4200)
         return true
       },
       setCartQuantity: (id, quantity) => {
@@ -129,6 +140,10 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
       clearCart: () => {
         setCart([])
         writeCart([])
+      },
+      dismissCartNotice: () => {
+        window.clearTimeout(noticeTimer.current)
+        setCartNotice(null)
       },
       toggleFavorite: id => {
         const exists = favorites.includes(id)
@@ -151,7 +166,7 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(RECENT_KEY, JSON.stringify([]))
       },
     }),
-    [cart, favorites, recent, user?.rol],
+    [cart, cartNotice, favorites, recent, user?.rol],
   )
 
   return <StorefrontContext.Provider value={value}>{children}</StorefrontContext.Provider>

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { assetUrl } from '../asset'
 import { useStorefront } from '../storefront'
@@ -120,6 +120,25 @@ function CatalogCollectionLink({
   )
 }
 
+function OpsNavIcon({ item }: { item: NavItem }) {
+  const key = item.to.split('?')[0]
+  const paths: Record<string, React.ReactNode> = {
+    '/admin': <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>,
+    '/admin/configuracion': <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.3" /><path d="M3.5 20c.5-3.4 2.3-5.2 5.5-5.2s5 1.8 5.5 5.2M14.5 20c.2-2.2 1.3-3.6 3.5-4" /></>,
+    '/admin/moderacion': <><path d="M4 5.5h16v11H9l-5 3v-14Z" /><path d="m8 11 2.2 2.2L16 7.8" /></>,
+    '/admin/bitacora': <><path d="M6 3.5h12v17H6z" /><path d="M9 8h6M9 12h6M9 16h3" /></>,
+    '/reportes': <><path d="M4 20V4M4 20h17" /><path d="M8 16v-4M13 16V7M18 16v-7" /></>,
+    '/pos': <><path d="M4 7h16v12H4z" /><path d="M7 4h10M8 11h3M8 15h8M16 11h1" /></>,
+    '/encargado': <><path d="M4 8.5 12 4l8 4.5v9L12 22l-8-4.5z" /><path d="M4 8.5 12 13l8-4.5M12 13v9" /></>,
+    '/despacho': <><path d="M3 7h11v10H3zM14 10h3l3 3v4h-6z" /><circle cx="7" cy="19" r="1.5" /><circle cx="17" cy="19" r="1.5" /></>,
+    '/catalogo': <><path d="M5 5.5h14v14H5z" /><path d="M8 9h8M8 12h8M8 15h5" /></>,
+    '/base-datos': <><ellipse cx="12" cy="5.5" rx="7" ry="2.5" /><path d="M5 5.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6M5 11.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6" /></>,
+    '/cuenta': <><circle cx="12" cy="8" r="3.2" /><path d="M5 20c.7-3.3 3-5 7-5s6.3 1.7 7 5" /></>,
+  }
+  const icon = paths[key] ?? <path d="M5 12h14M12 5v14" />
+  return <svg className="ops-nav-icon" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg>
+}
+
 function OpsNavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
   return (
     <NavLink
@@ -128,6 +147,7 @@ function OpsNavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => vo
       className={({ isActive }) => (isActive ? 'ops-nav-link is-active' : 'ops-nav-link')}
       onClick={onNavigate}
     >
+      <OpsNavIcon item={item} />
       {item.label}
     </NavLink>
   )
@@ -617,7 +637,7 @@ function ClientShell({
   home: string
 }) {
   const location = useLocation()
-  const { cart } = useStorefront()
+  const { cart, cartNotice, dismissCartNotice } = useStorefront()
   const [menuOpen, setMenuOpen] = useState(false)
   const [megaOpen, setMegaOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -687,10 +707,27 @@ function ClientShell({
             >
               <Icon name="heart" />
             </Link>
-            <Link className="shell-icon-button bag-button" aria-label="Bolsa" to="/carrito">
-              <Icon name="bag" />
-              {bagCount > 0 ? <span className="bag-count">{bagCount > 9 ? '9+' : bagCount}</span> : null}
-            </Link>
+            <div className="bag-notice-anchor">
+              <Link className="shell-icon-button bag-button" aria-label="Bolsa" to="/carrito">
+                <Icon name="bag" />
+                {bagCount > 0 ? <span className="bag-count">{bagCount > 9 ? '9+' : bagCount}</span> : null}
+              </Link>
+              {cartNotice ? (
+                <div className="bag-added-notice" role="status" aria-live="polite">
+                  {cartNotice.urlFoto ? <img src={assetUrl(cartNotice.urlFoto)} alt="" /> : <span className="bag-added-placeholder" aria-hidden="true">V</span>}
+                  <div className="bag-added-content">
+                    <strong>{cartNotice.nombre}</strong>
+                    <b>Bs {cartNotice.precio.toFixed(2)}</b>
+                    <dl>
+                      <div><dt>Color</dt><dd>{cartNotice.color}</dd></div>
+                      <div><dt>Talla</dt><dd>{cartNotice.talla}</dd></div>
+                      <div><dt>Cantidad</dt><dd>{cartNotice.cantidad}</dd></div>
+                    </dl>
+                  </div>
+                  <button type="button" onClick={dismissCartNotice} aria-label="Cerrar aviso">×</button>
+                </div>
+              ) : null}
+            </div>
             {!guest ? <NotificacionesBell variant="client" /> : null}
             {guest ? (
               <Link className="shell-auth-link" to={`/login?next=${authNext}`}>

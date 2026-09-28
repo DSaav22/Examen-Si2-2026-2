@@ -158,7 +158,7 @@ export function Carrito() {
       })
       setMsg(
         resultado === 'aprobado'
-          ? `Pago aprobado. Tu factura está en avisos y en ${user.email}.`
+          ? `Pago aprobado. Tu factura está en avisos y en ${user?.email ?? 'tu correo'}.`
           : 'Pago rechazado. El stock volvió al almacén.',
       )
       setPagoId('')

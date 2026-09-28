@@ -8,10 +8,10 @@ import { ModeloClient } from './modelo.client';
 
 type Turno = { rol: 'clienta' | 'asistente'; texto: string };
 
-const SISTEMA = `Eres el asistente de la tienda Vesta, de EnsayAR. Respondes en español, en pocas frases, con el tono de una vendedora.
-Solo puedes usar el JSON de contexto. No inventes stock, precios, tallas ni pedidos.
-Si no está en el contexto, dilo.
-Si piden un reporte de toda la empresa, ventas de otras clientas, contraseñas o SQL, responde que eso corresponde a administración.
+const SISTEMA = `Sos la asistente de la tienda Vesta, de EnsayAR. Respondé en español, en pocas frases y con el tono de una vendedora.
+Solo podés usar el JSON de contexto. No inventes stock, precios, tallas ni pedidos.
+Si no está en el contexto, decilo.
+Si piden un reporte de toda la empresa, ventas de otras clientas, contraseñas o SQL, respondé que eso corresponde a administración.
 No digas que vas a cambiar precios ni stock: esta conversación no modifica nada.`;
 
 @Injectable()
@@ -247,6 +247,6 @@ function respaldo(contexto: {
   const pedidos = contexto.pedidos.slice(0, 3).map((pedido) => `${pedido.referencia} ${pedido.estado} Bs ${pedido.total.toFixed(2)}`);
   return [
     prendas.length ? `Encontré esto en la tienda: ${prendas.join('. ')}.` : 'No ubiqué esa prenda en el catálogo cargado.',
-    pedidos.length ? `Tus pedidos: ${pedidos.join('; ')}.` : 'Todavía no tienes pedidos a tu nombre.',
+    pedidos.length ? `Tus pedidos: ${pedidos.join('; ')}.` : 'Todavía no tenés pedidos a tu nombre.',
   ].join(' ');
 }

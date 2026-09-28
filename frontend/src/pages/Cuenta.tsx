@@ -375,7 +375,7 @@ export function Cuenta() {
               ))}
             </>
           ) : (
-            <p className="muted">No tienes cupones activos.</p>
+            <p className="muted">No tenés cupones activos.</p>
           )}
         </article>
         <article className="ui-card">
@@ -443,7 +443,7 @@ export function Cuenta() {
               </div>
             ))
           ) : (
-            <p className="muted">Todavía no tienes direcciones.</p>
+            <p className="muted">Todavía no tenés direcciones.</p>
           )}
           <form onSubmit={e => void saveAddress(e)} className="customer-address-form">
             <p className="eyebrow">{editing ? 'Editar dirección' : 'Nueva dirección'}</p>

@@ -5,11 +5,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
-import { Rol } from '@prisma/client';
+import { Rol, TipoMovimiento } from '@prisma/client';
 import { CurrentUser } from '../auth/current-user';
 import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -116,6 +117,57 @@ export class ProveedoresController {
       },
       include: { variantes: true },
     });
+  }
+
+  @Get('mis-ingresos')
+  @Roles(Rol.PROVEEDOR)
+  async misIngresos(
+    @CurrentUser() user: JwtPayload,
+    @Query('pagina') paginaRaw?: string,
+    @Query('limite') limiteRaw?: string,
+  ) {
+    const u = await this.prisma.usuario.findUniqueOrThrow({
+      where: { id: user.sub },
+      select: { proveedorId: true },
+    });
+    const pagina = Math.max(1, Number.parseInt(paginaRaw ?? '1', 10) || 1);
+    const limite = Math.min(50, Math.max(1, Number.parseInt(limiteRaw ?? '8', 10) || 8));
+    if (!u.proveedorId) return { items: [], total: 0, pagina, limite };
+
+    const where = {
+      tipo: TipoMovimiento.ingreso_proveedor,
+      variante: { producto: { proveedorId: u.proveedorId } },
+    };
+    const [total, movimientos] = await this.prisma.$transaction([
+      this.prisma.movimientoInventario.count({ where }),
+      this.prisma.movimientoInventario.findMany({
+        where,
+        include: {
+          variante: { include: { producto: { select: { nombre: true } } } },
+          almacen: { include: { sucursal: { select: { nombre: true, ciudad: true } } } },
+        },
+        orderBy: { creadoEn: 'desc' },
+        skip: (pagina - 1) * limite,
+        take: limite,
+      }),
+    ]);
+    const actorIds = [...new Set(movimientos.map(item => item.usuarioId).filter(Boolean))] as string[];
+    const actores = actorIds.length
+      ? await this.prisma.usuario.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, nombre: true, email: true },
+        })
+      : [];
+    const porId = new Map(actores.map(actor => [actor.id, actor]));
+    return {
+      total,
+      pagina,
+      limite,
+      items: movimientos.map(item => ({
+        ...item,
+        usuario: item.usuarioId ? porId.get(item.usuarioId) ?? null : null,
+      })),
+    };
   }
 
   @Get()

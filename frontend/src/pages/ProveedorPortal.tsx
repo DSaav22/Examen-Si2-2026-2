@@ -5,13 +5,25 @@ import { useAuth } from '../auth'
 import type { Producto, Sucursal, Variante } from '../types'
 import { stockCapacidad } from '../types'
 import { homePorRol } from '../roles'
-import { OpsActions, OpsBtn, OpsEmpty, OpsField, OpsPage, OpsPanel, OpsStatus } from '../shared/ops/OpsUi'
+import { catalogLabel } from '../text'
+import { OpsActions, OpsBtn, OpsEmpty, OpsField, OpsPage, OpsPanel, OpsStatus, OpsTable } from '../shared/ops/OpsUi'
 
 type Nom = { id: string; nombre: string }
+type IngresoHistorico = {
+  id: string
+  cantidad: number
+  nota: string
+  creadoEn: string
+  variante: { sku: string; talla: string; color: string; producto: { nombre: string } }
+  almacen: { nombre: string; sucursal: { nombre: string; ciudad: string } }
+  usuario: { nombre: string; email: string } | null
+}
+type HistorialIngresos = { items: IngresoHistorico[]; total: number; pagina: number; limite: number }
 
 const CATEGORIAS = ['tops', 'blazer', 'abrigos', 'vestidos', 'pantalones', 'faldas', 'camisas', 'accesorios']
 const OCASIONES = ['casual', 'trabajo', 'fiesta', 'formal', 'temporada']
 const TALLAS = ['XS', 'S', 'M', 'L', 'XL']
+const INGRESOS_POR_PAGINA = 8
 
 function stockVariante(v: Variante) {
   return v.stocks.reduce((sum, s) => sum + stockCapacidad(s), 0)
@@ -38,6 +50,24 @@ export function ProveedorPortal() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [ingresos, setIngresos] = useState<IngresoHistorico[]>([])
+  const [paginaIngresos, setPaginaIngresos] = useState(1)
+  const [totalIngresos, setTotalIngresos] = useState(0)
+  const [loadingIngresos, setLoadingIngresos] = useState(true)
+
+  async function cargarIngresos(pagina = 1) {
+    setLoadingIngresos(true)
+    try {
+      const history = await api<HistorialIngresos>(
+        `/proveedores/mis-ingresos?pagina=${pagina}&limite=${INGRESOS_POR_PAGINA}`,
+      )
+      setIngresos(history.items)
+      setPaginaIngresos(history.pagina)
+      setTotalIngresos(history.total)
+    } finally {
+      setLoadingIngresos(false)
+    }
+  }
 
   async function cargar() {
     setProductos(await api<Producto[]>('/proveedores/mis-productos'))
@@ -46,6 +76,7 @@ export function ProveedorPortal() {
     const s = await api<Sucursal[]>('/catalogo/sucursales')
     setSucursales(s)
     setAlmacenId(current => current || s[0]?.almacenes[0]?.id || '')
+    await cargarIngresos(paginaIngresos)
   }
 
   useEffect(() => {
@@ -54,6 +85,8 @@ export function ProveedorPortal() {
       .catch(() => setError('No se pudo cargar el portal del proveedor.'))
       .finally(() => setLoading(false))
   }, [])
+
+  const paginasIngresos = Math.max(1, Math.ceil(totalIngresos / INGRESOS_POR_PAGINA))
 
   const varianteSeleccionada = useMemo(() => {
     for (const p of productos) {
@@ -333,9 +366,9 @@ export function ProveedorPortal() {
                   <div>
                     <strong>{p.nombre}</strong>
                     <p className="muted">
-                      {p.categoria} · {p.ocasion}
-                      {p.temporada?.nombre ? ` · ${p.temporada.nombre}` : ''}
-                      {p.coleccion?.nombre ? ` · ${p.coleccion.nombre}` : ''}
+                      {catalogLabel(p.categoria)} · {catalogLabel(p.ocasion)}
+                      {p.temporada?.nombre ? ` · ${catalogLabel(p.temporada.nombre)}` : ''}
+                      {p.coleccion?.nombre ? ` · ${catalogLabel(p.coleccion.nombre)}` : ''}
                     </p>
                   </div>
                   <b>Bs {Number(p.precioBase).toFixed(2)}</b>
@@ -372,6 +405,63 @@ export function ProveedorPortal() {
               </article>
             ))}
           </div>
+        )}
+      </OpsPanel>
+
+      <OpsPanel
+        title="Historial de ingresos a almacén"
+        eyebrow={loadingIngresos ? 'Cargando…' : `${totalIngresos} ingresos registrados`}
+        className="ops-panel--table"
+      >
+        {loadingIngresos ? (
+          <p className="muted">Cargando historial de ingresos…</p>
+        ) : !ingresos.length ? (
+          <OpsEmpty title="Todavía no registraste ingresos">
+            Cada ingreso de stock quedará registrado aquí con su almacén y responsable.
+          </OpsEmpty>
+        ) : (
+          <>
+            <OpsTable minWidth={780}>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Producto y variante</th>
+                  <th>Almacén</th>
+                  <th className="num">Ingresado</th>
+                  <th>Registrado por</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ingresos.map(ingreso => (
+                  <tr key={ingreso.id}>
+                    <td>{new Date(ingreso.creadoEn).toLocaleString('es-BO')}</td>
+                    <td>
+                      <strong>{ingreso.variante.producto.nombre}</strong>
+                      <small>{ingreso.variante.sku} · {ingreso.variante.talla}/{ingreso.variante.color}</small>
+                    </td>
+                    <td>
+                      {ingreso.almacen.sucursal.nombre}
+                      <small>{ingreso.almacen.nombre} · {ingreso.almacen.sucursal.ciudad}</small>
+                    </td>
+                    <td className="num">+{ingreso.cantidad} u.</td>
+                    <td>
+                      {ingreso.usuario?.nombre ?? 'Usuario no disponible'}
+                      {ingreso.usuario?.email ? <small>{ingreso.usuario.email}</small> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </OpsTable>
+            <div className="ops-pagination" aria-label="Paginación del historial de ingresos">
+              <span>Página {paginaIngresos} de {paginasIngresos}</span>
+              <OpsBtn type="button" variant="secondary" disabled={paginaIngresos <= 1} onClick={() => void cargarIngresos(paginaIngresos - 1)}>
+                Anterior
+              </OpsBtn>
+              <OpsBtn type="button" variant="secondary" disabled={paginaIngresos >= paginasIngresos} onClick={() => void cargarIngresos(paginaIngresos + 1)}>
+                Siguiente
+              </OpsBtn>
+            </div>
+          </>
         )}
       </OpsPanel>
     </OpsPage>

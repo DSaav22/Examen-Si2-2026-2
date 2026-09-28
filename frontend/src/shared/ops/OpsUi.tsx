@@ -5,12 +5,14 @@ export function OpsPage({
   eyebrow,
   title,
   description,
+  descriptionChips = false,
   actions,
   children,
 }: {
   eyebrow?: string
   title: string
   description?: string
+  descriptionChips?: boolean
   actions?: ReactNode
   children: ReactNode
 }) {
@@ -20,7 +22,13 @@ export function OpsPage({
         <div className="ops-page-copy">
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
           <h1>{title}</h1>
-          {description ? <p className="muted">{description}</p> : null}
+          {description ? (
+            descriptionChips ? (
+              <div className="ops-page-meta-chips" aria-label="Resumen del producto">
+                {description.split(' · ').map(item => <span key={item}>{item}</span>)}
+              </div>
+            ) : <p className="muted">{description}</p>
+          ) : null}
         </div>
         {actions ? <div className="ops-page-actions">{actions}</div> : null}
       </header>

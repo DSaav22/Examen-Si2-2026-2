@@ -2,21 +2,29 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { assetUrl } from '../asset'
+import { catalogLabel } from '../text'
 import { useAuth } from '../auth'
 import { useStorefront } from '../storefront'
-import type { Producto, Variante } from '../types'
+import type { Producto, Sucursal, Variante } from '../types'
 import { precioEfectivo, stockCapacidad, stockDisponible } from '../types'
 import { FichaOps } from './FichaOps'
 
 const internalRoles = ['ADMIN', 'SUPERADMIN', 'CAJERO', 'ENCARGADO']
+
+function reservationInitialTime() {
+  const date = new Date()
+  date.setMinutes(0, 0, 0)
+  date.setHours(date.getHours() + 2)
+  return date.toISOString().slice(0, 16)
+}
 
 function ProductMetadata({ product }: { product: Producto }) {
   return (
     <>
       <section className="detail-metadata" aria-label="Información editorial del producto">
         <strong>{product.modelo || 'Modelo Vesta'}</strong>
-        <span>Ajuste: {product.ajuste || 'relajado'}</span>
-        <span>Material: {product.material || 'selección textil'}</span>
+        <span>Ajuste: {catalogLabel(product.ajuste || 'relajado')}</span>
+        <span>Material: {catalogLabel(product.material || 'selección textil')}</span>
         <span>Composición: {product.composicion || 'consultar etiqueta'}</span>
         <span>Cuidados: {product.cuidados || 'seguir instrucciones de la prenda'}</span>
         <span>Origen: {product.origen || 'Bolivia'}</span>
@@ -209,6 +217,13 @@ function FichaClient() {
   const [zoom, setZoom] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [reserveOpen, setReserveOpen] = useState(false)
+  const [branches, setBranches] = useState<Sucursal[]>([])
+  const [reservationBranchId, setReservationBranchId] = useState('')
+  const [reservationTime, setReservationTime] = useState(reservationInitialTime)
+  const [reservationQuantity, setReservationQuantity] = useState(1)
+  const [reservationBusy, setReservationBusy] = useState(false)
+  const [reservationError, setReservationError] = useState('')
 
   async function load() {
     if (!id) return
@@ -292,6 +307,57 @@ function FichaClient() {
         : 'No puedes superar el stock disponible.',
     )
   }
+
+  async function openReservation() {
+    if (!selectedVariant || !productAvailability) return
+    setReservationError('')
+    setReservationTime(reservationInitialTime())
+    setReservationQuantity(1)
+    setReserveOpen(true)
+    try {
+      const list = await api<Sucursal[]>('/catalogo/sucursales')
+      const availableBranches = list.filter(branch =>
+        selectedVariant.stocks.some(stock =>
+          stock.almacen?.sucursal?.id === branch.id && stockCapacidad(stock) > 0,
+        ),
+      )
+      setBranches(availableBranches)
+      setReservationBranchId(current =>
+        availableBranches.some(branch => branch.id === current) ? current : availableBranches[0]?.id || '',
+      )
+      if (!availableBranches.length) setReservationError('No hay sucursales con esta variante disponible para reservar.')
+    } catch {
+      setReservationError('No se pudieron cargar las sucursales. Intentá nuevamente.')
+    }
+  }
+
+  async function createReservation(event: FormEvent) {
+    event.preventDefault()
+    if (!selectedVariant || !reservationBranchId) return
+    setReservationBusy(true)
+    setReservationError('')
+    try {
+      await api('/reservas', {
+        method: 'POST',
+        body: JSON.stringify({
+          sucursalId: reservationBranchId,
+          horario: new Date(reservationTime).toISOString(),
+          lineas: [{ varianteId: selectedVariant.id, cantidad: reservationQuantity }],
+        }),
+      })
+      setReserveOpen(false)
+      setMessage('Reserva creada. La sucursal preparará tu prenda para que la pruebes en tienda.')
+    } catch (reservationFailure) {
+      const detail = reservationFailure as Error & { codigo?: string }
+      setReservationError(
+        detail.codigo === 'STOCK_INSUFICIENTE'
+          ? 'No hay stock suficiente de esta variante en la sucursal elegida.'
+          : detail.message || 'No se pudo crear la reserva.',
+      )
+    } finally {
+      setReservationBusy(false)
+    }
+  }
   async function share() {
     const url = window.location.href
     try {
@@ -307,7 +373,6 @@ function FichaClient() {
   return (
     <section className="product-detail-page">
       <ProductMetadata product={product} />
-      <OpinionsPanel productId={product.id} canReview={user?.rol === 'CLIENTA'} onMessage={setMessage} />
       <AlertButtons productId={product.id} onMessage={setMessage} />
       <div className="product-detail-top">
         <Link to="/catalogo">← Volver al catálogo</Link>
@@ -356,7 +421,7 @@ function FichaClient() {
         </section>
         <section className="product-detail-info">
           <p className="eyebrow">
-            {product.categoria} · {product.ocasion}
+            {catalogLabel(product.categoria)} · {catalogLabel(product.ocasion)}
           </p>
           <div className="product-detail-title-row">
             <h1>{product.nombre}</h1>
@@ -446,6 +511,59 @@ function FichaClient() {
           >
             {productAvailability ? 'Añadir a la bolsa' : 'Producto agotado'}
           </button>
+          {user?.rol === 'CLIENTA' ? (
+            <button
+              type="button"
+              className="ui-button ui-button--secondary detail-reserve-button"
+              disabled={!selectedVariant || !productAvailability}
+              aria-expanded={reserveOpen}
+              onClick={() => void openReservation()}
+            >
+              Reservar para probar en tienda
+            </button>
+          ) : (
+            <Link
+              className="ui-button ui-button--secondary detail-reserve-button"
+              to={`/login?next=${encodeURIComponent(`/ficha/${product.id}`)}`}
+            >
+              Ingresá para reservar en tienda
+            </Link>
+          )}
+          {reserveOpen ? (
+            <form className="detail-reserve-panel" onSubmit={createReservation}>
+              <div className="detail-reserve-panel-head">
+                <div>
+                  <p className="eyebrow">Reserva en tienda</p>
+                  <strong>{product.nombre}</strong>
+                  <small>{selectedVariant?.talla} · {selectedVariant?.color}</small>
+                </div>
+                <button type="button" className="detail-reserve-close" onClick={() => setReserveOpen(false)} aria-label="Cerrar reserva">×</button>
+              </div>
+              <label>
+                Sucursal para probar
+                <select value={reservationBranchId} onChange={event => setReservationBranchId(event.target.value)} required>
+                  <option value="">Elegí una sucursal</option>
+                  {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.nombre} · {branch.ciudad}</option>)}
+                </select>
+              </label>
+              <label>
+                Horario aproximado
+                <input type="datetime-local" value={reservationTime} min={reservationInitialTime()} onChange={event => setReservationTime(event.target.value)} required />
+              </label>
+              <label>
+                Cantidad
+                <input type="number" min="1" max="5" value={reservationQuantity} onChange={event => setReservationQuantity(Math.max(1, Math.min(5, Number(event.target.value) || 1)))} required />
+              </label>
+              <p>La reserva aparta unidades para vos; el stock físico no se descuenta hasta la compra.</p>
+              {reservationError ? <p className="error" role="alert">{reservationError}</p> : null}
+              <div className="detail-reserve-actions">
+                <button type="submit" className="ui-button ui-button--primary" disabled={reservationBusy || !reservationBranchId}>
+                  {reservationBusy ? 'Creando reserva…' : 'Confirmar reserva'}
+                </button>
+                <Link to="/reservas" onClick={() => setReserveOpen(false)}>Ver mis reservas</Link>
+              </div>
+            </form>
+          ) : null}
           {selectedVariant ? (
             <Link
               className="ui-button"
@@ -474,7 +592,7 @@ function FichaClient() {
         </section>
       </div>
       {error ? <p className="error detail-message">{error}</p> : null}
-      {message ? (
+      {message && !message.toLocaleLowerCase().includes('bolsa') ? (
         <p className="ok detail-message" role="status">
           {message}
         </p>
@@ -489,7 +607,7 @@ function FichaClient() {
           <p>Composición, cuidados y país de origen pendientes de incorporar al catálogo.</p>
         </article>
         <article>
-          <h2>Opiniones</h2>
+          <h2>Información de compra</h2>
           <p>No hay opiniones todavía. Las opiniones verificadas se habilitarán en una fase posterior.</p>
         </article>
       </section>
@@ -516,6 +634,9 @@ function FichaClient() {
         <Link className="ui-button ui-button--secondary" to="/catalogo">
           Ver complementarios
         </Link>
+      </section>
+      <section className="detail-opinions-section" aria-label="Opiniones del producto">
+        <OpinionsPanel productId={product.id} canReview={user?.rol === 'CLIENTA'} onMessage={setMessage} />
       </section>
     </section>
   )

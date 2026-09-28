@@ -6,6 +6,7 @@ import type { CatalogPage, Producto, Sucursal, Variante } from '../types'
 import { precioEfectivo, stockCapacidad, stockDisponible } from '../types'
 import { editorialImage, lookImage, storefrontHeroImage } from '../shared/vestaAssets'
 import { useStorefront } from '../storefront'
+import { catalogLabel } from '../text'
 
 function ProductImage({ product, variant }: { product: Producto; variant?: Variante }) {
   const [failed, setFailed] = useState(false)
@@ -55,7 +56,7 @@ function HomeProductCard({
       <Link className="home-product-info" to={`/ficha/${product.id}`}>
         <strong>{product.nombre}</strong>
         <span>
-          {product.categoria} · {product.ocasion}
+          {catalogLabel(product.categoria)} · {catalogLabel(product.ocasion)}
         </span>
         <div>
           <b>Bs {precioEfectivo(product).toFixed(0)}</b>
@@ -239,7 +240,7 @@ export function Home() {
       </Link>
 
       {error ? <p className="error home-error">{error}</p> : null}
-      {message ? (
+      {message && !message.toLocaleLowerCase().includes('bolsa') ? (
         <p className="ok home-message" role="status">
           {message}
         </p>

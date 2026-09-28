@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api'
+import { assetUrl } from '../asset'
 import { useAuth } from '../auth'
 import {
   encolar,
@@ -657,7 +658,13 @@ export function Pos() {
                   disabled={stock <= 0}
                   onClick={() => agregar(p, v)}
                 >
-                  <strong>{p.nombre}</strong>
+                  {v.urlFoto ? (
+                    <img className="pos-product-image" src={assetUrl(v.urlFoto)} alt="" />
+                  ) : (
+                    <span className="pos-product-image pos-product-image--empty" aria-hidden="true">V</span>
+                  )}
+                  <div className="pos-product-copy">
+                    <strong>{p.nombre}</strong>
                   <span className="pos-product-variant">{v.talla} · {v.color}</span>
                   <span className="pos-product-sku muted">{v.sku}</span>
                   <div className="pos-product-meta">
@@ -665,6 +672,7 @@ export function Pos() {
                     <OpsStatus state={stock > 2 ? 'ok' : stock > 0 ? 'warn' : 'muted'}>
                       {stock > 0 ? `${stock} disp.` : 'Agotado'}
                     </OpsStatus>
+                    </div>
                   </div>
                 </button>
               ))}
