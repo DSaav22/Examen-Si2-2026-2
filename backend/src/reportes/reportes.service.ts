@@ -2,7 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ModeloClient } from '../ia/modelo.client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantContext } from '../tenancy/tenant-context';
 import { compilarPregunta, validarSelect } from './sql-seguro';
+
+const DE_LA_TIENDA = "current_setting('app.tienda_id', true)";
 
 const COLUMNAS = 'fecha_hora, sucursal_nombre, cajero_nombre, cliente_nombre, producto_nombre, talla, color, cantidad, precio_unitario, subtotal, medio_pago, variante_sku';
 
@@ -12,6 +15,20 @@ export class ReportesService {
     private readonly prisma: PrismaService,
     private readonly modelo: ModeloClient,
   ) {}
+
+  /**
+   * SQL crudo de reportes: la extensión de Prisma no lo ve, así que la tienda se fija en la
+   * sesión de Postgres (set_config local a la transacción). La vista v_reporte_ventas y los
+   * filtros `tienda_id = current_setting('app.tienda_id', true)` dependen de ese valor.
+   */
+  private async consultar<T = Record<string, unknown>>(sql: string): Promise<T[]> {
+    const tiendaId = TenantContext.tiendaIdOrThrow();
+    const [, filas] = await this.prisma.$transaction([
+      this.prisma.$queryRaw`SELECT set_config('app.tienda_id', ${tiendaId}, true)`,
+      this.prisma.$queryRawUnsafe<T[]>(sql),
+    ]);
+    return filas;
+  }
 
   async contexto() {
     const inicio = new Date();
@@ -143,21 +160,19 @@ export class ReportesService {
     const filtroSuc = sucursal
       ? ` AND s.nombre ILIKE '%${escaparLike(sucursal)}%'`
       : '';
-    const rows = await this.prisma.$queryRawUnsafe<
-      { total: unknown; operaciones: unknown }[]
-    >(
+    const rows = await this.consultar<{ total: unknown; operaciones: unknown }>(
       `SELECT COALESCE(SUM(v.total), 0) AS total,
               COUNT(v.id)::int AS operaciones
        FROM ventas v
        JOIN almacenes a ON a.id = v.almacen_id
        JOIN sucursales s ON s.id = a.sucursal_id
-       WHERE v.estado = 'cobrada'${filtroFecha}${filtroSuc}`,
+       WHERE v.tienda_id = ${DE_LA_TIENDA} AND v.estado = 'cobrada'${filtroFecha}${filtroSuc}`,
     );
     const fechaVista = filtroFechaSql(periodo, 'fecha_hora');
     const sucVista = sucursal
       ? ` AND sucursal_nombre ILIKE '%${escaparLike(sucursal)}%'`
       : '';
-    const unidadesRows = await this.prisma.$queryRawUnsafe<{ unidades: unknown }[]>(
+    const unidadesRows = await this.consultar<{ unidades: unknown }>(
       `SELECT COALESCE(SUM(cantidad), 0)::int AS unidades
        FROM v_reporte_ventas WHERE TRUE${fechaVista}${sucVista}`,
     );
@@ -180,7 +195,7 @@ export class ReportesService {
       const sql = `SELECT producto_nombre AS producto, SUM(cantidad)::int AS unidades, SUM(subtotal) AS total_bs
         FROM v_reporte_ventas WHERE TRUE${whereExtra}
         GROUP BY producto_nombre ORDER BY total_bs DESC LIMIT 30`;
-      const filas = this.serializar(await this.prisma.$queryRawUnsafe(sql));
+      const filas = this.serializar(await this.consultar(sql));
       return {
         titulo: 'Productos más vendidos',
         sqlInterno: sql,
@@ -200,7 +215,7 @@ export class ReportesService {
       const sql = `SELECT medio_pago, COUNT(*)::int AS tickets, SUM(subtotal) AS total_bs
         FROM v_reporte_ventas WHERE TRUE${whereExtra}
         GROUP BY medio_pago ORDER BY total_bs DESC LIMIT 20`;
-      const filas = this.serializar(await this.prisma.$queryRawUnsafe(sql));
+      const filas = this.serializar(await this.consultar(sql));
       return {
         titulo: 'Medios de pago',
         sqlInterno: sql,
@@ -221,7 +236,7 @@ export class ReportesService {
                COUNT(DISTINCT venta_id)::int AS compras, SUM(subtotal) AS total_bs
         FROM v_reporte_ventas WHERE TRUE${whereExtra}
         GROUP BY cliente_nombre ORDER BY total_bs DESC LIMIT 30`;
-      const filas = this.serializar(await this.prisma.$queryRawUnsafe(sql));
+      const filas = this.serializar(await this.consultar(sql));
       return {
         titulo: 'Clientas con más compras',
         sqlInterno: sql,
@@ -242,7 +257,7 @@ export class ReportesService {
                producto_nombre AS producto, talla, color, cantidad, subtotal AS total_bs, medio_pago
         FROM v_reporte_ventas WHERE TRUE${whereExtra}
         ORDER BY fecha_hora DESC LIMIT 100`;
-      const filas = this.serializar(await this.prisma.$queryRawUnsafe(sql));
+      const filas = this.serializar(await this.consultar(sql));
       return {
         titulo: 'Detalle de ventas',
         sqlInterno: sql,
@@ -262,7 +277,7 @@ export class ReportesService {
              SUM(subtotal) AS total_bs
       FROM v_reporte_ventas WHERE TRUE${whereExtra}
       GROUP BY sucursal_nombre ORDER BY total_bs DESC LIMIT 20`;
-    const filas = this.serializar(await this.prisma.$queryRawUnsafe(sql));
+    const filas = this.serializar(await this.consultar(sql));
     const max = Math.max(...filas.map(f => Number(f.total_bs ?? 0)), 1);
     return {
       titulo: 'Ventas por sucursal',
@@ -292,9 +307,9 @@ export class ReportesService {
      JOIN productos p ON p.id = v.producto_id
      JOIN almacenes a ON a.id = sa.almacen_id
      JOIN sucursales s ON s.id = a.sucursal_id
-     WHERE (sa.cantidad - sa.reservado) <= 2
+     WHERE sa.tienda_id = ${DE_LA_TIENDA} AND (sa.cantidad - sa.reservado) <= 2
      ORDER BY disponible ASC, s.nombre LIMIT 50`;
-    const filas = this.serializar(await this.prisma.$queryRawUnsafe(sql));
+    const filas = this.serializar(await this.consultar(sql));
     return {
       titulo: 'Stock crítico (≤ 2 disponibles)',
       sqlInterno: sql,
@@ -312,7 +327,7 @@ export class ReportesService {
   }
 
   async inventario(adminId: string) {
-    const filas = await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+    const filas = await this.consultar(
       `SELECT s.nombre AS sucursal, a.nombre AS almacen, p.nombre AS producto,
               v.talla, v.color, v.sku,
               sa.cantidad, sa.reservado,
@@ -322,6 +337,7 @@ export class ReportesService {
        JOIN productos p ON p.id = v.producto_id
        JOIN almacenes a ON a.id = sa.almacen_id
        JOIN sucursales s ON s.id = a.sucursal_id
+       WHERE sa.tienda_id = ${DE_LA_TIENDA}
        ORDER BY s.nombre, p.nombre
        LIMIT 200`,
     );
@@ -364,9 +380,7 @@ export class ReportesService {
             ORDER BY total DESC LIMIT 200`,
     };
     const sql = validarSelect(compilado.sql);
-    const filas = await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-      sql,
-    );
+    const filas = await this.consultar(sql);
     await this.prisma.reporteEjecucion.create({
       data: {
         pregunta: compilado.titulo,
@@ -401,9 +415,7 @@ export class ReportesService {
       });
     }
 
-    const filas = await this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(
-      sql,
-    );
+    const filas = await this.consultar(sql);
     const columnas = filas[0] ? Object.keys(filas[0]) : [];
     const serializadas = this.serializar(filas);
     const narracion = await this.narrar(

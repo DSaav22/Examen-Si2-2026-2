@@ -1,5 +1,6 @@
 import { CatalogoService } from './catalogo.service';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { PlanLimitesService } from '../tenancy/plan-limites.service';
 
 describe('CatalogoService.listarProductos', () => {
   const producto = { id: 'p-1', nombre: 'Blazer', variantes: [] };
@@ -17,7 +18,7 @@ describe('CatalogoService.listarProductos', () => {
       },
       $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     };
-    service = new CatalogoService(prisma as unknown as PrismaService);
+    service = new CatalogoService(prisma as unknown as PrismaService, {} as PlanLimitesService);
   });
 
   it('combina búsqueda, filtros y devuelve metadatos de paginación', async () => {

@@ -5,6 +5,7 @@ import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { Idempotente } from '../sync/idempotencia.interceptor';
 import { CajaService } from './caja.service';
 import { AbrirCajaDto, CerrarCajaDto } from './dto/caja.dto';
 
@@ -20,11 +21,13 @@ export class CajaController {
   }
 
   @Post('abrir')
+  @Idempotente()
   abrir(@CurrentUser() user: JwtPayload, @Body() dto: AbrirCajaDto) {
     return this.caja.abrir(user.sub, dto.sucursalId, dto.fondoInicial, user.rol);
   }
 
   @Post('cerrar')
+  @Idempotente()
   cerrar(@CurrentUser() user: JwtPayload, @Body() dto: CerrarCajaDto) {
     return this.caja.cerrar(user.sub, dto.totalDeclarado);
   }

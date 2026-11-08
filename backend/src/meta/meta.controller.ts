@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlanLimitesService } from '../tenancy/plan-limites.service';
 
 class SucursalDto {
   @IsString()
@@ -31,7 +32,10 @@ class NombreDto {
 
 @Controller()
 export class MetaController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly limites: PlanLimitesService,
+  ) {}
 
   @Get('temporadas')
   temporadas() {
@@ -68,7 +72,8 @@ export class MetaController {
   @Post('sucursales')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Rol.ADMIN, Rol.SUPERADMIN)
-  crearSucursal(@Body() dto: SucursalDto) {
+  async crearSucursal(@Body() dto: SucursalDto) {
+    await this.limites.verificar('sucursales');
     return this.prisma.sucursal.create({
       data: {
         nombre: dto.nombre,

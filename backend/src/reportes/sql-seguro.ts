@@ -1,5 +1,13 @@
+import { Prisma } from '@prisma/client';
+
 const PROHIBIDO =
-  /\b(insert|update|delete|drop|alter|truncate|copy|grant|revoke|create|comment|execute|call|do)\b/i;
+  /\b(insert|update|delete|drop|alter|truncate|copy|grant|revoke|create|comment|execute|call|do|set_config|current_setting|set|reset|dblink|lo_\w+)\b/i;
+
+/** Toda tabla real queda fuera: la única fuente permitida es la vista, que ya filtra por tienda. */
+const TABLAS = new RegExp(
+  `\\b(${Prisma.dmmf.datamodel.models.map((m) => m.dbName ?? m.name).join('|')}|_prisma_migrations)\\b`,
+  'i',
+);
 
 export function validarSelect(sql: string): string {
   const limpio = sql.replace(/;+\s*$/g, '').trim();
@@ -15,7 +23,7 @@ export function validarSelect(sql: string): string {
   if (!/\bv_reporte_ventas\b/i.test(limpio)) {
     throw new Error('SQL_FUERA_DE_VISTA');
   }
-  if (/\b(usuarios|password_hash|pg_|information_schema)\b/i.test(limpio)) {
+  if (/\b(usuarios|password_hash|information_schema)\b|\bpg_/i.test(limpio) || TABLAS.test(limpio)) {
     throw new Error('SQL_FUERA_DE_VISTA');
   }
   if (/\blimit\b/i.test(limpio)) {

@@ -20,6 +20,7 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { Idempotente } from '../sync/idempotencia.interceptor';
 import { CrearVentaDto } from './dto/crear-venta.dto';
 import {
   StockInsuficienteError,
@@ -92,6 +93,7 @@ export class VentasController {
   }
 
   @Post()
+  @Idempotente()
   @HttpCode(201)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Rol.CAJERO, Rol.ADMIN, Rol.CLIENTA, Rol.ENCARGADO, Rol.SUPERADMIN)
@@ -112,6 +114,8 @@ export class VentasController {
         throw new ConflictException({
           codigo: 'STOCK_INSUFICIENTE',
           varianteId: error.varianteId,
+          disponible: error.disponible,
+          pedido: error.pedido,
         });
       }
       if (error instanceof UuidConflictError) {

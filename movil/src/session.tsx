@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { api, cargarApiBase } from './api'
+import { api, cargarApiBase, esFalloRed } from './api'
 import type { Linea, Sucursal, User } from './types'
 
 export type FiltroCatalogo = 'novedades' | 'ofertas' | 'ocasiones'
@@ -102,7 +102,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState('')
 
   const cargarSucursales = useCallback(async (preferida?: string) => {
-    const lista = await api<Sucursal[]>('/catalogo/sucursales', null)
+    let lista: Sucursal[]
+    try {
+      lista = await api<Sucursal[]>('/catalogo/sucursales', null)
+      await AsyncStorage.setItem('ensayar_sucursales', JSON.stringify(lista))
+    } catch (err) {
+      const guardadas = esFalloRed(err) ? await leerJson<Sucursal[]>('ensayar_sucursales', []) : []
+      if (!guardadas.length) throw err
+      lista = guardadas
+    }
     setSucursales(lista)
     setSucursalId((actual) => {
       const id = preferida || actual
@@ -146,11 +154,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           setUser(next)
           await AsyncStorage.setItem('ensayar_user', JSON.stringify(next))
           setStack([{ name: 'inicio' }])
-        } catch {
-          await AsyncStorage.multiRemove(['ensayar_token', 'ensayar_user'])
-          setToken(null)
-          setUser(null)
-          setStack([{ name: 'login' }])
+        } catch (err) {
+          if (esFalloRed(err)) {
+            // Sin red la sesión guardada sigue sirviendo para operar offline; el backend la valida al sincronizar.
+            setToken(tok)
+            setUser(usuario)
+            setStack([{ name: 'inicio' }])
+          } else {
+            await AsyncStorage.multiRemove(['ensayar_token', 'ensayar_user'])
+            setToken(null)
+            setUser(null)
+            setStack([{ name: 'login' }])
+          }
         }
       }
       try {

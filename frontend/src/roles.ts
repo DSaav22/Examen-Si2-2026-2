@@ -115,6 +115,8 @@ export function navGruposPorRol(rol: Rol | string): NavGrupo[] {
         items: [
 
           { to: '/pos', label: 'Punto de venta', end: true },
+          { to: '/creditos', label: 'Cuentas por cobrar' },
+          { to: '/sincronizacion', label: 'Sincronización' },
 
           { to: '/catalogo', label: 'Consultar catálogo' },
 
@@ -151,6 +153,8 @@ export function navGruposPorRol(rol: Rol | string): NavGrupo[] {
           { to: '/encargado', label: 'Inventario y reservas', end: true },
 
           { to: '/despacho', label: 'Despacho de pedidos' },
+          { to: '/creditos', label: 'Cuentas por cobrar' },
+          { to: '/sincronizacion', label: 'Sincronización' },
 
           { to: '/catalogo', label: 'Consultar catálogo' },
 
@@ -191,6 +195,8 @@ export function navGruposPorRol(rol: Rol | string): NavGrupo[] {
           { to: '/encargado', label: 'Inventario' },
 
           { to: '/despacho', label: 'Despacho' },
+          { to: '/creditos', label: 'Cuentas por cobrar' },
+          { to: '/sincronizacion', label: 'Sincronización' },
 
           { to: '/catalogo', label: 'Catálogo' },
 

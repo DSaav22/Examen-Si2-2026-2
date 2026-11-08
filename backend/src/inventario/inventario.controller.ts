@@ -14,6 +14,7 @@ import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { Idempotente } from '../sync/idempotencia.interceptor';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventarioService } from './inventario.service';
 
@@ -90,6 +91,7 @@ export class InventarioController {
   }
 
   @Post('ajuste')
+  @Idempotente()
   @Roles(Rol.ADMIN, Rol.ENCARGADO, Rol.SUPERADMIN)
   async ajustar(@CurrentUser() user: JwtPayload, @Body() dto: AjusteDto) {
     if (user.rol === Rol.ENCARGADO) {
@@ -111,6 +113,7 @@ export class InventarioController {
   }
 
   @Post('ingreso')
+  @Idempotente()
   @Roles(Rol.ADMIN, Rol.PROVEEDOR, Rol.ENCARGADO, Rol.SUPERADMIN)
   async ingreso(@CurrentUser() user: JwtPayload, @Body() dto: IngresoDto) {
     if (user.rol === Rol.ENCARGADO) {
@@ -147,6 +150,7 @@ export class InventarioController {
   }
 
   @Post('transferencias')
+  @Idempotente()
   @Roles(Rol.ENCARGADO, Rol.ADMIN, Rol.SUPERADMIN)
   async transferir(@CurrentUser() user: JwtPayload, @Body() dto: TransferenciaDto) {
     if (user.rol === Rol.ENCARGADO) {

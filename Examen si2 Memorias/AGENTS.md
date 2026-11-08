@@ -99,6 +99,8 @@ Cuando lo pidan, o cada ~10 ingests. Buscar: contradicciones, claims viejos, hu�
 
 Cuando las fuentes choquen: problema e innovaciones ← audio del docente propio; stack, PUDS y estructura del informe ← `wiki/sources/stack-metodologia-parcial.md`; fecha y alcance ← `wiki/sources/correccion-alcance-parcial.md` (**solo el parcial, presentación 23 de septiembre, sin sprints**). El PDF de Garzón es complemento (RF, actores, reservas), no manda tecnología ni calendario.
 
+**Segundo parcial (desde 2026-11-08):** manda `wiki/sources/transcripcion-audio-segundo-parcial.md`. Es un incremento: lo del primer parcial sigue vigente salvo donde esta fuente lo cambia (metodología ICONIX en vez de PU; SaaS multi-tienda; offline web y móvil; PDF hasta el 11 nov a las 8:00). Hub: `wiki/synthesis/Mapa del segundo parcial.md`.
+
 ## Primera fuente recomendada
 
 Programa, syllabus o rúbrica del examen. Sin eso, el mapa de `wiki/synthesis/` nace ciego. El primer lote (audio + PDF Garzón + stack) ya está compilado en `wiki/synthesis/Mapa del examen.md`.

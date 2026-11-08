@@ -15,6 +15,18 @@ Fuente oral literal: [[transcripcion-audio-stack-metodologia-parcial]]. Resumen:
 2. **Proceso de desarrollo** — 100% [[Proceso Unificado]] (PUD).
 3. **Adopción y capacitación** — mecanismo para que el usuario aprenda.
 
+## Segundo parcial
+
+Fuente: [[transcripcion-audio-segundo-parcial]].
+
+- **PDF en la plataforma hasta el 11 nov, 8:00.** Sin prórroga.
+- Se conservan todos los temas del primer parcial.
+- Proceso de desarrollo con [[ICONIX]] en lugar del PU.
+- Capítulos teóricos nuevos, extensos y propios (no copiados): SaaS y sus variantes, organización de inquilinos, pagos internacionales, offline/[[PWA]]/sincronización/idempotencia, IA para reportes dinámicos, analítica con modelos supervisados y no supervisados.
+- En la defensa preguntarán teoría sin mirar la app.
+
+Lista completa: [[Mapa del segundo parcial]].
+
 ## Dónde se escribe el cuerpo
 
 **`docs/parcial/`** — un `.md` por capítulo (copiar luego a Word).  

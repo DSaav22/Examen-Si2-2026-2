@@ -1,5 +1,9 @@
 export class StockInsuficienteError extends Error {
-  constructor(public readonly varianteId: string) {
+  constructor(
+    public readonly varianteId: string,
+    public readonly disponible?: number,
+    public readonly pedido?: number,
+  ) {
     super(`Stock insuficiente para la variante ${varianteId}`);
     this.name = 'StockInsuficienteError';
   }

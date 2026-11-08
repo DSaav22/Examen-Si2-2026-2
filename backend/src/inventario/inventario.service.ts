@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma, TipoMovimiento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { exigirDeLaTienda } from '../tenancy/pertenencia';
 
 type Tx = Prisma.TransactionClient;
 
@@ -55,6 +56,7 @@ export class InventarioService {
     usuarioId: string,
   ) {
     const qty = Math.max(0, cantidad);
+    await exigirDeLaTienda(this.prisma, { variante: varianteId, almacen: almacenId });
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<{ cantidad: number; reservado: number }[]>`
         SELECT cantidad, reservado FROM stock_almacen
@@ -99,6 +101,7 @@ export class InventarioService {
     usuarioId: string,
     nota = 'Ingreso proveedor',
   ) {
+    await exigirDeLaTienda(this.prisma, { variante: varianteId, almacen: almacenId });
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<{ cantidad: number }[]>`
         SELECT cantidad FROM stock_almacen
@@ -129,7 +132,7 @@ export class InventarioService {
     });
   }
 
-  transferir(
+  async transferir(
     varianteId: string,
     origenId: string,
     destinoId: string,
@@ -142,6 +145,8 @@ export class InventarioService {
     if (cantidad < 1) {
       throw new ConflictException({ codigo: 'CANTIDAD_INVALIDA' });
     }
+    await exigirDeLaTienda(this.prisma, { variante: varianteId, almacen: origenId });
+    await exigirDeLaTienda(this.prisma, { almacen: destinoId });
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         { cantidad: number; reservado: number }[]

@@ -16,3 +16,9 @@ Baseline cerrado en [[Fase Elaboracion]]: un `POST /ventas`, stock solo en servi
 Spikes: A overlay, B stock concurrente, C SELECT acotado.
 
 Ver [[Stack del parcial]] · [[Estado del codigo]] · `docs/parcial/02-puds/02-fase-elaboracion.md` §7–8.
+
+## Segundo parcial
+
+El docente lo nombra así: **monolito modular**, "listo para convertirse en microservicios cuando así fuera necesario". Se evalúa si la arquitectura del primer parcial aguanta el incremento sin rehacerse. [[transcripcion-audio-segundo-parcial]]
+
+Cambios de arquitectura que exige: capa multi-tenant ([[SaaS multi-tenant]]), sincronización offline ([[Modo offline]]) y un módulo de analítica ([[Analitica con IA]]) que es el primer candidato a separarse.

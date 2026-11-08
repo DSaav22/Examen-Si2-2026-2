@@ -1,15 +1,23 @@
 {
+  "id": "/",
   "name": "EnsayAR Vesta",
   "short_name": "Vesta",
-  "description": "Tienda EnsayAR instalable, con caja offline.",
+  "description": "Tienda EnsayAR instalable: caja, clientes y productos también sin conexión.",
   "start_url": "/inicio",
   "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#f6f1ea",
   "theme_color": "#4a1c24",
   "lang": "es",
+  "categories": ["shopping", "business"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Punto de venta", "short_name": "Caja", "url": "/pos", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Catálogo", "url": "/catalogo", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Sincronización", "url": "/sincronizacion", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

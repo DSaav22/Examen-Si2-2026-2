@@ -23,3 +23,7 @@ Además, analogía con Scrum: en PUD el “sprint” se llama **ciclo** (ciclo 1
 Para el índice del parcial: estructurar la Parte 2 por **fases**; opcional nombrar iteraciones/ciclos *dentro*. No usar el calendario Scrum (18 sep / 3 semanas) — [[Cronograma]].
 
 La Parte 2 del [[Documento del examen]] es 100% este proceso: no un diario de commits, sino el modelado UP.
+
+## Segundo parcial
+
+El docente lo descarta para el segundo parcial: "no vamos a usar proceso unificado… tampoco Scrum". Se usa [[ICONIX]]. [[transcripcion-audio-segundo-parcial]] Aun así usa la idea de **ciclo** del PU para explicar que el segundo parcial es un incremento. Contraste: [[ICONIX vs Proceso Unificado]].

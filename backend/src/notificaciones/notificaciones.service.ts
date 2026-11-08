@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CorreoService } from '../correo/correo.service';
+import { PushService } from '../push/push.service';
 import { numeroFactura, plantillaFacturaHtml } from './factura-html';
 import { NotificacionesGateway } from './notificaciones.gateway';
 
@@ -10,6 +11,7 @@ export class NotificacionesService {
     private readonly prisma: PrismaService,
     private readonly correo: CorreoService,
     private readonly gateway: NotificacionesGateway,
+    private readonly push: PushService,
   ) {}
 
   listar(usuarioId: string, limit = 30) {
@@ -61,6 +63,9 @@ export class NotificacionesService {
     this.gateway.emitNueva(data.usuarioId, n);
     const count = await this.noLeidas(data.usuarioId);
     this.gateway.emitConteo(data.usuarioId, count);
+    void this.push
+      .enviar(data.usuarioId, { titulo: data.titulo, cuerpo: data.cuerpo, enlace: data.enlace, tipo: data.tipo })
+      .catch(() => null);
     return n;
   }
 

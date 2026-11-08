@@ -1,6 +1,6 @@
 ---
 tipo: index
-actualizado: 2026-09-25
+actualizado: 2026-11-08
 tags: [index]
 ---
 
@@ -8,7 +8,18 @@ tags: [index]
 
 Portal compilado. En cada query, empezar aquí.
 
-## Síntesis
+## Segundo parcial (11 nov, PDF hasta las 8:00)
+
+- [[Mapa del segundo parcial]] — requisitos B/S/O/R/A/P/D extraídos de la clase
+- [[Brecha segundo parcial]] — requisitos vs código al 8 nov
+- [[ICONIX vs Proceso Unificado]] — contraste y qué se reutiliza
+- [[ICONIX]] — metodología nueva: robustez, PDR, CDR
+- [[SaaS multi-tenant]] — muchas tiendas, planes, un login varias tiendas
+- [[PWA]] — offline web, instalable, push
+- [[Analitica con IA]] — supervisado + no supervisado, datos sintéticos, dashboards
+- Fuente: [[transcripcion-audio-segundo-parcial]]
+
+## Síntesis (primer parcial)
 
 - [[Mapa del examen]] — qué hay que entregar y qué es canónico
 - [[Contradicciones entre fuentes]] — audio vs Garzón vs stack vs código
@@ -55,6 +66,7 @@ Portal compilado. En cada query, empezar aquí.
 
 ## Fuentes
 
+- [[transcripcion-audio-segundo-parcial]] — **canon del segundo parcial** (SaaS, offline, reportes, ML, pagos, ICONIX)
 - [[transcripcion-audio-clase-ecommerce]] — problema e innovaciones (oral)
 - [[transcripcion-audio-stack-metodologia-parcial]] — stack, PUD, 3 partes (transcripción literal)
 - [[examen1-garzon-fashionstore]] — PDF otro docente (RF, actores, reservas)

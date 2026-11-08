@@ -1,9 +1,13 @@
 import { execSync } from 'node:child_process';
 import { PrismaClient, Rol } from '@prisma/client';
+import { crearPrismaTenant } from '../src/tenancy/prisma-tenant.extension';
+import { TenantContext, TIENDA_VESTA_ID } from '../src/tenancy/tenant-context';
 import * as bcrypt from 'bcrypt';
 import { SPIKE_UUIDS } from '../src/spike-ids';
 
-const prisma = new PrismaClient();
+const base = new PrismaClient();
+/** Todo el seed corre dentro de la tienda Vesta: los deleteMany no tocan otras tiendas. */
+const prisma = crearPrismaTenant(base);
 const CLAVE = 'diego';
 
 async function main() {
@@ -34,6 +38,52 @@ async function main() {
   await prisma.proveedor.deleteMany();
 
   const passwordHash = await bcrypt.hash(CLAVE, 10);
+
+  // Identidad global (una cuenta, varias tiendas): las cuentas viven fuera de la tienda.
+  const personas = [
+    { id: SPIKE_UUIDS.admin, email: 'admin@ensayar.bo', nombre: 'Admin EnsayAR' },
+    { id: SPIKE_UUIDS.superadmin, email: 'superadmin@ensayar.bo', nombre: 'Superadmin EnsayAR' },
+    { id: SPIKE_UUIDS.cajero, email: 'cajero@ensayar.bo', nombre: 'Cajero Central' },
+    { id: SPIKE_UUIDS.encargado, email: 'encargado@ensayar.bo', nombre: 'Encargada SC' },
+    { id: SPIKE_UUIDS.proveedorUser, email: 'proveedor@ensayar.bo', nombre: 'Proveedor Textiles' },
+    { id: SPIKE_UUIDS.clienta, email: 'clienta@ensayar.bo', nombre: 'Ana Cliente' },
+  ];
+  const cuentaDe: Record<string, string> = {};
+  for (const p of personas) {
+    const datos = {
+      nombre: p.nombre,
+      passwordHash,
+      emailVerificado: true,
+      esPlataforma: p.email === 'superadmin@ensayar.bo',
+    };
+    const cuenta = await prisma.cuenta.upsert({
+      where: { email: p.email },
+      update: datos,
+      create: { id: p.id, email: p.email, ...datos },
+    });
+    cuentaDe[p.email] = cuenta.id;
+  }
+
+  await prisma.tienda.upsert({
+    where: { id: TIENDA_VESTA_ID },
+    update: { estado: 'activa', duenoCuentaId: cuentaDe['admin@ensayar.bo'] },
+    create: {
+      id: TIENDA_VESTA_ID,
+      slug: 'vesta',
+      nombre: 'Vesta',
+      duenoCuentaId: cuentaDe['admin@ensayar.bo'],
+    },
+  });
+  const vigente = await prisma.suscripcion.findFirst({
+    where: { tiendaId: TIENDA_VESTA_ID, estado: 'activa', venceEn: { gt: new Date() } },
+  });
+  if (!vigente) {
+    const venceEn = new Date();
+    venceEn.setFullYear(venceEn.getFullYear() + 1);
+    await prisma.suscripcion.create({
+      data: { tiendaId: TIENDA_VESTA_ID, planId: 'plan-cadena', periodo: 'ANUAL', venceEn, monto: 1238.4 },
+    });
+  }
 
   await prisma.proveedor.create({
     data: {
@@ -76,47 +126,47 @@ async function main() {
       {
         id: SPIKE_UUIDS.admin,
         email: 'admin@ensayar.bo',
+        cuentaId: cuentaDe['admin@ensayar.bo'],
         nombre: 'Admin EnsayAR',
         rol: Rol.ADMIN,
-        passwordHash,
       },
       {
         id: SPIKE_UUIDS.superadmin,
         email: 'superadmin@ensayar.bo',
+        cuentaId: cuentaDe['superadmin@ensayar.bo'],
         nombre: 'Superadmin EnsayAR',
         rol: Rol.SUPERADMIN,
-        passwordHash,
       },
       {
         id: SPIKE_UUIDS.cajero,
         email: 'cajero@ensayar.bo',
+        cuentaId: cuentaDe['cajero@ensayar.bo'],
         nombre: 'Cajero Central',
         rol: Rol.CAJERO,
-        passwordHash,
         sucursalId: SPIKE_UUIDS.sucursal,
       },
       {
         id: SPIKE_UUIDS.encargado,
         email: 'encargado@ensayar.bo',
+        cuentaId: cuentaDe['encargado@ensayar.bo'],
         nombre: 'Encargada SC',
         rol: Rol.ENCARGADO,
-        passwordHash,
         sucursalId: SPIKE_UUIDS.sucursal,
       },
       {
         id: SPIKE_UUIDS.proveedorUser,
         email: 'proveedor@ensayar.bo',
+        cuentaId: cuentaDe['proveedor@ensayar.bo'],
         nombre: 'Proveedor Textiles',
         rol: Rol.PROVEEDOR,
-        passwordHash,
         proveedorId: SPIKE_UUIDS.proveedor,
       },
       {
         id: SPIKE_UUIDS.clienta,
         email: 'clienta@ensayar.bo',
+        cuentaId: cuentaDe['clienta@ensayar.bo'],
         nombre: 'Ana Cliente',
         rol: Rol.CLIENTA,
-        passwordHash,
       },
     ],
   });
@@ -356,7 +406,7 @@ async function main() {
   // creando opinión en otro producto tras el seed de catálogo demo.
 
   await prisma.cupon.upsert({
-    where: { codigo: 'VESTA10' },
+    where: { tiendaId_codigo: { tiendaId: TIENDA_VESTA_ID, codigo: 'VESTA10' } },
     update: { porcentaje: 10, activo: true, usoMaximo: 50 },
     create: { codigo: 'VESTA10', porcentaje: 10, usoMaximo: 50 },
   });
@@ -391,7 +441,7 @@ async function main() {
   }
 }
 
-main()
+TenantContext.enTienda(TIENDA_VESTA_ID, main)
   .then(async () => {
     await prisma.$disconnect();
   })

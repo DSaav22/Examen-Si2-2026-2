@@ -22,6 +22,7 @@ import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { Idempotente } from '../sync/idempotencia.interceptor';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogoService } from './catalogo.service';
 import { ImagenService } from './imagen.service';
@@ -187,6 +188,7 @@ export class CatalogoController {
   }
 
   @Post('productos')
+  @Idempotente()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   crear(@Body() dto: CrearProductoDto) {

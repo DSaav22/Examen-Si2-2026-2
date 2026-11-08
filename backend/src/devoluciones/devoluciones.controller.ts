@@ -19,6 +19,7 @@ import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { Idempotente } from '../sync/idempotencia.interceptor';
 import { InventarioService } from '../inventario/inventario.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -48,6 +49,7 @@ export class DevolucionesController {
   ) {}
 
   @Post()
+  @Idempotente()
   @Roles(Rol.CLIENTA, Rol.CAJERO, Rol.ADMIN, Rol.ENCARGADO, Rol.SUPERADMIN)
   crear(@CurrentUser() user: JwtPayload, @Body() dto: CrearDevolucionDto) {
     if (!dto.lineas?.length) {
@@ -150,13 +152,25 @@ export class DevolucionesController {
           pagoEstado = 'aprobado';
         }
       }
-      if (venta.cajaTurnoId && venta.cajaTurno && !venta.cajaTurno.cerradoEn) {
-        const bruto = venta.lineas.reduce(
-          (acc, l) => acc + l.cantidad * Number(l.precioUnitario),
-          0,
-        );
-        const factor = bruto > 0 ? Number(venta.total) / bruto : 1;
-        const ajuste = Math.round(reembolso * factor * 100) / 100;
+      const bruto = venta.lineas.reduce(
+        (acc, l) => acc + l.cantidad * Number(l.precioUnitario),
+        0,
+      );
+      const factor = bruto > 0 ? Number(venta.total) / bruto : 1;
+      let ajuste = Math.round(reembolso * factor * 100) / 100;
+      if (venta.medioPago === 'credito') {
+        // Lo devuelto primero rebaja la deuda; solo lo ya abonado se reintegra en efectivo.
+        const cuenta = await tx.cuentaCobrar.findUnique({ where: { ventaId: venta.id } });
+        if (cuenta) {
+          const rebaja = Math.min(Number(cuenta.saldo), ajuste);
+          await tx.cuentaCobrar.update({
+            where: { id: cuenta.id },
+            data: { saldo: { decrement: rebaja } },
+          });
+          ajuste = Math.round((ajuste - rebaja) * 100) / 100;
+        }
+      }
+      if (ajuste > 0 && venta.cajaTurnoId && venta.cajaTurno && !venta.cajaTurno.cerradoEn) {
         await tx.cajaTurno.update({
           where: { id: venta.cajaTurnoId },
           data: { totalSistema: { decrement: ajuste } },

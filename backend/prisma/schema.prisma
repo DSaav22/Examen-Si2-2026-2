@@ -36,6 +36,7 @@ enum MedioPago {
   tarjeta
   transferencia
   mixto
+  credito
 }
 
 enum EstadoReserva {
@@ -64,37 +65,151 @@ enum EstadoPago {
   reembolsado
 }
 
-model Usuario {
-  id            String              @id @default(uuid())
-  email         String              @unique
-  nombre        String              @default("")
-  passwordHash  String              @map("password_hash")
-  activo        Boolean             @default(true)
-  mayorista     Boolean             @default(false)
-  rol           Rol
-  sucursalId    String?             @map("sucursal_id")
-  sucursal      Sucursal?           @relation(fields: [sucursalId], references: [id])
-  proveedorId   String?             @map("proveedor_id")
-  proveedor     Proveedor?          @relation(fields: [proveedorId], references: [id])
-  turnos        CajaTurno[]
-  ventasClienta Venta[]             @relation("ClientaVentas")
-  reportes      ReporteEjecucion[]
-  reservas      Reserva[]
-  opiniones     Opinion[]
-  alertas       AlertaProducto[]
-  direcciones   DireccionCliente[]
-  favoritos     Favorito[]
-  lealtad       CuentaLealtad?
-  pedidos       Pedido[]
-  notificaciones Notificacion[]
-  empleado      Empleado?
-  avatarUrl     String              @default("") @map("avatar_url")
+enum PeriodoPlan {
+  MENSUAL
+  TRIMESTRAL
+  ANUAL
+}
 
+enum EstadoSuscripcion {
+  activa
+  vencida
+  cancelada
+}
+
+enum EstadoTienda {
+  activa
+  suspendida
+}
+
+/// Identidad global de una persona: un solo login para todas sus tiendas.
+model Cuenta {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  nombre             String    @default("")
+  passwordHash       String    @map("password_hash")
+  emailVerificado    Boolean   @default(false) @map("email_verificado")
+  verificacionToken  String?   @unique @map("verificacion_token")
+  verificacionExpira DateTime? @map("verificacion_expira")
+  esPlataforma       Boolean   @default(false) @map("es_plataforma")
+  creadaEn           DateTime  @default(now()) @map("creada_en")
+  usuarios           Usuario[]
+  tiendas            Tienda[]
+
+  @@map("cuentas")
+}
+
+/// Inquilino (tenant) del SaaS.
+model Tienda {
+  id            String        @id @default(uuid())
+  slug          String        @unique
+  nombre        String
+  pais          String        @default("BO")
+  moneda        String        @default("BOB")
+  estado        EstadoTienda  @default(activa)
+  creadaEn      DateTime      @default(now()) @map("creada_en")
+  duenoCuentaId String?       @map("dueno_cuenta_id")
+  dueno         Cuenta?       @relation(fields: [duenoCuentaId], references: [id])
+  suscripciones Suscripcion[]
+  /// Máximo de días que una operación hecha sin red puede esperar para sincronizarse.
+  ventanaOfflineDias Int      @default(7) @map("ventana_offline_dias")
+
+  @@map("tiendas")
+}
+
+model Plan {
+  id            String        @id
+  codigo        String        @unique
+  nombre        String
+  descripcion   String        @default("")
+  precioMensual Decimal       @map("precio_mensual") @db.Decimal(10, 2)
+  moneda        String        @default("USD")
+  maxUsuarios   Int           @map("max_usuarios")
+  maxSucursales Int           @map("max_sucursales")
+  maxProductos  Int?          @map("max_productos")
+  modulos       String[]
+  destacado     Boolean       @default(false)
+  orden         Int           @default(0)
+  activo        Boolean       @default(true)
+  suscripciones Suscripcion[]
+
+  @@map("planes")
+}
+
+model Suscripcion {
+  id       String            @id @default(uuid())
+  tiendaId String            @map("tienda_id")
+  tienda   Tienda            @relation(fields: [tiendaId], references: [id])
+  planId   String            @map("plan_id")
+  plan     Plan              @relation(fields: [planId], references: [id])
+  periodo  PeriodoPlan
+  estado   EstadoSuscripcion @default(activa)
+  inicio   DateTime          @default(now())
+  venceEn  DateTime          @map("vence_en")
+  monto    Decimal           @db.Decimal(10, 2)
+  moneda   String            @default("USD")
+  creadaEn DateTime          @default(now()) @map("creada_en")
+  pagos    PagoSuscripcion[]
+
+  @@index([tiendaId, estado])
+  @@map("suscripciones")
+}
+
+model PagoSuscripcion {
+  id             String      @id @default(uuid())
+  suscripcionId  String      @map("suscripcion_id")
+  suscripcion    Suscripcion @relation(fields: [suscripcionId], references: [id])
+  monto          Decimal     @db.Decimal(10, 2)
+  moneda         String      @default("USD")
+  pasarela       String
+  referencia     String
+  estado         EstadoPago
+  ultimos4       String      @default("")
+  idempotencyKey String      @unique @map("idempotency_key")
+  creadoEn       DateTime    @default(now()) @map("creado_en")
+
+  @@map("pagos_suscripcion")
+}
+
+/// Perfil de una cuenta dentro de una tienda (rol, sucursal…).
+model Usuario {
+  id             String             @id @default(uuid())
+  tiendaId       String             @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  cuentaId       String             @map("cuenta_id")
+  cuenta         Cuenta             @relation(fields: [cuentaId], references: [id])
+  email          String
+  nombre         String             @default("")
+  activo         Boolean            @default(true)
+  mayorista      Boolean            @default(false)
+  rol            Rol
+  sucursalId     String?            @map("sucursal_id")
+  sucursal       Sucursal?          @relation(fields: [sucursalId], references: [id])
+  proveedorId    String?            @map("proveedor_id")
+  proveedor      Proveedor?         @relation(fields: [proveedorId], references: [id])
+  turnos         CajaTurno[]
+  ventasClienta  Venta[]            @relation("ClientaVentas")
+  creditos       CuentaCobrar[]     @relation("ClientaCreditos")
+  reportes       ReporteEjecucion[]
+  reservas       Reserva[]
+  opiniones      Opinion[]
+  alertas        AlertaProducto[]
+  direcciones    DireccionCliente[]
+  favoritos      Favorito[]
+  lealtad        CuentaLealtad?
+  pedidos        Pedido[]
+  notificaciones Notificacion[]
+  empleado       Empleado?
+  avatarUrl      String             @default("") @map("avatar_url")
+
+  @@unique([tiendaId, email])
+  @@unique([cuentaId, tiendaId])
+  @@index([tiendaId])
   @@map("usuarios")
 }
 
 model Sucursal {
   id        String      @id @default(uuid())
+  tiendaId  String      @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   nombre    String
   ciudad    String
   almacenes Almacen[]
@@ -102,11 +217,13 @@ model Sucursal {
   usuarios  Usuario[]
   reservas  Reserva[]
 
+  @@index([tiendaId])
   @@map("sucursales")
 }
 
 model Almacen {
   id          String                 @id @default(uuid())
+  tiendaId    String                 @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   nombre      String
   sucursalId  String                 @map("sucursal_id")
   sucursal    Sucursal               @relation(fields: [sucursalId], references: [id])
@@ -114,75 +231,87 @@ model Almacen {
   ventas      Venta[]
   movimientos MovimientoInventario[]
 
+  @@index([tiendaId])
   @@map("almacenes")
 }
 
 model Proveedor {
   id        String     @id @default(uuid())
+  tiendaId  String     @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   nombre    String
   contacto  String     @default("")
   productos Producto[]
   usuarios  Usuario[]
 
+  @@index([tiendaId])
   @@map("proveedores")
 }
 
 model Temporada {
   id        String     @id @default(uuid())
-  nombre    String     @unique
+  tiendaId  String     @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  nombre    String
   productos Producto[]
 
+  @@unique([tiendaId, nombre])
+  @@index([tiendaId])
   @@map("temporadas")
 }
 
 model Coleccion {
   id        String     @id @default(uuid())
-  nombre    String     @unique
+  tiendaId  String     @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  nombre    String
   productos Producto[]
 
+  @@unique([tiendaId, nombre])
+  @@index([tiendaId])
   @@map("colecciones")
 }
 
 model Producto {
-  id           String     @id @default(uuid())
-  nombre       String
-  descripcion  String     @default("")
-  categoria    String
-  ocasion      String
-  precioBase      Decimal  @map("precio_base") @db.Decimal(12, 2)
-  precioMayorista Decimal? @map("precio_mayorista") @db.Decimal(12, 2)
-  minimoMayorista Int      @default(0) @map("minimo_mayorista")
-  descuentoPct    Decimal  @default(0) @map("descuento_pct") @db.Decimal(5, 2)
-  temporadaId  String?    @map("temporada_id")
-  temporada    Temporada? @relation(fields: [temporadaId], references: [id])
-  coleccionId  String?    @map("coleccion_id")
-  coleccion    Coleccion? @relation(fields: [coleccionId], references: [id])
-  proveedorId  String?    @map("proveedor_id")
-  proveedor    Proveedor? @relation(fields: [proveedorId], references: [id])
-  variantes    Variante[]
-  opiniones    Opinion[]
-  alertas      AlertaProducto[]
-  favoritos    Favorito[]
-  categorias   ProductoCategoria[]
-  creadoEn     DateTime @default(now()) @map("creado_en")
-  material     String   @default("")
-  ajuste       String   @default("")
-  composicion  String   @default("")
-  cuidados     String   @default("")
-  origen       String   @default("")
-  modelo       String   @default("")
-  popularidad  Int      @default(0)
+  id              String              @id @default(uuid())
+  tiendaId        String              @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  nombre          String
+  descripcion     String              @default("")
+  categoria       String
+  ocasion         String
+  precioBase      Decimal             @map("precio_base") @db.Decimal(12, 2)
+  precioMayorista Decimal?            @map("precio_mayorista") @db.Decimal(12, 2)
+  minimoMayorista Int                 @default(0) @map("minimo_mayorista")
+  descuentoPct    Decimal             @default(0) @map("descuento_pct") @db.Decimal(5, 2)
+  temporadaId     String?             @map("temporada_id")
+  temporada       Temporada?          @relation(fields: [temporadaId], references: [id])
+  coleccionId     String?             @map("coleccion_id")
+  coleccion       Coleccion?          @relation(fields: [coleccionId], references: [id])
+  proveedorId     String?             @map("proveedor_id")
+  proveedor       Proveedor?          @relation(fields: [proveedorId], references: [id])
+  variantes       Variante[]
+  opiniones       Opinion[]
+  alertas         AlertaProducto[]
+  favoritos       Favorito[]
+  categorias      ProductoCategoria[]
+  creadoEn        DateTime            @default(now()) @map("creado_en")
+  material        String              @default("")
+  ajuste          String              @default("")
+  composicion     String              @default("")
+  cuidados        String              @default("")
+  origen          String              @default("")
+  modelo          String              @default("")
+  popularidad     Int                 @default(0)
 
+  @@index([tiendaId])
   @@map("productos")
 }
 
 model Variante {
   id            String                 @id @default(uuid())
+  tiendaId      String                 @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   productoId    String                 @map("producto_id")
   producto      Producto               @relation(fields: [productoId], references: [id])
   talla         String
   color         String
-  sku           String                 @unique
+  sku           String
   urlFoto       String                 @default("") @map("url_foto")
   urlOverlay    String                 @default("") @map("url_overlay")
   urlModelo     String                 @default("") @map("url_modelo")
@@ -192,12 +321,15 @@ model Variante {
   movimientos   MovimientoInventario[]
 
   @@unique([productoId, talla, color])
+  @@unique([tiendaId, sku])
   @@index([productoId])
+  @@index([tiendaId])
   @@map("variantes")
 }
 
 model StockAlmacen {
   varianteId String   @map("variante_id")
+  tiendaId   String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   almacenId  String   @map("almacen_id")
   cantidad   Int
   reservado  Int      @default(0)
@@ -206,11 +338,13 @@ model StockAlmacen {
 
   @@id([varianteId, almacenId])
   @@index([almacenId])
+  @@index([tiendaId])
   @@map("stock_almacen")
 }
 
 model MovimientoInventario {
   id         String         @id @default(uuid())
+  tiendaId   String         @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   tipo       TipoMovimiento
   cantidad   Int
   nota       String         @default("")
@@ -226,39 +360,45 @@ model MovimientoInventario {
   usuarioId  String?        @map("usuario_id")
 
   @@index([almacenId, creadoEn])
+  @@index([tiendaId])
   @@map("movimientos_inventario")
 }
 
 model Reserva {
-  id         String         @id @default(uuid())
-  estado     EstadoReserva  @default(pendiente)
-  horario    DateTime
-  nota       String         @default("")
-  creadaEn   DateTime       @default(now()) @map("creada_en")
-  clientaId  String         @map("clienta_id")
-  clienta    Usuario        @relation(fields: [clientaId], references: [id])
-  sucursalId String         @map("sucursal_id")
-  sucursal   Sucursal       @relation(fields: [sucursalId], references: [id])
-  lineas     LineaReserva[]
+  id          String                 @id @default(uuid())
+  tiendaId    String                 @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  estado      EstadoReserva          @default(pendiente)
+  horario     DateTime
+  nota        String                 @default("")
+  creadaEn    DateTime               @default(now()) @map("creada_en")
+  clientaId   String                 @map("clienta_id")
+  clienta     Usuario                @relation(fields: [clientaId], references: [id])
+  sucursalId  String                 @map("sucursal_id")
+  sucursal    Sucursal               @relation(fields: [sucursalId], references: [id])
+  lineas      LineaReserva[]
   movimientos MovimientoInventario[]
 
   @@index([sucursalId, estado])
+  @@index([tiendaId])
   @@map("reservas")
 }
 
 model LineaReserva {
   id         String   @id @default(uuid())
+  tiendaId   String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   reservaId  String   @map("reserva_id")
   reserva    Reserva  @relation(fields: [reservaId], references: [id])
   varianteId String   @map("variante_id")
   variante   Variante @relation(fields: [varianteId], references: [id])
   cantidad   Int
 
+  @@index([tiendaId])
   @@map("lineas_reserva")
 }
 
 model CajaTurno {
   id             String    @id @default(uuid())
+  tiendaId       String    @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   sucursalId     String    @map("sucursal_id")
   sucursal       Sucursal  @relation(fields: [sucursalId], references: [id])
   cajeroId       String    @map("cajero_id")
@@ -270,150 +410,219 @@ model CajaTurno {
   totalDeclarado Decimal?  @map("total_declarado") @db.Decimal(12, 2)
   ventas         Venta[]
 
+  @@index([tiendaId])
   @@map("caja_turnos")
 }
 
 model Venta {
-  id          String                 @id @default(uuid())
-  uuid        String                 @unique
-  canal       Canal
-  estado      EstadoVenta
-  medioPago   MedioPago              @map("medio_pago")
-  total       Decimal                @db.Decimal(12, 2)
-  creadaEn    DateTime               @default(now()) @map("creada_en")
-  almacenId   String                 @map("almacen_id")
-  almacen     Almacen                @relation(fields: [almacenId], references: [id])
-  cajaTurnoId String?                @map("caja_turno_id")
-  cajaTurno   CajaTurno?             @relation(fields: [cajaTurnoId], references: [id])
-  clientaId   String?                @map("clienta_id")
-  clienta     Usuario?               @relation("ClientaVentas", fields: [clientaId], references: [id])
+  id           String                 @id @default(uuid())
+  tiendaId     String                 @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  uuid         String
+  canal        Canal
+  estado       EstadoVenta
+  medioPago    MedioPago              @map("medio_pago")
+  total        Decimal                @db.Decimal(12, 2)
+  creadaEn     DateTime               @default(now()) @map("creada_en")
+  almacenId    String                 @map("almacen_id")
+  almacen      Almacen                @relation(fields: [almacenId], references: [id])
+  cajaTurnoId  String?                @map("caja_turno_id")
+  cajaTurno    CajaTurno?             @relation(fields: [cajaTurnoId], references: [id])
+  clientaId    String?                @map("clienta_id")
+  clienta      Usuario?               @relation("ClientaVentas", fields: [clientaId], references: [id])
   lineas       LineaVenta[]
   pago         PagoSimulado?
   movimientos  MovimientoInventario[]
   pedido       Pedido?
   devoluciones Devolucion[]
+  credito      CuentaCobrar?
 
+  @@unique([tiendaId, uuid])
   @@index([creadaEn])
   @@index([cajaTurnoId])
   @@index([clientaId])
+  @@index([tiendaId])
   @@map("ventas")
 }
 
 model LineaVenta {
-  id             String   @id @default(uuid())
-  ventaId        String   @map("venta_id")
-  venta          Venta    @relation(fields: [ventaId], references: [id])
-  varianteId     String   @map("variante_id")
-  variante       Variante @relation(fields: [varianteId], references: [id])
+  id               String   @id @default(uuid())
+  tiendaId         String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  ventaId          String   @map("venta_id")
+  venta            Venta    @relation(fields: [ventaId], references: [id])
+  varianteId       String   @map("variante_id")
+  variante         Variante @relation(fields: [varianteId], references: [id])
   cantidad         Int
   cantidadDevuelta Int      @default(0) @map("cantidad_devuelta")
   precioUnitario   Decimal  @map("precio_unitario") @db.Decimal(12, 2)
 
+  @@index([tiendaId])
   @@map("lineas_venta")
 }
 
 model PagoSimulado {
   id          String     @id @default(uuid())
+  tiendaId    String     @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   ventaId     String     @unique @map("venta_id")
   venta       Venta      @relation(fields: [ventaId], references: [id])
   estado      EstadoPago @default(pendiente)
   referencia  String     @default("")
   actualizado DateTime   @default(now()) @map("actualizado_en")
 
+  @@index([tiendaId])
   @@map("pagos_simulados")
 }
 
 model ReporteEjecucion {
   id       String   @id @default(uuid())
-  pregunta String
-  sql      String
-  filas    Int
-  creadaEn DateTime @default(now()) @map("creada_en")
-  adminId  String   @map("admin_id")
-  admin    Usuario  @relation(fields: [adminId], references: [id])
+  tiendaId String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  pregunta      String
+  sql           String
+  filas         Int
+  especificacion Json?
+  creadaEn      DateTime @default(now()) @map("creada_en")
+  adminId       String   @map("admin_id")
+  admin         Usuario  @relation(fields: [adminId], references: [id])
 
+  @@index([tiendaId])
   @@map("reporte_ejecuciones")
+}
+
+/// Saldo pendiente de una venta al crédito.
+model CuentaCobrar {
+  id        String          @id @default(uuid())
+  tiendaId  String          @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  ventaId   String          @unique @map("venta_id")
+  venta     Venta           @relation(fields: [ventaId], references: [id])
+  clientaId String          @map("clienta_id")
+  clienta   Usuario         @relation("ClientaCreditos", fields: [clientaId], references: [id])
+  monto     Decimal         @db.Decimal(12, 2)
+  saldo     Decimal         @db.Decimal(12, 2)
+  venceEn   DateTime        @map("vence_en")
+  creadaEn  DateTime        @default(now()) @map("creada_en")
+  abonos    AbonoCredito[]
+
+  @@index([tiendaId, clientaId])
+  @@map("cuentas_cobrar")
+}
+
+model AbonoCredito {
+  id          String       @id @default(uuid())
+  tiendaId    String       @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  cuentaId    String       @map("cuenta_id")
+  cuenta      CuentaCobrar @relation(fields: [cuentaId], references: [id])
+  monto       Decimal      @db.Decimal(12, 2)
+  medioPago   MedioPago    @map("medio_pago")
+  usuarioId   String?      @map("usuario_id")
+  cajaTurnoId String?      @map("caja_turno_id")
+  creadoEn    DateTime     @default(now()) @map("creado_en")
+
+  @@index([tiendaId, cuentaId])
+  @@map("abonos_credito")
 }
 
 model Categoria {
   id        String              @id @default(uuid())
-  nombre    String              @unique
+  tiendaId  String              @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  nombre    String
   activa    Boolean             @default(true)
   productos ProductoCategoria[]
+
+  @@unique([tiendaId, nombre])
+  @@index([tiendaId])
   @@map("categorias")
 }
 
 model ProductoCategoria {
-  productoId  String   @map("producto_id")
-  categoriaId String   @map("categoria_id")
-  producto    Producto @relation(fields: [productoId], references: [id])
+  productoId  String    @map("producto_id")
+  tiendaId    String    @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  categoriaId String    @map("categoria_id")
+  producto    Producto  @relation(fields: [productoId], references: [id])
   categoria   Categoria @relation(fields: [categoriaId], references: [id])
+
   @@id([productoId, categoriaId])
+  @@index([tiendaId])
   @@map("productos_categorias")
 }
 
 model DireccionCliente {
   id        String  @id @default(uuid())
+  tiendaId  String  @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   etiqueta  String  @default("Casa")
   detalle   String
   ciudad    String
   usuarioId String  @map("usuario_id")
   usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
   @@index([usuarioId])
+  @@index([tiendaId])
   @@map("direcciones_cliente")
 }
 
 model Favorito {
-  id        String   @id @default(uuid())
-  creadoEn  DateTime @default(now()) @map("creado_en")
-  usuarioId String   @map("usuario_id")
-  productoId String  @map("producto_id")
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
-  producto  Producto @relation(fields: [productoId], references: [id])
+  id         String   @id @default(uuid())
+  tiendaId   String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  creadoEn   DateTime @default(now()) @map("creado_en")
+  usuarioId  String   @map("usuario_id")
+  productoId String   @map("producto_id")
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  producto   Producto @relation(fields: [productoId], references: [id])
+
   @@unique([usuarioId, productoId])
+  @@index([tiendaId])
   @@map("favoritos")
 }
 
 model CuentaLealtad {
-  id        String   @id @default(uuid())
-  puntos    Int      @default(0)
-  nivel     String   @default("inicial")
-  usuarioId String   @unique @map("usuario_id")
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  id        String  @id @default(uuid())
+  tiendaId  String  @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  puntos    Int     @default(0)
+  nivel     String  @default("inicial")
+  usuarioId String  @unique @map("usuario_id")
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([tiendaId])
   @@map("cuentas_lealtad")
 }
 
 model Cupon {
-  id          String   @id @default(uuid())
-  codigo      String   @unique
-  porcentaje  Decimal  @db.Decimal(5, 2)
-  activo      Boolean  @default(true)
-  venceEn     DateTime? @map("vence_en")
-  usoMaximo   Int?     @map("uso_maximo")
-  usado       Int      @default(0)
-  creadoEn    DateTime @default(now()) @map("creado_en")
+  id         String    @id @default(uuid())
+  tiendaId   String    @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  codigo     String
+  porcentaje Decimal   @db.Decimal(5, 2)
+  activo     Boolean   @default(true)
+  venceEn    DateTime? @map("vence_en")
+  usoMaximo  Int?      @map("uso_maximo")
+  usado      Int       @default(0)
+  creadoEn   DateTime  @default(now()) @map("creado_en")
+
+  @@unique([tiendaId, codigo])
+  @@index([tiendaId])
   @@map("cupones")
 }
 
 model Pedido {
-  id           String    @id @default(uuid())
-  estado       String    @default("pendiente")
-  total        Decimal   @db.Decimal(12, 2)
-  direccion    String    @default("")
-  seguimiento  String    @default("")
-  creadoEn     DateTime  @default(now()) @map("creado_en")
-  enviadoEn    DateTime? @map("enviado_en")
-  usuarioId    String    @map("usuario_id")
-  usuario      Usuario   @relation(fields: [usuarioId], references: [id])
-  ventaId      String?   @unique @map("venta_id")
-  venta        Venta?    @relation(fields: [ventaId], references: [id])
+  id          String    @id @default(uuid())
+  tiendaId    String    @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  estado      String    @default("pendiente")
+  total       Decimal   @db.Decimal(12, 2)
+  direccion   String    @default("")
+  seguimiento String    @default("")
+  creadoEn    DateTime  @default(now()) @map("creado_en")
+  enviadoEn   DateTime? @map("enviado_en")
+  usuarioId   String    @map("usuario_id")
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+  ventaId     String?   @unique @map("venta_id")
+  venta       Venta?    @relation(fields: [ventaId], references: [id])
+
   @@index([usuarioId, creadoEn])
   @@index([estado])
+  @@index([tiendaId])
   @@map("pedidos")
 }
 
 model Devolucion {
   id        String            @id @default(uuid())
+  tiendaId  String            @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   nota      String            @default("")
   creadaEn  DateTime          @default(now()) @map("creada_en")
   ventaId   String            @map("venta_id")
@@ -422,105 +631,157 @@ model Devolucion {
   lineas    DevolucionLinea[]
 
   @@index([ventaId])
+  @@index([tiendaId])
   @@map("devoluciones")
 }
 
 model DevolucionLinea {
   id           String     @id @default(uuid())
+  tiendaId     String     @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   cantidad     Int
   devolucionId String     @map("devolucion_id")
   devolucion   Devolucion @relation(fields: [devolucionId], references: [id])
   lineaVentaId String     @map("linea_venta_id")
 
+  @@index([tiendaId])
   @@map("devolucion_lineas")
 }
 
 model Promocion {
-  id          String   @id @default(uuid())
-  nombre      String
-  porcentaje  Decimal  @db.Decimal(5, 2)
-  activa      Boolean  @default(true)
-  iniciaEn    DateTime @default(now()) @map("inicia_en")
-  venceEn     DateTime? @map("vence_en")
+  id         String    @id @default(uuid())
+  tiendaId   String    @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  nombre     String
+  porcentaje Decimal   @db.Decimal(5, 2)
+  activa     Boolean   @default(true)
+  iniciaEn   DateTime  @default(now()) @map("inicia_en")
+  venceEn    DateTime? @map("vence_en")
+
+  @@index([tiendaId])
   @@map("promociones")
 }
 
 model Empleado {
-  id          String   @id @default(uuid())
-  usuarioId   String   @unique @map("usuario_id")
-  puesto      String
-  contrato    String   @default("")
-  salario     Decimal  @default(0) @db.Decimal(12, 2)
-  ingresoEn   DateTime @default(now()) @map("ingreso_en")
-  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
-  turnos      TurnoEmpleado[]
+  id        String          @id @default(uuid())
+  tiendaId  String          @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  usuarioId String          @unique @map("usuario_id")
+  puesto    String
+  contrato  String          @default("")
+  salario   Decimal         @default(0) @db.Decimal(12, 2)
+  ingresoEn DateTime        @default(now()) @map("ingreso_en")
+  usuario   Usuario         @relation(fields: [usuarioId], references: [id])
+  turnos    TurnoEmpleado[]
+
+  @@index([tiendaId])
   @@map("empleados")
 }
 
 model TurnoEmpleado {
-  id         String   @id @default(uuid())
-  empleadoId String   @map("empleado_id")
+  id         String    @id @default(uuid())
+  tiendaId   String    @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  empleadoId String    @map("empleado_id")
   inicio     DateTime
   fin        DateTime?
-  estado     String   @default("programado")
-  empleado   Empleado @relation(fields: [empleadoId], references: [id])
+  estado     String    @default("programado")
+  empleado   Empleado  @relation(fields: [empleadoId], references: [id])
+
   @@index([empleadoId, inicio])
+  @@index([tiendaId])
   @@map("turnos_empleado")
 }
 
 model EventoAnalitica {
   id        String   @id @default(uuid())
+  tiendaId  String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   tipo      String
   ruta      String   @default("")
   datos     Json
   creadoEn  DateTime @default(now()) @map("creado_en")
   usuarioId String?  @map("usuario_id")
+
   @@index([tipo, creadoEn])
+  @@index([tiendaId])
   @@map("eventos_analitica")
 }
 
 model Dispositivo {
-  id          String   @id
-  nombre      String   @default("")
-  activo      Boolean  @default(true)
-  ultimoUso   DateTime @default(now()) @map("ultimo_uso")
-  creadoEn    DateTime @default(now()) @map("creado_en")
+  id        String   @id
+  tiendaId  String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  nombre    String   @default("")
+  activo    Boolean  @default(true)
+  ultimoUso DateTime @default(now()) @map("ultimo_uso")
+  creadoEn  DateTime @default(now()) @map("creado_en")
+
+  @@index([tiendaId])
   @@map("dispositivos")
 }
 
+/// Registro de idempotencia: operaciones del lote offline y peticiones con cabecera Idempotency-Key.
 model OperacionSync {
-  id          String   @id @default(uuid())
-  operationId String   @unique @map("operation_id")
-  dispositivoId String @map("dispositivo_id")
-  estado      String   @default("pending")
-  payload     Json
-  error       String   @default("")
-  creadoEn    DateTime @default(now()) @map("creado_en")
-  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+  id            String    @id @default(uuid())
+  tiendaId      String    @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  operationId   String    @map("operation_id")
+  dispositivoId String    @map("dispositivo_id")
+  usuarioId     String?   @map("usuario_id")
+  /// venta | cliente | producto | http
+  tipo          String    @default("")
+  /// en_curso | aplicada | fusionada | conflicto | rechazada | vencida
+  estado        String    @default("en_curso")
+  /// Huella del contenido: la misma clave con otro contenido es un error, no una repetición.
+  hash          String    @default("")
+  payload       Json
+  resultado     Json?
+  error         String    @default("")
+  /// Momento en que el dispositivo hizo la operación (puede ser días antes de sincronizar).
+  hechaEn       DateTime? @map("hecha_en")
+  creadoEn      DateTime  @default(now()) @map("creado_en")
+  actualizadoEn DateTime  @updatedAt @map("actualizado_en")
+
+  @@unique([tiendaId, operationId])
   @@index([dispositivoId, estado])
+  @@index([tiendaId, estado])
   @@map("operaciones_sync")
 }
 
+/// Suscripción Web Push de un navegador (notificaciones con la PWA cerrada).
+model PushSuscripcion {
+  id        String   @id @default(uuid())
+  tiendaId  String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  usuarioId String   @map("usuario_id")
+  endpoint  String
+  p256dh    String
+  auth      String
+  creadaEn  DateTime @default(now()) @map("creada_en")
+
+  @@unique([tiendaId, endpoint])
+  @@index([tiendaId, usuarioId])
+  @@map("push_suscripciones")
+}
+
 model TokenRevocado {
-  hash      String   @id
-  revocadoEn DateTime @default(now()) @map("revocado_en")
-  expiraEn  DateTime? @map("expira_en")
+  hash       String    @id
+  revocadoEn DateTime  @default(now()) @map("revocado_en")
+  expiraEn   DateTime? @map("expira_en")
+
   @@map("tokens_revocados")
 }
 
 model Auditoria {
   id        String   @id @default(uuid())
+  tiendaId  String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   accion    String
   recurso   String   @default("")
   detalle   String   @default("")
   creadoEn  DateTime @default(now()) @map("creado_en")
   usuarioId String?  @map("usuario_id")
+
   @@index([usuarioId, creadoEn])
+  @@index([tiendaId])
   @@map("auditoria")
 }
 
 model Notificacion {
   id        String   @id @default(uuid())
+  tiendaId  String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
   usuarioId String   @map("usuario_id")
   usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   tipo      String
@@ -531,37 +792,42 @@ model Notificacion {
   creadaEn  DateTime @default(now()) @map("creada_en")
 
   @@index([usuarioId, leida, creadaEn])
+  @@index([tiendaId])
   @@map("notificaciones")
 }
 
 model Opinion {
-  id          String   @id @default(uuid())
-  puntuacion  Int
-  comentario  String   @default("")
-  imagenUrl   String   @default("") @map("imagen_url")
-  verificada  Boolean  @default(false)
-  moderada    Boolean  @default(false)
-  creadaEn    DateTime @default(now()) @map("creada_en")
-  productoId  String   @map("producto_id")
-  producto    Producto @relation(fields: [productoId], references: [id])
-  usuarioId   String   @map("usuario_id")
-  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  id         String   @id @default(uuid())
+  tiendaId   String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  puntuacion Int
+  comentario String   @default("")
+  imagenUrl  String   @default("") @map("imagen_url")
+  verificada Boolean  @default(false)
+  moderada   Boolean  @default(false)
+  creadaEn   DateTime @default(now()) @map("creada_en")
+  productoId String   @map("producto_id")
+  producto   Producto @relation(fields: [productoId], references: [id])
+  usuarioId  String   @map("usuario_id")
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
 
   @@unique([productoId, usuarioId])
   @@index([productoId, moderada])
+  @@index([tiendaId])
   @@map("opiniones")
 }
 
 model AlertaProducto {
-  id          String   @id @default(uuid())
-  tipo        String
-  activa      Boolean  @default(true)
-  creadaEn    DateTime @default(now()) @map("creada_en")
-  productoId  String   @map("producto_id")
-  producto    Producto @relation(fields: [productoId], references: [id])
-  usuarioId   String   @map("usuario_id")
-  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  id         String   @id @default(uuid())
+  tiendaId   String   @default(dbgenerated("current_setting('app.tienda_id'::text)")) @map("tienda_id")
+  tipo       String
+  activa     Boolean  @default(true)
+  creadaEn   DateTime @default(now()) @map("creada_en")
+  productoId String   @map("producto_id")
+  producto   Producto @relation(fields: [productoId], references: [id])
+  usuarioId  String   @map("usuario_id")
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
 
   @@unique([productoId, usuarioId, tipo])
+  @@index([tiendaId])
   @@map("alertas_producto")
 }

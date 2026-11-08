@@ -15,6 +15,21 @@ describe('Spike C — SQL acotado', () => {
     ).toThrow('SQL_FUERA_DE_VISTA');
   });
 
+  it('no deja salir de la tienda: ni tablas base junto a la vista ni cambiar la sesión', () => {
+    expect(() =>
+      validarSelect('SELECT p.nombre FROM v_reporte_ventas JOIN productos p ON true'),
+    ).toThrow('SQL_FUERA_DE_VISTA');
+    expect(() =>
+      validarSelect('SELECT * FROM v_reporte_ventas, tiendas'),
+    ).toThrow('SQL_FUERA_DE_VISTA');
+    expect(() =>
+      validarSelect("SELECT set_config('app.tienda_id', 'otra', true), * FROM v_reporte_ventas"),
+    ).toThrow('SQL_PROHIBIDO');
+    expect(() =>
+      validarSelect("SELECT current_setting('app.tienda_id') FROM v_reporte_ventas"),
+    ).toThrow('SQL_PROHIBIDO');
+  });
+
   it('compila la pregunta del docente a la vista', () => {
     const { sql } = compilarPregunta(
       'ventas de la sucursal Santa Cruz, a quién y cuánto',

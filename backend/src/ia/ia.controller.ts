@@ -3,11 +3,11 @@ import { IsArray, IsIn, IsOptional, IsString, MinLength, ValidateNested } from '
 import { Type } from 'class-transformer';
 import type { Request } from 'express';
 import { Rol } from '@prisma/client';
-import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { TokenService } from '../auth/token.service';
+import { TenantContext } from '../tenancy/tenant-context';
 import { IaService } from './ia.service';
 
 class PreguntaFichaDto {
@@ -74,8 +74,10 @@ export class IaController {
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     if (token) {
       try {
-        const payload = this.tokens.verify(token) as JwtPayload;
-        if (payload.rol === Rol.CLIENTA) clientaId = payload.sub;
+        const payload = this.tokens.verify(token);
+        if (payload.tipo === 'tienda' && payload.tiendaId === TenantContext.tiendaId() && payload.rol === Rol.CLIENTA) {
+          clientaId = payload.sub;
+        }
       } catch {
         /* invitada */
       }

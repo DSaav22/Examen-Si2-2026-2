@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -20,12 +20,20 @@ import { PedidosModule } from './pedidos/pedidos.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { CorreoModule } from './correo/correo.module';
 import { DevolucionesModule } from './devoluciones/devoluciones.module';
+import { TenancyModule } from './tenancy/tenancy.module';
+import { TenantMiddleware } from './tenancy/tenant.middleware';
+import { PlataformaModule } from './plataforma/plataforma.module';
+import { PushModule } from './push/push.module';
+import { SyncModule } from './sync/sync.module';
+import { CreditosModule } from './creditos/creditos.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    TenancyModule,
     AuthModule,
+    PlataformaModule,
     CatalogoModule,
     CajaModule,
     VentasModule,
@@ -42,8 +50,15 @@ import { DevolucionesModule } from './devoluciones/devoluciones.module';
     DevolucionesModule,
     CorreoModule,
     NotificacionesModule,
+    PushModule,
+    SyncModule,
+    CreditosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(TenantMiddleware).forRoutes('*');
+  }
+}

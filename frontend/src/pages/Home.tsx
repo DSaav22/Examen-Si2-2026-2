@@ -7,6 +7,7 @@ import { precioEfectivo, stockCapacidad, stockDisponible } from '../types'
 import { editorialImage, lookImage, storefrontHeroImage } from '../shared/vestaAssets'
 import { useStorefront } from '../storefront'
 import { catalogLabel } from '../text'
+import { useTiendaPublica } from '../shared/SelectorTienda'
 
 function ProductImage({ product, variant }: { product: Producto; variant?: Variante }) {
   const [failed, setFailed] = useState(false)
@@ -131,6 +132,7 @@ const OCASIONES = [
 
 export function Home() {
   const { recent, addToCart } = useStorefront()
+  const marca = useTiendaPublica()?.nombre ?? 'Vesta'
   const [products, setProducts] = useState<Producto[]>([])
   const [bestSellers, setBestSellers] = useState<Producto[]>([])
   const [branches, setBranches] = useState<Sucursal[]>([])
@@ -215,7 +217,7 @@ export function Home() {
         <img src={storefrontHeroImage} alt="" />
         <div className="home-hero-overlay" />
         <div className="home-hero-copy">
-          <p className="vesta-hero-brand">VESTA</p>
+          <p className="vesta-hero-brand">{marca.toUpperCase()}</p>
           <p className="vesta-hero-eyebrow">Edición 01 · Otoño</p>
           <h1 id="home-hero-title">
             La nueva
@@ -297,10 +299,10 @@ export function Home() {
 
       <section className="home-editorial">
         <div className="home-editorial-image">
-          <img src={editorialImage} alt="Selección editorial Vesta" />
+          <img src={editorialImage} alt={`Selección editorial ${marca}`} />
         </div>
         <div className="home-editorial-copy">
-          <p className="eyebrow">Vesta Journal · 01</p>
+          <p className="eyebrow">{marca} Journal · 01</p>
           <h2>
             Vestir menos.
             <br />
@@ -374,7 +376,7 @@ export function Home() {
 
       <section className="home-customer-care" aria-label="Atención al cliente">
         <p className="eyebrow">Estamos para ayudarte</p>
-        <h2>Atención Vesta</h2>
+        <h2>Atención {marca}</h2>
         <p>Disponibilidad, cambios y retiro en tienda con nuestro equipo.</p>
         <div className="home-care-actions">
           <a className="ui-button ui-button--secondary" href="mailto:hola@vesta.local">

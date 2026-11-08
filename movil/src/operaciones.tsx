@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { api } from './api'
+import { api, esFalloRed } from './api'
+import { borrarCache, guardarCache, leerCache } from './offline/almacen'
+import { alSincronizar, cambiosReintento, descartar, encolar, motor, reintentar, sincronizar, textoReintento, useAutoSync, useSync, uuid } from './offline/sync'
+import type { OperacionLocal } from './offline/tipos'
+import { ReporteInteligenteMovil } from './reporte-inteligente'
 import { useSession } from './session'
 import { colors } from './theme'
 import type { Producto, Variante } from './types'
 import { precioEfectivo } from './types'
 
-type CajaTurno = { id: string; fondoInicial: string | number; totalSistema: string | number; sucursal?: { nombre: string } }
+type CajaTurno = { id: string; fondoInicial: string | number; totalSistema: string | number; sucursal?: { id: string; nombre: string; almacenes?: { id: string }[] } }
+type Clienta = { id: string; nombre: string; email: string }
 type LineaPos = { variante: Variante; producto: Producto; cantidad: number }
 type ReservaOperativa = {
   id: string; estado: string; horario: string
@@ -44,6 +49,7 @@ export function OperacionesScreen() {
       <Text style={styles.eyebrow}>ENSAYAR · OPERACIONES</Text>
       <Text style={styles.title}>Panel de {rol.toLowerCase()}</Text>
       <Text style={styles.lead}>Las acciones se validan nuevamente en el backend con tu sesión y sucursal asignada.</Text>
+      {['ADMIN', 'SUPERADMIN', 'ENCARGADO'].includes(rol) ? <ReporteInteligenteMovil /> : null}
       {rol === 'CAJERO' ? <CajaPos onCambio={() => setRecargar(n => n + 1)} /> : null}
       {rol === 'ENCARGADO' ? <Encargado onCambio={() => setRecargar(n => n + 1)} /> : null}
       {rol === 'PROVEEDOR' ? <Proveedor onCambio={() => setRecargar(n => n + 1)} /> : null}
@@ -58,31 +64,173 @@ export function OperacionesScreen() {
   )
 }
 
+/** Pide al backend y guarda la respuesta en SQLite; sin red devuelve la última copia guardada. */
+async function conCache<T>(clave: string, pedir: () => Promise<T>): Promise<{ datos: T; deCache: boolean }> {
+  try {
+    const datos = await pedir()
+    await guardarCache(clave, datos)
+    return { datos, deCache: false }
+  } catch (err) {
+    const copia = esFalloRed(err) ? await leerCache<T>(clave) : null
+    if (copia === null) throw err
+    return { datos: copia, deCache: true }
+  }
+}
+
 function CajaPos({ onCambio }: { onCambio: () => void }) {
   const s = useSession()
+  useAutoSync(s.token)
+  const sync = useSync()
   const [turno, setTurno] = useState<CajaTurno | null>(null)
   const [productos, setProductos] = useState<Producto[]>([])
+  const [stock, setStock] = useState<Record<string, number>>({})
+  const [deCache, setDeCache] = useState(false)
   const [ticket, setTicket] = useState<LineaPos[]>([])
   const [fondo, setFondo] = useState('0')
   const [declarado, setDeclarado] = useState('0')
   const [medio, setMedio] = useState<'efectivo' | 'qr'>('efectivo')
+  const [clientas, setClientas] = useState<Clienta[]>([])
+  const [clientaId, setClientaId] = useState('')
+  const [altaClienta, setAltaClienta] = useState(false)
+  const [nombreClienta, setNombreClienta] = useState('')
+  const [emailClienta, setEmailClienta] = useState('')
+  const pendientes = sync.ops.filter(o => o.estado === 'pendiente').length
+  const almacenId = turno?.sucursal?.almacenes?.[0]?.id ?? s.almacenId
+
   const cargar = useCallback(async () => {
     try {
-      const [t, p] = await Promise.all([api<CajaTurno | null>('/caja/turno-abierto', s.token), api<{ items?: Producto[] } | Producto[]>('/catalogo/productos?limite=24', null)])
-      setTurno(t); setProductos(Array.isArray(p) ? p : p.items ?? [])
+      const [t, p, c] = await Promise.all([
+        conCache(`turno:${s.user?.id}`, () => api<CajaTurno | null>('/caja/turno-abierto', s.token)),
+        conCache('catalogo-pos', async () => {
+          const r = await api<{ items?: Producto[] } | Producto[]>('/catalogo/productos?limite=60', null)
+          return Array.isArray(r) ? r : r.items ?? []
+        }),
+        leerCache<Clienta[]>('clientas'),
+      ])
+      setTurno(t.datos ?? null)
+      setProductos(p.datos)
+      setClientas(c ?? [])
+      setDeCache(t.deCache || p.deCache)
+      const sucursalId = t.datos?.sucursal?.id
+      if (sucursalId) {
+        const inv = await conCache(`inventario:${sucursalId}`, async () => {
+          const items = await api<{ varianteId: string; disponible: number }[]>(`/catalogo/disponibilidad?sucursalId=${sucursalId}`, s.token)
+          return Object.fromEntries(items.map(i => [i.varianteId, Math.max(0, i.disponible)]))
+        })
+        setStock(inv.datos)
+      }
     } catch (e) { s.setError(e instanceof Error ? e.message : 'No se pudo cargar caja') }
-  }, [s.token])
+  }, [s.token, s.user?.id])
   useEffect(() => { void cargar() }, [cargar])
+  useEffect(() => alSincronizar(resultados => {
+    void cargar(); onCambio()
+    const ok = resultados.filter(r => r.estado === 'aplicada' || r.estado === 'repetida' || r.estado === 'fusionada').length
+    const revisar = resultados.filter(r => r.estado === 'conflicto' || r.estado === 'rechazada' || r.estado === 'vencida').length
+    s.setAviso(revisar ? `${ok} operación(es) sincronizadas; ${revisar} necesitan revisión en el panel de arriba.` : `${ok} operación(es) del teléfono sincronizadas.`)
+  }), [cargar])
+
   const total = ticket.reduce((sum, l) => sum + precioEfectivo(l.producto) * l.cantidad, 0)
-  function agregar(producto: Producto, variante: Variante) { setTicket(prev => { const i = prev.findIndex(l => l.variante.id === variante.id); return i < 0 ? [...prev, { producto, variante, cantidad: 1 }] : prev.map((l, n) => n === i ? { ...l, cantidad: l.cantidad + 1 } : l) }) }
-  async function abrir() { try { await api('/caja/abrir', s.token, { method: 'POST', body: JSON.stringify({ sucursalId: s.sucursalId, fondoInicial: Number(fondo) || 0 }) }); s.setAviso('Caja abierta'); await cargar(); onCambio() } catch (e) { s.setError(e instanceof Error ? e.message : 'No se abrió la caja') } }
-  async function cerrar() { if (!turno) return; try { await api('/caja/cerrar', s.token, { method: 'POST', body: JSON.stringify({ totalDeclarado: Number(declarado) || 0 }) }); s.setAviso('Caja cerrada'); setTicket([]); await cargar(); onCambio() } catch (e) { s.setError(e instanceof Error ? e.message : 'No se cerró la caja') } }
-  async function cobrar() { if (!turno || !ticket.length || !s.almacenId) return; try { const venta = await api<{ id: string; pago?: { id: string } }>('/ventas', s.token, { method: 'POST', body: JSON.stringify({ uuid: `movil-pos-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, canal: 'pos', medioPago: medio, almacenId: s.almacenId, cajaTurnoId: turno.id, lineas: ticket.map(l => ({ varianteId: l.variante.id, cantidad: l.cantidad })) }) }); if (medio === 'qr' && venta.pago?.id) await api(`/pagos/${venta.pago.id}/simular`, s.token, { method: 'POST', body: JSON.stringify({ resultado: 'aprobado' }) }); setTicket([]); s.setAviso(`Venta POS ${venta.id.slice(0, 8)} cobrada`); await cargar(); onCambio() } catch (e) { s.setError(e instanceof Error ? e.message : 'No se pudo cobrar') } }
+  function agregar(producto: Producto, variante: Variante) {
+    setTicket(prev => {
+      const i = prev.findIndex(l => l.variante.id === variante.id)
+      const actual = i < 0 ? 0 : prev[i].cantidad
+      if (stock[variante.id] !== undefined && actual >= stock[variante.id]) { s.setError('No queda más stock de esa variante.'); return prev }
+      return i < 0 ? [...prev, { producto, variante, cantidad: 1 }] : prev.map((l, n) => n === i ? { ...l, cantidad: l.cantidad + 1 } : l)
+    })
+  }
+  async function abrir() {
+    try {
+      const t = await api<CajaTurno>('/caja/abrir', s.token, { method: 'POST', headers: { 'Idempotency-Key': uuid() }, body: JSON.stringify({ sucursalId: s.sucursalId, fondoInicial: Number(fondo) || 0 }) })
+      await guardarCache(`turno:${s.user?.id}`, t)
+      s.setAviso('Caja abierta'); await cargar(); onCambio()
+    } catch (e) { s.setError(e instanceof Error ? e.message : 'No se abrió la caja') }
+  }
+  async function cerrar() {
+    if (!turno) return
+    try {
+      await api('/caja/cerrar', s.token, { method: 'POST', headers: { 'Idempotency-Key': uuid() }, body: JSON.stringify({ totalDeclarado: Number(declarado) || 0 }) })
+      await borrarCache(`turno:${s.user?.id}`)
+      s.setAviso('Caja cerrada'); setTicket([]); await cargar(); onCambio()
+    } catch (e) { s.setError(e instanceof Error ? e.message : 'No se cerró la caja') }
+  }
+  async function venderSinRed(payload: { uuid: string; almacenId: string; cajaTurnoId: string; clientaId?: string; lineas: { varianteId: string; cantidad: number }[] }) {
+    const prendas = payload.lineas.reduce((n, l) => n + l.cantidad, 0)
+    await encolar('venta', { almacenId: payload.almacenId, cajaTurnoId: payload.cajaTurnoId, clientaId: payload.clientaId, medioPago: 'efectivo', lineas: payload.lineas }, `Venta Bs ${total.toFixed(2)} · ${prendas} prenda(s)`, { id: payload.uuid })
+    const resto = { ...stock }
+    for (const l of payload.lineas) resto[l.varianteId] = Math.max(0, (resto[l.varianteId] ?? 0) - l.cantidad)
+    setStock(resto)
+    if (turno?.sucursal?.id) await guardarCache(`inventario:${turno.sucursal.id}`, resto)
+    setTicket([])
+    s.setAviso(`Venta ${payload.uuid.slice(0, 8)} guardada en el teléfono (${motor}); se sincroniza sola al volver la red.`)
+    void sincronizar(s.token)
+  }
+  async function cobrar() {
+    if (!turno || !ticket.length || !almacenId) return
+    const payload = { uuid: uuid(), almacenId, cajaTurnoId: turno.id, clientaId: clientaId || undefined, lineas: ticket.map(l => ({ varianteId: l.variante.id, cantidad: l.cantidad })) }
+    if (medio === 'qr' && !sync.online) { s.setError('El pago QR necesita red: el banco tiene que confirmarlo. Sin conexión cobrá en efectivo.'); return }
+    // Detrás de operaciones pendientes la venta también va a la cola, para respetar el orden (p. ej. una clienta recién creada).
+    if (medio === 'efectivo' && (!sync.online || pendientes > 0)) { await venderSinRed(payload); return }
+    try {
+      const venta = await api<{ id: string; pago?: { id: string } }>('/ventas', s.token, { method: 'POST', headers: { 'Idempotency-Key': payload.uuid }, body: JSON.stringify({ ...payload, canal: 'pos', medioPago: medio }) })
+      if (medio === 'qr' && venta.pago?.id) await api(`/pagos/${venta.pago.id}/simular`, s.token, { method: 'POST', headers: { 'Idempotency-Key': uuid() }, body: JSON.stringify({ resultado: 'aprobado' }) })
+      setTicket([]); s.setAviso(`Venta POS ${venta.id.slice(0, 8)} cobrada`); await cargar(); onCambio()
+    } catch (e) {
+      if (esFalloRed(e) && medio === 'efectivo') { await venderSinRed(payload); return }
+      s.setError(e instanceof Error ? e.message : 'No se pudo cobrar')
+    }
+  }
+  async function registrarClienta() {
+    const nombre = nombreClienta.trim()
+    const email = emailClienta.trim().toLowerCase()
+    if (!nombre || !/^\S+@\S+\.\S+$/.test(email)) { s.setError('Completá nombre y un correo válido.'); return }
+    const id = uuid()
+    await encolar('cliente', { id, nombre, email }, `Clienta ${nombre} · ${email}`, { id })
+    const lista = [...clientas, { id, nombre, email }]
+    setClientas(lista); await guardarCache('clientas', lista)
+    setClientaId(id); setAltaClienta(false); setNombreClienta(''); setEmailClienta('')
+    s.setAviso(`${nombre} quedó registrada en el teléfono.`)
+    void sincronizar(s.token)
+  }
+
   return <>
-    <Card><Text style={styles.cardTitle}>Caja</Text>{turno ? <><Text style={styles.rowTitle}>Turno abierto · {turno.sucursal?.nombre ?? s.sucursal?.nombre}</Text><Text style={styles.muted}>Fondo Bs {Number(turno.fondoInicial).toFixed(2)} · Sistema Bs {Number(turno.totalSistema).toFixed(2)}</Text><TextInput value={declarado} onChangeText={setDeclarado} keyboardType="decimal-pad" style={styles.input} placeholder="Total declarado para cierre" /><Action label="CERRAR CAJA" onPress={() => void cerrar()} secondary /></> : <><Text style={styles.muted}>No hay turno abierto en esta sesión.</Text><TextInput value={fondo} onChangeText={setFondo} keyboardType="decimal-pad" style={styles.input} placeholder="Fondo inicial" /><Action label="ABRIR CAJA" onPress={() => void abrir()} /></>}</Card>
-    <Card><Text style={styles.cardTitle}>Punto de venta</Text><Text style={styles.muted}>Tocá una variante para añadirla al ticket.</Text>{productos.map(p => <View key={p.id} style={styles.row}><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{p.nombre}</Text><Text style={styles.muted}>Bs {precioEfectivo(p).toFixed(2)}</Text></View>{p.variantes.slice(0, 3).map(v => <Pressable key={v.id} onPress={() => agregar(p, v)} style={styles.pill}><Text style={styles.pillText}>{v.talla}/{v.color}</Text></Pressable>)}</View>)}</Card>
-    <Card><Text style={styles.cardTitle}>Ticket · Bs {total.toFixed(2)}</Text>{ticket.length ? ticket.map(l => <View key={l.variante.id} style={styles.row}><Text style={styles.rowTitle}>{l.producto.nombre} · {l.variante.talla}/{l.variante.color} × {l.cantidad}</Text><Pressable onPress={() => setTicket(p => p.flatMap(x => x.variante.id === l.variante.id ? x.cantidad === 1 ? [] : [{ ...x, cantidad: x.cantidad - 1 }] : [x]))}><Text style={styles.remove}>Quitar</Text></Pressable></View>) : <Text style={styles.muted}>Sin artículos.</Text>}<View style={styles.chips}><Pressable style={[styles.chip, medio === 'efectivo' && styles.chipOn]} onPress={() => setMedio('efectivo')}><Text>Efectivo</Text></Pressable><Pressable style={[styles.chip, medio === 'qr' && styles.chipOn]} onPress={() => setMedio('qr')}><Text>QR simulado</Text></Pressable></View><Action label="COBRAR TICKET" disabled={!turno || !ticket.length} onPress={() => void cobrar()} /></Card>
+    <ColaMovil turnoId={turno?.id} />
+    <Card><Text style={styles.cardTitle}>Caja</Text>{deCache ? <Text style={styles.muted}>Datos guardados en el teléfono: la última copia antes de perder la red.</Text> : null}{turno ? <><Text style={styles.rowTitle}>Turno abierto · {turno.sucursal?.nombre ?? s.sucursal?.nombre}</Text><Text style={styles.muted}>Fondo Bs {Number(turno.fondoInicial).toFixed(2)} · Sistema Bs {Number(turno.totalSistema).toFixed(2)}</Text><TextInput value={declarado} onChangeText={setDeclarado} keyboardType="decimal-pad" style={styles.input} placeholder="Total declarado para cierre" />{sync.ops.length > 0 || !sync.online ? <Text style={styles.muted}>El cierre espera a que las ventas del teléfono se sincronicen y sus conflictos se resuelvan.</Text> : null}<Action label="CERRAR CAJA" disabled={sync.ops.length > 0 || !sync.online} onPress={() => void cerrar()} secondary /></> : <><Text style={styles.muted}>No hay turno abierto en esta sesión.</Text><TextInput value={fondo} onChangeText={setFondo} keyboardType="decimal-pad" style={styles.input} placeholder="Fondo inicial" /><Action label="ABRIR CAJA" disabled={!sync.online} onPress={() => void abrir()} /></>}</Card>
+    <Card><Text style={styles.cardTitle}>Punto de venta</Text><Text style={styles.muted}>Tocá una variante para añadirla al ticket.</Text>{productos.map(p => <View key={p.id} style={styles.row}><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{p.nombre}</Text><Text style={styles.muted}>Bs {precioEfectivo(p).toFixed(2)}</Text></View>{p.variantes.slice(0, 3).map(v => { const disp = stock[v.id]; const agotado = disp === 0; return <Pressable key={v.id} disabled={agotado} onPress={() => agregar(p, v)} style={[styles.pill, agotado && styles.disabled]}><Text style={styles.pillText}>{v.talla}/{v.color}{disp !== undefined ? ` · ${disp}` : ''}</Text></Pressable> })}</View>)}</Card>
+    <Card><Text style={styles.cardTitle}>Ticket · Bs {total.toFixed(2)}</Text>{ticket.length ? ticket.map(l => <View key={l.variante.id} style={styles.row}><Text style={styles.rowTitle}>{l.producto.nombre} · {l.variante.talla}/{l.variante.color} × {l.cantidad}</Text><Pressable onPress={() => setTicket(p => p.flatMap(x => x.variante.id === l.variante.id ? x.cantidad === 1 ? [] : [{ ...x, cantidad: x.cantidad - 1 }] : [x]))}><Text style={styles.remove}>Quitar</Text></Pressable></View>) : <Text style={styles.muted}>Sin artículos.</Text>}
+      <Text style={styles.rowTitle}>Clienta</Text>
+      <View style={styles.chips}><Pressable style={[styles.chip, !clientaId && styles.chipOn]} onPress={() => setClientaId('')}><Text>Sin clienta</Text></Pressable>{clientas.map(c => <Pressable key={c.id} style={[styles.chip, clientaId === c.id && styles.chipOn]} onPress={() => setClientaId(c.id)}><Text>{c.nombre}</Text></Pressable>)}<Pressable style={styles.chip} onPress={() => setAltaClienta(v => !v)}><Text>+ Nueva clienta</Text></Pressable></View>
+      {altaClienta ? <View style={styles.row}><TextInput value={nombreClienta} onChangeText={setNombreClienta} style={styles.input} placeholder="Nombre" /><TextInput value={emailClienta} onChangeText={setEmailClienta} style={styles.input} placeholder="Correo" keyboardType="email-address" autoCapitalize="none" /><Action label="REGISTRAR CLIENTA" onPress={() => void registrarClienta()} /></View> : null}
+      <View style={styles.chips}><Pressable style={[styles.chip, medio === 'efectivo' && styles.chipOn]} onPress={() => setMedio('efectivo')}><Text>Efectivo</Text></Pressable><Pressable style={[styles.chip, medio === 'qr' && styles.chipOn, !sync.online && styles.disabled]} disabled={!sync.online} onPress={() => setMedio('qr')}><Text>QR simulado{sync.online ? '' : ' (requiere red)'}</Text></Pressable></View>
+      <Action label="COBRAR TICKET" disabled={!turno || !ticket.length} onPress={() => void cobrar()} />
+    </Card>
   </>
+}
+
+const ETIQUETA_ESTADO: Record<OperacionLocal['estado'], string> = { pendiente: 'Pendiente', conflicto: 'Conflicto', rechazada: 'Rechazada', vencida: 'Vencida' }
+
+/** Estado de la red y de la cola SQLite del teléfono, con acciones para resolver conflictos. */
+function ColaMovil({ turnoId }: { turnoId?: string }) {
+  const s = useSession()
+  const sync = useSync()
+  const pendientes = sync.ops.filter(o => o.estado === 'pendiente').length
+  return <Card>
+    <View style={styles.syncHead}><Text style={styles.cardTitle}>Modo sin conexión</Text><Text style={[styles.estado, sync.online ? styles.estadoOk : styles.estadoOff]}>{sync.online ? 'Conectado' : 'Sin red'}</Text></View>
+    <Text style={styles.muted}>{sync.online ? 'Las ventas en efectivo y las clientas nuevas se guardan primero en el teléfono si la red falla.' : 'Podés seguir vendiendo en efectivo y registrando clientas: quedan en la base local y se envían solas al volver la red.'} Base local: {motor}.{sync.ultimaSync ? ` Última sincronización: ${new Date(sync.ultimaSync).toLocaleTimeString()}.` : ''}</Text>
+    {sync.ultimoError ? <Text style={styles.errorText}>{sync.ultimoError}</Text> : null}
+    {sync.ops.map(op => {
+      const cambios = op.estado === 'pendiente' ? null : cambiosReintento(op, turnoId)
+      return <View key={op.id} style={[styles.row, op.estado !== 'pendiente' && styles.opConflicto]}>
+        <Text style={styles.rowTitle}>{op.resumen}</Text>
+        <Text style={styles.muted}>{op.tipo} · {new Date(op.creadaEn).toLocaleString()} · {op.id.slice(0, 8)} · {ETIQUETA_ESTADO[op.estado]}</Text>
+        {op.error ? <Text style={styles.errorText}>{op.error.mensaje ?? op.error.codigo}</Text> : null}
+        <View style={styles.chips}>
+          {cambios ? <Action label={textoReintento(op)} onPress={() => void reintentar(op, cambios).then(() => sincronizar(s.token))} /> : null}
+          <Action label="DESCARTAR" secondary onPress={() => void descartar(op.id)} />
+        </View>
+      </View>
+    })}
+    {sync.ops.length ? <Action label={sync.sincronizando ? 'SINCRONIZANDO…' : `SINCRONIZAR (${pendientes})`} disabled={sync.sincronizando || !sync.online || !pendientes} secondary onPress={() => void sincronizar(s.token)} /> : <Text style={styles.muted}>No hay operaciones pendientes en el teléfono.</Text>}
+  </Card>
 }
 
 function Encargado({ onCambio }: { onCambio: () => void }) {
@@ -119,4 +267,5 @@ function Administrador({ onCambio }: { onCambio: () => void }) {
 
 const styles = StyleSheet.create({
   page: { padding: 16, paddingBottom: 42, gap: 10, backgroundColor: colors.paper }, link: { color: colors.wine, marginBottom: 4 }, eyebrow: { color: colors.taupe, fontSize: 11, letterSpacing: 1.8 }, title: { color: colors.ink, fontSize: 28, fontWeight: '700', textTransform: 'capitalize' }, lead: { color: colors.taupe, lineHeight: 19 }, card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: 13, gap: 8, marginTop: 4 }, cardTitle: { color: colors.ink, fontWeight: '700', fontSize: 18 }, row: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 9, gap: 3 }, rowTitle: { color: colors.ink, fontWeight: '600' }, muted: { color: colors.taupe, fontSize: 12, lineHeight: 17 }, input: { borderWidth: 1, borderColor: colors.line, color: colors.ink, padding: 11, backgroundColor: colors.paper, marginTop: 4 }, action: { backgroundColor: colors.wine, padding: 11, alignItems: 'center', marginTop: 4 }, actionText: { color: colors.white, fontSize: 11, fontWeight: '700', letterSpacing: .8 }, secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.wine }, secondaryText: { color: colors.wine }, disabled: { opacity: .45 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }, chip: { borderWidth: 1, borderColor: colors.line, paddingVertical: 7, paddingHorizontal: 8, backgroundColor: colors.paper }, chipOn: { borderColor: colors.wine, backgroundColor: '#f1e4e7' }, pill: { borderWidth: 1, borderColor: colors.wine, paddingHorizontal: 6, paddingVertical: 4, marginLeft: 3 }, pillText: { color: colors.wine, fontSize: 10 }, remove: { color: colors.wine, fontSize: 12 }, pre: { color: colors.ink, fontSize: 11, lineHeight: 16 },
+  syncHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, estado: { fontSize: 11, fontWeight: '700', paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1 }, estadoOk: { color: '#2f5d3a', borderColor: '#2f5d3a' }, estadoOff: { color: '#8a5a12', borderColor: '#8a5a12', backgroundColor: '#f7ecd6' }, errorText: { color: colors.wine, fontSize: 12, lineHeight: 17 }, opConflicto: { borderLeftWidth: 3, borderLeftColor: colors.wine, paddingLeft: 8 },
 })

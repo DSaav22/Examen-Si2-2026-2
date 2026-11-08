@@ -21,6 +21,13 @@ En [[transcripcion-audio-stack-metodologia-parcial]] anota **18 de septiembre** 
 
 Sprints Scrum, 18 sep, ciclos de 3 semanas como calendario de entrega del parcial. [[stack-metodologia-parcial]]
 
+## Segundo parcial
+
+- **PDF publicado en la plataforma: 11 nov 2026, 8:00 como máximo.**
+- Examen y defensa: 11 nov.
+
+Fuente: [[transcripcion-audio-segundo-parcial]]. Hub: [[Mapa del segundo parcial]].
+
 ## Calendario Garzón (otro paralelo)
 
 05/09, 13/09, 20/09 y defensa 22/09. No usar. [[examen1-garzon-fashionstore]]

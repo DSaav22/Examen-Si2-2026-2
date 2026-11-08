@@ -158,3 +158,49 @@ Fuente [[codigo-23-sep]] (working tree, sin archivo en `raw/`). Canon nuevo: [[E
 
 Fuente [[codigo-24-sep-movil-web]] (working tree). Paridad pantallas/nav Expo con storefront Vesta; demo en Expo web `:8081`. Probador: SUBIR FOTO / SILUETA DEMO cuando no hay cámara; HUD con contraste. Frontend: full-bleed sin `100vw` (scroll horizontal arreglado). Backend: quitado `ignoreDeprecations: "6.0"` (tsc 5.9). Canon: [[Estado del codigo]]. Actualiza [[UC03 Probador]], [[Probador virtual]], [[React Native]], [[Huecos locales vs examen]], índice.
 
+## [2026-11-08] ingest | Consigna del segundo parcial (2 audios)
+
+Fuente pegada en el chat → `raw/2026-11-08-transcripcion-audio-segundo-parcial.md` → [[transcripcion-audio-segundo-parcial]]. Nuevo ciclo sobre EnsayAR: SaaS multi-tienda, offline web (PWA) + móvil (SQLite) con idempotencia y conflictos de stock, reportes generativos con voz y PDF/Excel, analítica ML supervisada + no supervisada con datos sintéticos, pagos para países hispanohablantes, monolito modular, metodología ICONIX. PDF hasta 11 nov 8:00. Nuevas: [[Mapa del segundo parcial]], [[Brecha segundo parcial]], [[ICONIX]], [[ICONIX vs Proceso Unificado]], [[SaaS multi-tenant]], [[PWA]], [[Analitica con IA]]. Actualiza offline, reportes, pagos, PU, arquitectura, stack, documento, cronograma, contradicciones, índice y canon de `AGENTS.md`. ICONIX investigado en iconixprocess.wordpress.com y Rosenberg/Stephens. Brecha revisada contra el repo en `863d62e` (la wiki de código seguía en 25 sep).
+
+## [2026-11-08] query | Punto 1 del segundo parcial: SaaS multi-tienda en código
+
+Working tree sobre `863d62e` (sin commit). S1–S9 implementados y verificados: `verificar:tenancy`, `verificar:saas` (15 chequeos) y recorrido en navegador (landing, registro y verificación, pago rechazado y aprobado, alta automática, vitrina `/t/:slug`, selector de tienda, métricas, panel de la dueña). Estrategia S8 justificada en [[SaaS multi-tenant]]: base compartida con `tienda_id` en capas; RLS completa queda como evolución. Actualiza [[Brecha segundo parcial]]. Sigue: offline, reportes, analítica, pagos, documento ICONIX.
+
+## [2026-11-08] query | Punto 2 del segundo parcial: offline web y móvil
+
+Working tree sin commit. O1–O10 implementados:
+
+- `POST /sync/lote`, interceptor `Idempotency-Key` en 11 endpoints, `UPDATE` condicional de stock con conflicto visible, política offline y ventana por tienda;
+- en la web: service worker v2 con datos, cola IndexedDB, página `/sincronizacion` y Web Push;
+- en el móvil: `expo-sqlite`.
+
+Verificado con `verificar:offline` (14 chequeos) y recorrido en navegador:
+- venta y clienta sin red, conflicto forzado de la última unidad, "Vender lo disponible", recarga completa sin red y alta de producto sin red en la web;
+- el mismo flujo en la app móvil (Expo web).
+
+Detalle, sagas y guion para la defensa en [[Modo offline]] y [[PWA]]. Actualiza [[Brecha segundo parcial]]. Sigue: reportes, analítica, pagos, documento ICONIX.
+
+## [2026-11-08] query | Punto 3 del segundo parcial: reportes generativos
+
+Working tree sin commit. R1–R3 implementados:
+
+- capa semántica de 6 fuentes;
+- especificación JSON validada;
+- compilador a SQL parametrizado con HAVING y agrupación en varios niveles, filtrado por tienda;
+- intérprete por modelo con respaldo por reglas (Azure da 401);
+- voz con Web Speech en la web y dictado del teclado en el móvil;
+- Excel con `exceljs` y PDF con `pdfkit`, desde web y móvil.
+
+Para el ejemplo del docente se agregó la venta al crédito: `CuentaCobrar`, `AbonoCredito`, la pantalla `/creditos` y la opción en el POS. El crédito queda solo en línea.
+
+Verificado con `verificar:reportes` (24 chequeos) y recorrido en navegador:
+- el ejemplo del docente;
+- ventas por mes con HAVING;
+- sucursal × medio de pago con barras;
+- quitar un criterio;
+- ver el SQL;
+- el PDF de 7 páginas sin hojas en blanco;
+- `/creditos`.
+
+Detalle en [[Reportes generativos]]. Actualiza [[Brecha segundo parcial]] y [[Modo offline]]. Sigue: analítica, pagos, documento ICONIX.
+

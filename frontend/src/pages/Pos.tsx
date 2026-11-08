@@ -1,20 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { assetUrl } from '../asset'
 import { useAuth } from '../auth'
-import {
-  encolar,
-  guardarCatalogoOffline,
-  guardarInventarioOffline,
-  hidratarCola,
-  leerCatalogoOffline,
-  leerCola,
-  leerInventarioOffline,
-  marcarEstado,
-  sacarDeCola,
-  type VentaCola,
-} from '../cola-pos'
+import { borrarCache, conCache, guardarCache } from '../offline/cache'
+import { encolar } from '../offline/cola'
+import { esFalloRed, uuid } from '../offline/red'
+import { sincronizar, useEstadoSync, type ResultadoServidor } from '../offline/sync'
+import { ColaDispositivo } from '../shared/Offline'
 import { TicketPrint, type TicketDatos } from './Ticket'
 import type { Arqueo, Producto, Sucursal, Turno, Variante } from '../types'
 import { precioEfectivo } from '../types'
@@ -39,27 +32,26 @@ type VentaSucursal = {
 
 type Tab = 'vender' | 'devoluciones' | 'cierre'
 
+type MedioPago = 'efectivo' | 'qr' | 'tarjeta' | 'transferencia' | 'mixto' | 'credito'
+
+type VentaPos = {
+  uuid: string
+  canal: 'pos'
+  medioPago: MedioPago
+  almacenId: string
+  cajaTurnoId: string
+  lineas: { varianteId: string; cantidad: number }[]
+  clientaId?: string
+  cuponCodigo?: string
+}
+
+type Clienta = { id: string; nombre: string; email: string }
+
 const ERRORES_DEV: Record<string, string> = {
   VENTA_NO: 'No se encontró la venta.',
   YA_DEVUELTA: 'Esa venta ya fue devuelta.',
   CANTIDAD_INVALIDA: 'La cantidad a devolver no es válida.',
   NO_ES_TU_VENTA: 'No podés devolver una venta que no es tuya.',
-}
-
-function esFalloRed(err: unknown): boolean {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return true
-  if (err instanceof TypeError) return true
-  if (err instanceof Error) {
-    const m = err.message.toLowerCase()
-    return (
-      m.includes('failed to fetch') ||
-      m.includes('networkerror') ||
-      m.includes('network request failed') ||
-      m.includes('load failed') ||
-      m.includes('fetch failed')
-    )
-  }
-  return false
 }
 
 function DevolucionesPanel({
@@ -164,12 +156,11 @@ export function Pos() {
   const [fondo, setFondo] = useState('200')
   const [msg, setMsg] = useState('')
   const [ticket, setTicket] = useState('')
+  const ventaEnCola = useRef<string | null>(null)
   const [comprobante, setComprobante] = useState<TicketDatos | null>(null)
-  const [cola, setCola] = useState<VentaCola[]>(() => leerCola())
-  const [medio, setMedio] = useState<'efectivo' | 'qr' | 'tarjeta' | 'transferencia' | 'mixto'>('efectivo')
+  const [medio, setMedio] = useState<MedioPago>('efectivo')
   const [declarado, setDeclarado] = useState('')
   const [arqueo, setArqueo] = useState<Arqueo | null>(null)
-  const [colaError, setColaError] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [clientaId, setClientaId] = useState('88888888-8888-8888-8888-888888888888')
   const [cuponCodigo, setCuponCodigo] = useState('')
@@ -184,12 +175,17 @@ export function Pos() {
   const [tab, setTab] = useState<Tab>('vender')
   const [enviandoCorreo, setEnviandoCorreo] = useState(false)
   const [correoMsg, setCorreoMsg] = useState('')
+  const [deCache, setDeCache] = useState(false)
+  const [recarga, setRecarga] = useState(0)
+  const [altaClienta, setAltaClienta] = useState<{ nombre: string; email: string } | null>(null)
+  const sync = useEstadoSync()
 
-  const [clientas, setClientas] = useState<{ id: string; nombre: string; email: string }[]>([
+  const [clientas, setClientas] = useState<Clienta[]>([
     { id: '88888888-8888-8888-8888-888888888888', nombre: 'Ana Cliente', email: 'clienta@ensayar.bo' },
   ])
 
   const almacenId = turno?.sucursal.almacenes[0]?.id
+  const claveInventario = turno ? `inventario:${turno.sucursal.id}` : ''
 
   async function cargarVentasDevolucion() {
     setDevErr('')
@@ -224,16 +220,15 @@ export function Pos() {
 
   useEffect(() => {
     if (!turno) return
-    api<{ varianteId: string; disponible: number }[]>(
-      `/catalogo/disponibilidad?sucursalId=${encodeURIComponent(turno.sucursal.id)}`,
-    )
-      .then(items => {
-        const stock = Object.fromEntries(items.map(item => [item.varianteId, Math.max(0, item.disponible)]))
-        setStockExacto(stock)
-        guardarInventarioOffline(stock)
-      })
-      .catch(() => setStockExacto(leerInventarioOffline()))
-  }, [turno])
+    void conCache(`inventario:${turno.sucursal.id}`, async () => {
+      const items = await api<{ varianteId: string; disponible: number }[]>(
+        `/catalogo/disponibilidad?sucursalId=${encodeURIComponent(turno.sucursal.id)}`,
+      )
+      return Object.fromEntries(items.map(item => [item.varianteId, Math.max(0, item.disponible)]))
+    })
+      .then(r => setStockExacto(r.datos))
+      .catch(() => undefined)
+  }, [turno?.sucursal.id, recarga])
 
   const total = useMemo(
     () => lineas.reduce((acc, l) => acc + precioEfectivo(l.producto) * l.cantidad, 0),
@@ -254,10 +249,20 @@ export function Pos() {
 
   async function cargarTurno(opts?: { soft?: boolean }) {
     try {
-      const t = await api<Turno | null>('/caja/turno-abierto')
-      setTurno(t ?? null)
+      const r = await conCache(`turno:${user?.id}`, () => api<Turno | null>('/caja/turno-abierto'))
+      setTurno(r.datos ?? null)
+      setDeCache(r.deCache)
     } catch {
       if (!opts?.soft) setTurno(null)
+    }
+  }
+
+  async function cargarCatalogo() {
+    try {
+      const r = await conCache('catalogo-pos', () => api<Producto[]>('/catalogo/productos'))
+      setProductos(r.datos)
+    } catch {
+      /* se mantiene lo cargado */
     }
   }
 
@@ -265,23 +270,20 @@ export function Pos() {
     if (!user || !['CAJERO', 'ADMIN', 'ENCARGADO', 'SUPERADMIN'].includes(user.rol)) return
     Promise.all([
       cargarTurno(),
-      api<Sucursal[]>('/catalogo/sucursales').then(s => {
+      conCache('sucursales-catalogo', () => api<Sucursal[]>('/catalogo/sucursales')).then(({ datos: s }) => {
         setSucursales(s)
         const preferida = user.sucursalId && s.find(x => x.id === user.sucursalId)
         if (preferida) setSucursalId(preferida.id)
         else if (s[0]) setSucursalId(s[0].id)
       }),
-      api<Producto[]>('/catalogo/productos')
-        .then(items => {
-          setProductos(items)
-          guardarCatalogoOffline(items)
-        })
-        .catch(() => setProductos(leerCatalogoOffline<Producto>())),
-      api<{ id: string; nombre: string; email: string; rol: string }[]>('/usuarios')
-        .then(users => {
-          const list = users.filter(u => u.rol === 'CLIENTA')
+      cargarCatalogo(),
+      conCache('clientas', async () => {
+        const users = await api<{ id: string; nombre: string; email: string; rol: string }[]>('/usuarios')
+        return users.filter(u => u.rol === 'CLIENTA').map(u => ({ id: u.id, nombre: u.nombre, email: u.email }))
+      })
+        .then(({ datos: list }) => {
           if (list.length) {
-            setClientas(list.map(u => ({ id: u.id, nombre: u.nombre, email: u.email })))
+            setClientas(list)
             setClientaId(prev => prev || list.find(u => u.email === 'clienta@ensayar.bo')?.id || list[0].id)
           }
         })
@@ -292,6 +294,27 @@ export function Pos() {
     })
   }, [user])
 
+  useEffect(() => {
+    // Tras sincronizar, el stock y el total del turno vienen del servidor.
+    const alSincronizar = (e: Event) => {
+      void cargarTurno({ soft: true })
+      void cargarCatalogo()
+      setRecarga(n => n + 1)
+      const id = ventaEnCola.current
+      const r = (e as CustomEvent<ResultadoServidor[]>).detail?.find(x => x.id === id)
+      if (!id || !r) return
+      ventaEnCola.current = null
+      setTicket(
+        r.estado === 'aplicada' || r.estado === 'repetida'
+          ? `Venta ${id.slice(0, 8)} sincronizada con el servidor.`
+          : `Venta ${id.slice(0, 8)} no se pudo aplicar: revisala en la lista de abajo.`,
+      )
+    }
+    window.addEventListener('ensayar:sincronizado', alSincronizar)
+    return () => window.removeEventListener('ensayar:sincronizado', alSincronizar)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function abrir(e: FormEvent) {
     e.preventDefault()
     setMsg('')
@@ -301,6 +324,7 @@ export function Pos() {
         body: JSON.stringify({ sucursalId, fondoInicial: Number(fondo) }),
       })
       setTurno(t)
+      guardarCache(`turno:${user?.id}`, t)
       setTab('vender')
       setArqueo(null)
     } catch (err) {
@@ -324,11 +348,62 @@ export function Pos() {
     })
   }
 
-  async function enviarVenta(payload: VentaCola) {
+  async function enviarVenta(payload: VentaPos) {
     return api<{ id: string; total: string; pago?: { id: string; estado: string } | null }>('/ventas', {
       method: 'POST',
+      // El mismo uuid como clave: un doble clic o un reintento devuelve la misma venta.
+      headers: { 'Idempotency-Key': payload.uuid },
       body: JSON.stringify(payload),
     })
+  }
+
+  /** Guarda la venta en el dispositivo y descuenta el stock local para no vender lo que ya no hay. */
+  async function venderSinRed(payload: VentaPos) {
+    await encolar(
+      'venta',
+      {
+        almacenId: payload.almacenId,
+        cajaTurnoId: payload.cajaTurnoId,
+        clientaId: payload.clientaId,
+        medioPago: 'efectivo',
+        lineas: payload.lineas,
+      },
+      `Venta Bs ${total.toFixed(2)} · ${lineas.reduce((n, l) => n + l.cantidad, 0)} prenda(s)`,
+      { id: payload.uuid },
+    )
+    const stock = { ...stockExacto }
+    for (const l of payload.lineas) stock[l.varianteId] = Math.max(0, (stock[l.varianteId] ?? 0) - l.cantidad)
+    setStockExacto(stock)
+    if (claveInventario) guardarCache(claveInventario, stock)
+    ventaEnCola.current = payload.uuid
+    setTicket(
+      navigator.onLine
+        ? `Venta ${payload.uuid.slice(0, 8)} guardada; se está sincronizando.`
+        : `Sin red: venta ${payload.uuid.slice(0, 8)} guardada en el dispositivo. Se sincroniza al volver la conexión.`,
+    )
+    setComprobante(null)
+    setLineas([])
+    setCuponCodigo('')
+    void sincronizar()
+  }
+
+  async function registrarClienta(e: FormEvent) {
+    e.preventDefault()
+    if (!altaClienta) return
+    const nueva: Clienta = { id: uuid(), nombre: altaClienta.nombre.trim(), email: altaClienta.email.trim().toLowerCase() }
+    await encolar('cliente', { ...nueva }, `Clienta ${nueva.nombre} · ${nueva.email}`)
+    const lista = [...clientas, nueva]
+    setClientas(lista)
+    guardarCache('clientas', lista)
+    setClientaId(nueva.id)
+    setAltaClienta(null)
+    setMsg('')
+    setTicket(
+      navigator.onLine
+        ? `Clienta ${nueva.nombre} registrada.`
+        : `Clienta ${nueva.nombre} guardada en el dispositivo; se registra al volver la red.`,
+    )
+    void sincronizar()
   }
 
   function decisionTarjeta(numero: string) {
@@ -353,68 +428,29 @@ export function Pos() {
     void cargarVentasDevolucion()
   }
 
-  async function sincronizar() {
-    const pendientes = leerCola()
-    setColaError('')
-    for (const item of pendientes) {
-      try {
-        marcarEstado(item.uuid, 'syncing')
-        await enviarVenta(item)
-        marcarEstado(item.uuid, 'synced')
-        sacarDeCola(item.uuid)
-      } catch (err) {
-        const codigo = err instanceof Error ? err.message : ''
-        if (codigo === 'STOCK_INSUFICIENTE') {
-          setColaError(`Cola: stock insuficiente para ${item.uuid.slice(0, 8)}`)
-        } else if (esFalloRed(err)) {
-          setColaError('Cola: sin red — se reintentará')
-        } else {
-          setColaError(`Cola: ${codigo || 'error de sync'}`)
-        }
-        break
-      }
-    }
-    setCola(leerCola())
-    await cargarTurno({ soft: true })
-    try {
-      setProductos(await api<Producto[]>('/catalogo/productos'))
-    } catch {
-      /* keep */
-    }
-  }
-
-  function descartarDeCola(uuid: string) {
-    sacarDeCola(uuid)
-    setCola(leerCola())
-    setColaError('')
-  }
-
-  useEffect(() => {
-    void hidratarCola().then(items => {
-      if (items.length) setCola(items)
-    })
-    const on = () => {
-      void sincronizar()
-    }
-    window.addEventListener('online', on)
-    if (navigator.onLine && leerCola().length) void sincronizar()
-    return () => window.removeEventListener('online', on)
-  }, [])
-
   if (!user || !['CAJERO', 'ADMIN', 'SUPERADMIN'].includes(user.rol)) {
     return <Navigate to={user ? homePorRol(user.rol) : '/login'} replace />
   }
 
   async function cobrar() {
     if (cobrando || !turno || !almacenId || lineas.length === 0 || pagoId) return
-    if ((medio === 'qr' || medio === 'tarjeta') && !navigator.onLine) {
-      setMsg('QR y tarjeta necesitan conexión. Sin red, cobrá en efectivo.')
+    const sinRed = !navigator.onLine
+    if (sinRed && medio !== 'efectivo') {
+      setMsg('Sin conexión solo se cobra en efectivo: QR, tarjeta, transferencia y crédito necesitan confirmar en línea.')
+      return
+    }
+    if (medio === 'credito' && !clientaId) {
+      setMsg('Para vender al crédito elegí la clienta: la deuda queda a su nombre.')
+      return
+    }
+    if (sinRed && cuponCodigo) {
+      setMsg('Los cupones se validan en línea. Quitá el cupón para vender sin conexión.')
       return
     }
     setCobrando(true)
     setMsg('')
-    const payload: VentaCola = {
-      uuid: crypto.randomUUID(),
+    const payload: VentaPos = {
+      uuid: uuid(),
       canal: 'pos',
       medioPago: medio,
       almacenId,
@@ -425,6 +461,15 @@ export function Pos() {
       })),
       ...(clientaId ? { clientaId } : {}),
       ...(cuponCodigo ? { cuponCodigo } : {}),
+    }
+    // Con operaciones en cola, la venta va detrás de ellas (p. ej. la clienta recién creada sin red).
+    if (medio === 'efectivo' && !cuponCodigo && (sinRed || sync.pendientes > 0)) {
+      try {
+        await venderSinRed(payload)
+      } finally {
+        setCobrando(false)
+      }
+      return
     }
     try {
       const venta = await enviarVenta(payload)
@@ -454,17 +499,16 @@ export function Pos() {
       setLineas([])
       await cargarTurno({ soft: true })
       void cargarVentasDevolucion()
-      try {
-        setProductos(await api<Producto[]>('/catalogo/productos'))
-      } catch {
-        /* keep */
-      }
+      void cargarCatalogo()
+      setRecarga(n => n + 1)
     } catch (err) {
       if (esFalloRed(err)) {
-        encolar(payload)
-        setCola(leerCola())
-        setTicket(`Sin red: venta ${payload.uuid.slice(0, 8)} en cola local`)
-        setLineas([])
+        if (medio === 'efectivo' && !cuponCodigo) {
+          // Mismo uuid: si el servidor alcanzó a registrarla, la sincronización no la duplica.
+          await venderSinRed(payload)
+        } else {
+          setMsg('Se perdió la conexión. QR, tarjeta y cupones necesitan red: cobrá en efectivo o reintentá.')
+        }
         return
       }
       const codigo = err instanceof Error ? err.message : ''
@@ -488,6 +532,10 @@ export function Pos() {
 
   async function cerrarCaja() {
     setMsg('')
+    if (sync.pendientes > 0 || sync.conflictos > 0) {
+      setMsg('Hay operaciones de este dispositivo sin sincronizar o en conflicto. El arqueo tiene que incluirlas.')
+      return
+    }
     try {
       const res = await api<Arqueo>('/caja/cerrar', {
         method: 'POST',
@@ -495,6 +543,7 @@ export function Pos() {
       })
       setArqueo(res)
       setTurno(null)
+      borrarCache(`turno:${user?.id}`)
       setTab('vender')
       setLineas([])
     } catch (err) {
@@ -615,7 +664,7 @@ export function Pos() {
     <OpsPage
       eyebrow={`Turno · ${turno.sucursal.nombre}`}
       title="Punto de venta"
-      description={`Fondo Bs ${Number(turno.fondoInicial).toFixed(2)} · sistema Bs ${Number(turno.totalSistema).toFixed(2)} · al cierre esperado Bs ${esperado.toFixed(2)}`}
+      description={`Fondo Bs ${Number(turno.fondoInicial).toFixed(2)} · sistema Bs ${Number(turno.totalSistema).toFixed(2)} · al cierre esperado Bs ${esperado.toFixed(2)}${deCache ? ' · datos guardados en el dispositivo' : ''}`}
       actions={
         <div className="pos-tabs" role="tablist" aria-label="Secciones del POS">
           {([
@@ -718,6 +767,9 @@ export function Pos() {
                           <option key={c.id} value={c.id}>{c.nombre} · {c.email}</option>
                         ))}
                       </select>
+                      <button type="button" className="ghost pos-nueva-clienta" onClick={() => setAltaClienta({ nombre: '', email: '' })}>
+                        + Nueva clienta
+                      </button>
                     </OpsField>
                     <OpsField label="Cupón">
                       <input value={cuponCodigo} onChange={e => setCuponCodigo(e.target.value)} placeholder="VESTA10" />
@@ -729,9 +781,36 @@ export function Pos() {
                         <option value="tarjeta">Tarjeta simulada</option>
                         <option value="transferencia">Transferencia</option>
                         <option value="mixto">Mixto</option>
+                        <option value="credito">Crédito (30 días)</option>
                       </select>
                     </OpsField>
                   </div>
+
+                  {altaClienta ? (
+                    <form className="pos-alta-clienta" onSubmit={e => void registrarClienta(e)}>
+                      <p className="eyebrow">Nueva clienta {sync.online ? '' : '(sin conexión)'}</p>
+                      <OpsField label="Nombre">
+                        <input
+                          value={altaClienta.nombre}
+                          onChange={e => setAltaClienta({ ...altaClienta, nombre: e.target.value })}
+                          required
+                          autoFocus
+                        />
+                      </OpsField>
+                      <OpsField label="Correo">
+                        <input
+                          type="email"
+                          value={altaClienta.email}
+                          onChange={e => setAltaClienta({ ...altaClienta, email: e.target.value })}
+                          required
+                        />
+                      </OpsField>
+                      <OpsActions>
+                        <OpsBtn type="submit">Registrar</OpsBtn>
+                        <OpsBtn type="button" variant="secondary" onClick={() => setAltaClienta(null)}>Cancelar</OpsBtn>
+                      </OpsActions>
+                    </form>
+                  ) : null}
 
                   {medio === 'tarjeta' ? (
                     <OpsField label="Tarjeta de prueba">
@@ -770,22 +849,6 @@ export function Pos() {
 
                   {msg ? <p className="error">{msg}</p> : null}
 
-                  {cola.length ? (
-                    <div className="pos-cola">
-                      <p className="eyebrow">Cola offline ({cola.length})</p>
-                      <ul>
-                        {cola.map(c => (
-                          <li key={c.uuid}>
-                            {c.uuid.slice(0, 8)} · {c.lineas.length} línea(s)
-                            <button type="button" className="ghost" onClick={() => descartarDeCola(c.uuid)}>Descartar</button>
-                          </li>
-                        ))}
-                      </ul>
-                      <OpsBtn type="button" variant="secondary" onClick={() => void sincronizar()}>Sincronizar</OpsBtn>
-                    </div>
-                  ) : null}
-                  {colaError ? <p className="error">{colaError}</p> : null}
-
                   <div className="pos-ticket-pay">
                     <OpsBtn type="button" disabled={!lineas.length || cobrando || Boolean(pagoId)} onClick={() => void cobrar()}>
                       {cobrando ? 'Procesando…' : `Cobrar Bs ${total.toFixed(2)}`}
@@ -796,19 +859,10 @@ export function Pos() {
 
               {ticket && !comprobante && lineas.length === 0 ? <p className="ok">{ticket}</p> : null}
 
-              {lineas.length === 0 && cola.length ? (
+              {sync.pendientes || sync.conflictos ? (
                 <div className="pos-cola">
-                  <p className="eyebrow">Cola offline ({cola.length})</p>
-                  <ul>
-                    {cola.map(c => (
-                      <li key={c.uuid}>
-                        {c.uuid.slice(0, 8)} · {c.lineas.length} línea(s)
-                        <button type="button" className="ghost" onClick={() => descartarDeCola(c.uuid)}>Descartar</button>
-                      </li>
-                    ))}
-                  </ul>
-                  <OpsBtn type="button" variant="secondary" onClick={() => void sincronizar()}>Sincronizar</OpsBtn>
-                  {colaError ? <p className="error">{colaError}</p> : null}
+                  <p className="eyebrow">Hecho sin conexión en este dispositivo</p>
+                  <ColaDispositivo turnoId={turno.id} />
                 </div>
               ) : null}
 
@@ -896,8 +950,23 @@ export function Pos() {
                 onChange={e => setDeclarado(e.target.value)}
               />
             </OpsField>
-            <OpsBtn type="submit" className="ops-inline-form__action">Cerrar turno</OpsBtn>
+            <OpsBtn type="submit" className="ops-inline-form__action" disabled={sync.pendientes > 0 || sync.conflictos > 0 || !sync.online}>
+              Cerrar turno
+            </OpsBtn>
           </form>
+          {sync.pendientes > 0 ? (
+            <p className="error">
+              Hay {sync.pendientes} operación(es) hechas sin conexión que todavía no llegaron al servidor. Sincronizá
+              antes de cerrar para que el arqueo las incluya.
+            </p>
+          ) : sync.conflictos > 0 ? (
+            <p className="error">
+              Hay {sync.conflictos} operación(es) en conflicto: el dinero ya está en la caja pero la venta no está en el
+              sistema. Resolvelas en la pestaña Vender antes de cerrar.
+            </p>
+          ) : !sync.online ? (
+            <p className="error">El cierre de caja necesita conexión.</p>
+          ) : null}
           {msg ? <p className="error">{msg}</p> : null}
           <p className="muted">Al cerrar volvés a la pantalla de apertura. El arqueo muestra la diferencia.</p>
         </OpsPanel>

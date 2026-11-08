@@ -2,7 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { apiPorDefecto } from './theme'
 
 const CLAVE_API = 'ensayar_api'
+const CLAVE_TIENDA = 'ensayar_tienda'
+const TIENDA_POR_DEFECTO = process.env.EXPO_PUBLIC_TIENDA || 'vesta'
 let base = apiPorDefecto()
+let tienda = TIENDA_POR_DEFECTO
 
 /** Mensajes legibles cuando el backend solo manda `codigo`. */
 const CODIGOS: Record<string, string> = {
@@ -19,6 +22,10 @@ const CODIGOS: Record<string, string> = {
   FOTO_GRANDE: 'La foto es demasiado pesada. Probá con una más liviana.',
   VARIANTE_NO: 'No encontramos esa prenda.',
   PRODUCTO_NO_EXISTE: 'No encontramos ese producto.',
+  TIENDA_NO_EXISTE: 'No existe una tienda con esa dirección.',
+  TIENDA_SUSPENDIDA: 'Esta tienda está suspendida.',
+  SUSCRIPCION_VENCIDA: 'La suscripción de esta tienda venció. Avisale a la dueña.',
+  TENANT_REQUERIDO: 'Falta indicar la tienda.',
 }
 
 export function apiBase() {
@@ -26,10 +33,25 @@ export function apiBase() {
 }
 
 export async function cargarApiBase() {
-  const saved = await AsyncStorage.getItem(CLAVE_API)
+  const [saved, slug] = await Promise.all([
+    AsyncStorage.getItem(CLAVE_API),
+    AsyncStorage.getItem(CLAVE_TIENDA),
+  ])
   if (saved) base = saved.replace(/\/$/, '')
   else base = apiPorDefecto()
+  tienda = slug || TIENDA_POR_DEFECTO
   return base
+}
+
+/** Slug de la tienda a la que habla la app (header X-Tienda). Con sesión, manda la tienda del token. */
+export function tiendaActiva() {
+  return tienda
+}
+
+export async function guardarTienda(slug: string) {
+  tienda = slug.trim().toLowerCase() || TIENDA_POR_DEFECTO
+  await AsyncStorage.setItem(CLAVE_TIENDA, tienda)
+  return tienda
 }
 
 export async function guardarApiBase(url: string) {
@@ -87,6 +109,14 @@ function mensajeError(body: unknown, fallback: string): string {
   return readable || mapped || codigo || fallback
 }
 
+export type ApiError = Error & { red?: boolean; status?: number; codigo?: string }
+
+/** Sin respuesta del backend (sin red, API caída o gateway): la operación puede guardarse y reintentarse. */
+export function esFalloRed(err: unknown) {
+  const e = err as ApiError
+  return e?.red === true || e?.status === 502 || e?.status === 503 || e?.status === 504
+}
+
 export async function api<T>(
   path: string,
   token: string | null,
@@ -97,6 +127,7 @@ export async function api<T>(
     headers.set('Content-Type', 'application/json')
   }
   if (token) headers.set('Authorization', `Bearer ${token}`)
+  headers.set('X-Tienda', tienda)
   let res: Response
   try {
     res = await fetch(`${base}${path}`, { ...init, headers })
@@ -104,12 +135,13 @@ export async function api<T>(
     const abort =
       (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) ||
       (err instanceof Error && /aborted|timeout/i.test(err.message))
-    if (abort) {
-      throw new Error('La petición tardó demasiado. Probá de nuevo.')
-    }
-    throw new Error(
-      `No se alcanza la API en ${base}. Revisá que el backend esté encendido y que el teléfono esté en la misma Wi‑Fi (o usá http://10.0.2.2:3000 en el emulador Android).`,
+    const fallo = new Error(
+      abort
+        ? 'La petición tardó demasiado. Probá de nuevo.'
+        : `No se alcanza la API en ${base}. Revisá que el backend esté encendido y que el teléfono esté en la misma Wi‑Fi (o usá http://10.0.2.2:3000 en el emulador Android).`,
     )
+    ;(fallo as Error & { red?: boolean }).red = true
+    throw fallo
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()
@@ -132,4 +164,20 @@ export async function api<T>(
     throw err
   }
   return body as T
+}
+
+/** POST que devuelve un archivo (PDF/Excel): nombre según Content-Disposition y contenido como Blob. */
+export async function apiArchivo(path: string, token: string | null, body: unknown) {
+  const headers = new Headers({ 'Content-Type': 'application/json', 'X-Tienda': tienda })
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  const res = await fetch(`${base}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+  if (!res.ok) {
+    const text = await res.text()
+    let cuerpo: unknown
+    try { cuerpo = JSON.parse(text) } catch { cuerpo = undefined }
+    throw new Error(mensajeError(cuerpo, res.statusText || 'No se pudo descargar'))
+  }
+  const disposicion = res.headers.get('Content-Disposition') ?? ''
+  const nombre = decodeURIComponent(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposicion)?.[1] ?? 'reporte')
+  return { nombre, tipo: res.headers.get('Content-Type') ?? 'application/octet-stream', blob: await res.blob() }
 }

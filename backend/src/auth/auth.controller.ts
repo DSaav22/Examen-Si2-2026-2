@@ -1,11 +1,18 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { IsString } from 'class-validator';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
+import { CuentaAuthGuard, CurrentCuenta, type CuentaSesion } from './cuenta-auth.guard';
 import { CurrentUser } from './current-user';
 import { LoginDto } from './dto/login.dto';
 import { RegistroDto } from './dto/registro.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import type { JwtPayload } from './jwt-payload';
+
+class CambiarTiendaDto {
+  @IsString()
+  tiendaId!: string;
+}
 
 @Controller('auth')
 export class AuthController {
@@ -33,6 +40,18 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: JwtPayload) {
     return this.auth.me(user.sub);
+  }
+
+  @Get('mis-tiendas')
+  @UseGuards(CuentaAuthGuard)
+  misTiendas(@CurrentCuenta() cuenta: CuentaSesion) {
+    return this.auth.misTiendas(cuenta.cuentaId);
+  }
+
+  @Post('cambiar-tienda')
+  @UseGuards(CuentaAuthGuard)
+  cambiarTienda(@CurrentCuenta() cuenta: CuentaSesion, @Body() dto: CambiarTiendaDto) {
+    return this.auth.cambiarTienda(cuenta.cuentaId, dto.tiendaId);
   }
 
   @Post('cambiar-clave')

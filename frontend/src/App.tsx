@@ -25,6 +25,15 @@ import { Moderacion } from './pages/Moderacion'
 import { Bitacora } from './pages/Bitacora'
 import { Reservas } from './pages/Reservas'
 import { Shell } from './pages/Shell'
+import { Sincronizacion } from './pages/Sincronizacion'
+import { Creditos } from './pages/Creditos'
+import { PlataformaLayout } from './plataforma/comun'
+import { Planes } from './plataforma/Planes'
+import { Empezar, PlataformaLogin, Verificar } from './plataforma/Acceso'
+import { MisTiendas } from './plataforma/MisTiendas'
+import { NuevaTienda } from './plataforma/NuevaTienda'
+import { MetricasPlataforma } from './plataforma/Metricas'
+import { TiendaPorSlug } from './shared/SelectorTienda'
 
 function loginPath(next?: string) {
   if (!next || next === '/login' || next === '/registro') return '/login'
@@ -55,6 +64,16 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Registro />} />
+            <Route path="/t/:slug" element={<TiendaPorSlug />} />
+            <Route element={<PlataformaLayout />}>
+              <Route path="/planes" element={<Planes />} />
+              <Route path="/empezar" element={<Empezar />} />
+              <Route path="/verificar" element={<Verificar />} />
+              <Route path="/plataforma/login" element={<PlataformaLogin />} />
+              <Route path="/plataforma" element={<MisTiendas />} />
+              <Route path="/plataforma/nueva" element={<NuevaTienda />} />
+              <Route path="/plataforma/admin" element={<MetricasPlataforma />} />
+            </Route>
             <Route path="/" element={<Navigate to="/inicio" replace />} />
             <Route element={<Shell />}>
               <Route path="/inicio" element={<Home />} />
@@ -106,6 +125,22 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={['CAJERO', 'ADMIN', 'SUPERADMIN']}>
                     <Pos />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creditos"
+                element={
+                  <ProtectedRoute roles={['CAJERO', 'ENCARGADO', 'ADMIN', 'SUPERADMIN']}>
+                    <Creditos />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/sincronizacion"
+                element={
+                  <ProtectedRoute roles={['CAJERO', 'ENCARGADO', 'ADMIN', 'SUPERADMIN']}>
+                    <Sincronizacion />
                   </ProtectedRoute>
                 }
               />

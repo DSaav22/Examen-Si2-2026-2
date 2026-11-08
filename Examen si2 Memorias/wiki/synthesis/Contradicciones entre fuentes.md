@@ -27,3 +27,18 @@ Regla: **canónico** = docente propio + [[correccion-alcance-parcial]]. Audio fi
 | Actores MVP | Clienta/cajero/admin | +encargado/proveedor | — | Decisiones 19 sep: +encargado/proveedor (código los tiene) |
 
 El propio audio dice que stack y documentos “se definen el lunes”. La clase de [[stack-metodologia-parcial]] es esa definición.
+
+## Cambios del segundo parcial
+
+[[transcripcion-audio-segundo-parcial]] es canon para el segundo parcial. No contradice al primero: lo amplía. Donde cambia una decisión:
+
+| Tema | Primer parcial | Segundo parcial |
+|------|----------------|-----------------|
+| Metodología | [[Proceso Unificado]] | **[[ICONIX]]** |
+| Negocio | Una tienda | **Muchas tiendas (SaaS)** |
+| Offline | Capacidad en el POS; PWA no obligatoria | **Web PWA + móvil SQLite**, obligatorio |
+| Reportes generativos | SQL acotado a una vista | Pedidos complejos, voz, PDF y Excel |
+| Analítica ML | No existía | Supervisados + no supervisados, datos sintéticos |
+| Pagos | QR simulado | Sandbox real, países hispanohablantes |
+| Fecha | 23 sep | **11 nov, PDF hasta las 8:00** |
+| Arquitectura | "No microservicios" | Igual: **monolito modular** listo para separarse |

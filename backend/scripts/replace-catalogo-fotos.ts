@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { PrismaClient, Rol } from '@prisma/client';
+import { Rol } from '@prisma/client';
+import { crearPrismaTenant } from '../src/tenancy/prisma-tenant.extension';
+import { TenantContext, TIENDA_VESTA_ID } from '../src/tenancy/tenant-context';
 
-const prisma = new PrismaClient();
+const prisma = crearPrismaTenant();
+const TIENDA = process.env.TIENDA_ID || TIENDA_VESTA_ID;
 const repositoryRoot = resolve(__dirname, '../..');
 const sourceDir = join(repositoryRoot, 'Fotos para catalogo de ropa');
 const frontendAssetsDir = join(repositoryRoot, 'frontend', 'public', 'catalogo', 'ropa');
@@ -114,8 +117,8 @@ async function main() {
       await tx.producto.deleteMany({ where: { id: { in: productIds } } });
     }
 
-    const temporada = await tx.temporada.upsert({ where: { nombre: 'catalogo-fotos-2026' }, update: {}, create: { nombre: 'catalogo-fotos-2026' } });
-    const coleccion = await tx.coleccion.upsert({ where: { nombre: 'Vesta · Fotos para catalogo' }, update: {}, create: { nombre: 'Vesta · Fotos para catalogo' } });
+    const temporada = await tx.temporada.upsert({ where: { tiendaId_nombre: { tiendaId: TIENDA, nombre: 'catalogo-fotos-2026' } }, update: {}, create: { nombre: 'catalogo-fotos-2026' } });
+    const coleccion = await tx.coleccion.upsert({ where: { tiendaId_nombre: { tiendaId: TIENDA, nombre: 'Vesta · Fotos para catalogo' } }, update: {}, create: { nombre: 'Vesta · Fotos para catalogo' } });
     const proveedor = await tx.proveedor.upsert({ where: { id: stableId('proveedor-fotos-catalogo') }, update: { nombre: 'Catalogo cargado por administracion' }, create: { id: stableId('proveedor-fotos-catalogo'), nombre: 'Catalogo cargado por administracion', contacto: 'admin@vesta.local' } });
 
     for (let index = 0; index < profiles.length; index += 1) {
@@ -140,4 +143,4 @@ async function main() {
   console.log(`Imagenes copiadas a: ${basename(dirname(frontendAssetsDir))}/ropa y backend/public/catalogo/ropa.`);
 }
 
-main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => prisma.$disconnect());
+TenantContext.enTienda(TIENDA, main).catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => prisma.$disconnect());

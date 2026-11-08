@@ -17,6 +17,7 @@ import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { Idempotente } from '../sync/idempotencia.interceptor';
 import { InventarioService } from '../inventario/inventario.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -57,6 +58,7 @@ export class PagosController {
   }
 
   @Post(':id/simular')
+  @Idempotente()
   @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
   async simular(
     @CurrentUser() user: JwtPayload,

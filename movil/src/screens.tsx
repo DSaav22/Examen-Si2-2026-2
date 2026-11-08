@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { api, apiBase, assetUrl, guardarApiBase } from './api'
+import { api, apiBase, assetUrl, guardarApiBase, guardarTienda, tiendaActiva } from './api'
 import { useSession } from './session'
 import { colors } from './theme'
 import {
@@ -39,6 +39,7 @@ export function LoginScreen() {
   const [email, setEmail] = useState('clienta@ensayar.bo')
   const [password, setPassword] = useState('diego')
   const [servidor, setServidor] = useState(apiBase())
+  const [tienda, setTienda] = useState(tiendaActiva())
   const [mostrarApi, setMostrarApi] = useState(false)
   const [cargando, setCargando] = useState(false)
 
@@ -47,6 +48,7 @@ export function LoginScreen() {
     s.setError('')
     try {
       await guardarApiBase(servidor)
+      await guardarTienda(tienda)
       await s.entrar(email.trim(), password)
     } catch (e) {
       s.setError(e instanceof Error ? e.message : 'No se pudo entrar')
@@ -122,6 +124,17 @@ export function LoginScreen() {
             <Text style={styles.authHint}>
               Actual: {apiBase()}. En teléfono usá la IP de tu PC. Emulador Android: http://10.0.2.2:3000
             </Text>
+            <Text style={styles.authLabel}>Tienda</Text>
+            <TextInput
+              style={styles.authInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={tienda}
+              onChangeText={setTienda}
+              placeholder="vesta"
+              placeholderTextColor={colors.taupe}
+            />
+            <Text style={styles.authHint}>Dirección de la tienda (ensayar.app/t/…). Ej.: vesta, demo-aurora</Text>
           </View>
         ) : null}
       </View>

@@ -3,6 +3,7 @@ import { Canal, EstadoVenta, Prisma, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventarioService } from '../inventario/inventario.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { TenantContext } from '../tenancy/tenant-context';
 import { CrearVentaDto } from './dto/crear-venta.dto';
 import {
   StockInsuficienteError,
@@ -11,14 +12,14 @@ import {
   UuidConflictError,
 } from './errores-venta';
 
-type StockLockRow = {
-  variante_id: string;
-  almacen_id: string;
-  cantidad: number;
-  reservado: number;
-};
-
 type Tx = Prisma.TransactionClient;
+
+export const PLAZO_CREDITO_DIAS = 30;
+
+export type OpcionesCobro = {
+  /** Hora real de la venta cuando se hizo sin red y se sincroniza después. */
+  hechaEn?: Date;
+};
 
 @Injectable()
 export class VentasService {
@@ -62,12 +63,14 @@ export class VentasService {
   async cobrar(
     dto: CrearVentaDto,
     actor?: { id: string; rol: Rol },
+    opciones: OpcionesCobro = {},
   ) {
     if (dto.canal === Canal.pos && !dto.cajaTurnoId) {
       throw new TurnoRequeridoError();
     }
+    const tiendaId = TenantContext.tiendaIdOrThrow();
 
-    const existente = await this.prisma.venta.findUnique({
+    const existente = await this.prisma.venta.findFirst({
       where: { uuid: dto.uuid },
       include: { lineas: true, pago: true },
     });
@@ -96,8 +99,22 @@ export class VentasService {
       throw new ConflictException({ codigo: 'CUPON_AGOTADO' });
     }
     const pendientePago = dto.medioPago === 'qr' || dto.medioPago === 'tarjeta';
+    const alCredito = dto.medioPago === 'credito';
+    if (alCredito) {
+      if (dto.canal !== Canal.pos || !dto.clientaId) {
+        throw new ConflictException({
+          codigo: 'CREDITO_REQUIERE_CLIENTA',
+          mensaje: 'La venta al crédito se hace en caja y a nombre de una clienta registrada.',
+        });
+      }
+      const clienta = await this.prisma.usuario.findFirst({
+        where: { id: dto.clientaId, activo: true },
+        select: { id: true },
+      });
+      if (!clienta) throw new ConflictException({ codigo: 'CREDITO_REQUIERE_CLIENTA' });
+    }
 
-    const creada = await this.prisma.$transaction(async (tx) => {
+    const creada = await this.transaccionVenta(dto, async (tx) => {
       if (dto.canal === Canal.pos && dto.cajaTurnoId) {
         await this.validarTurnoEnTx(
           tx,
@@ -107,7 +124,7 @@ export class VentasService {
         );
       }
 
-      const otraVez = await tx.venta.findUnique({
+      const otraVez = await tx.venta.findFirst({
         where: { uuid: dto.uuid },
         include: { lineas: true, pago: true },
       });
@@ -118,22 +135,6 @@ export class VentasService {
         return otraVez;
       }
 
-      const ids = [...new Set(dto.lineas.map((l) => l.varianteId))].sort();
-      const locked: StockLockRow[] = [];
-      for (const varianteId of ids) {
-        const rows = await tx.$queryRaw<StockLockRow[]>`
-          SELECT variante_id, almacen_id, cantidad, reservado
-          FROM stock_almacen
-          WHERE almacen_id = ${dto.almacenId}
-            AND variante_id = ${varianteId}
-          FOR UPDATE
-        `;
-        locked.push(...rows);
-      }
-
-      const porVariante = new Map(
-        locked.map((r) => [r.variante_id, r.cantidad - r.reservado]),
-      );
       const pedidas = new Map<string, number>();
       for (const linea of dto.lineas) {
         pedidas.set(
@@ -142,36 +143,31 @@ export class VentasService {
         );
       }
 
-      for (const [varianteId, cantidad] of pedidas) {
-        const disponible = porVariante.get(varianteId);
-        if (disponible === undefined || disponible < cantidad) {
-          throw new StockInsuficienteError(varianteId);
-        }
-      }
-
-      if (pendientePago) {
-        for (const [varianteId, cantidad] of pedidas) {
-          await tx.stockAlmacen.update({
-            where: {
-              varianteId_almacenId: {
-                varianteId,
-                almacenId: dto.almacenId,
-              },
-            },
-            data: { reservado: { increment: cantidad } },
+      // UPDATE condicional: la base descuenta solo si alcanza, de forma atómica.
+      // Dos cajas que venden la última unidad a la vez: una actualiza 1 fila y la otra 0.
+      // Orden fijo por variante para que dos ventas cruzadas no se bloqueen entre sí.
+      for (const varianteId of [...pedidas.keys()].sort()) {
+        const cantidad = pedidas.get(varianteId)!;
+        const filas = pendientePago
+          ? await tx.$executeRaw`
+              UPDATE stock_almacen SET reservado = reservado + ${cantidad}
+              WHERE tienda_id = ${tiendaId} AND almacen_id = ${dto.almacenId}
+                AND variante_id = ${varianteId} AND cantidad - reservado >= ${cantidad}`
+          : await tx.$executeRaw`
+              UPDATE stock_almacen SET cantidad = cantidad - ${cantidad}
+              WHERE tienda_id = ${tiendaId} AND almacen_id = ${dto.almacenId}
+                AND variante_id = ${varianteId} AND cantidad - reservado >= ${cantidad}`;
+        if (filas === 0) {
+          const actual = await tx.stockAlmacen.findUnique({
+            where: { varianteId_almacenId: { varianteId, almacenId: dto.almacenId } },
+            select: { cantidad: true, reservado: true },
           });
-        }
-      } else {
-        for (const [varianteId, cantidad] of pedidas) {
-          await tx.stockAlmacen.update({
-            where: {
-              varianteId_almacenId: {
-                varianteId,
-                almacenId: dto.almacenId,
-              },
-            },
-            data: { cantidad: { decrement: cantidad } },
-          });
+          // Lanzar aborta la transacción: lo ya descontado en esta venta se revierte.
+          throw new StockInsuficienteError(
+            varianteId,
+            Math.max(0, (actual?.cantidad ?? 0) - (actual?.reservado ?? 0)),
+            cantidad,
+          );
         }
       }
 
@@ -197,6 +193,7 @@ export class VentasService {
           estado,
           medioPago: dto.medioPago,
           total,
+          ...(opciones.hechaEn ? { creadaEn: opciones.hechaEn } : {}),
           almacenId: dto.almacenId,
           cajaTurnoId: dto.cajaTurnoId,
           clientaId: dto.clientaId,
@@ -244,10 +241,25 @@ export class VentasService {
         }
       }
 
-      if (dto.cajaTurnoId && !pendientePago) {
+      // A crédito no entra dinero a la caja: lo que entra son los abonos.
+      if (dto.cajaTurnoId && !pendientePago && !alCredito) {
         await tx.cajaTurno.update({
           where: { id: dto.cajaTurnoId },
           data: { totalSistema: { increment: total } },
+        });
+      }
+
+      if (alCredito) {
+        const plazo = new Date(venta.creadaEn);
+        plazo.setDate(plazo.getDate() + PLAZO_CREDITO_DIAS);
+        await tx.cuentaCobrar.create({
+          data: {
+            ventaId: venta.id,
+            clientaId: dto.clientaId!,
+            monto: total,
+            saldo: total,
+            venceEn: plazo,
+          },
         });
       }
 
@@ -280,6 +292,25 @@ export class VentasService {
     }
 
     return creada;
+  }
+
+  /**
+   * Dos envíos simultáneos del mismo uuid pasan ambos el chequeo previo; el índice único
+   * (tienda, uuid) frena al segundo, que entonces devuelve la venta ya registrada.
+   */
+  private async transaccionVenta<T>(dto: CrearVentaDto, fn: (tx: Tx) => Promise<T>) {
+    try {
+      return await this.prisma.$transaction(fn);
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+      const ganadora = await this.prisma.venta.findFirst({
+        where: { uuid: dto.uuid },
+        include: { lineas: true, pago: true },
+      });
+      if (!ganadora) throw error;
+      if (!this.mismoPayload(ganadora, dto)) throw new UuidConflictError();
+      return ganadora as T;
+    }
   }
 
   private async validarTurnoEnTx(

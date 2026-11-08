@@ -5,7 +5,9 @@ import { assetUrl } from '../asset'
 import { useStorefront } from '../storefront'
 import { ThemeToggle } from '../shared/ThemeToggle'
 import { NotificacionesBell } from '../shared/NotificacionesBell'
-import { ConnectionIndicator, SidePanel } from '../shared/Visual'
+import { SelectorTienda, useTiendaPublica } from '../shared/SelectorTienda'
+import { SidePanel } from '../shared/Visual'
+import { AccionesPwa, BannerOffline, EstadoConexion } from '../shared/Offline'
 import { api } from '../api'
 import type { Sucursal } from '../types'
 import {
@@ -134,6 +136,8 @@ function OpsNavIcon({ item }: { item: NavItem }) {
     '/catalogo': <><path d="M5 5.5h14v14H5z" /><path d="M8 9h8M8 12h8M8 15h5" /></>,
     '/base-datos': <><ellipse cx="12" cy="5.5" rx="7" ry="2.5" /><path d="M5 5.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6M5 11.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6" /></>,
     '/cuenta': <><circle cx="12" cy="8" r="3.2" /><path d="M5 20c.7-3.3 3-5 7-5s6.3 1.7 7 5" /></>,
+    '/sincronizacion': <><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 13a8 8 0 0 0 14.3 4.9L20 16" /><path d="M4 4v4h4M20 20v-4h-4" /></>,
+    '/creditos': <><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 10h18M7 15h4" /></>,
   }
   const icon = paths[key] ?? <path d="M5 12h14M12 5v14" />
   return <svg className="ops-nav-icon" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg>
@@ -304,6 +308,7 @@ function AccountPanel({
             )
           })}
         </nav>
+        <AccionesPwa />
       </div>
 
       <div className="account-drawer-foot">
@@ -593,6 +598,7 @@ function OpsSidebar({
             <p className="ops-sidebar-name">{userName}</p>
             <p className="ops-sidebar-email">{userEmail}</p>
           </div>
+          <SelectorTienda />
         </div>
         <nav className="ops-sidebar-nav" aria-label="Módulos del rol">
           {grupos.map(grupo => (
@@ -612,6 +618,7 @@ function OpsSidebar({
         </nav>
         <div className="ops-sidebar-foot">
           <OpsSucursalContext sucursalId={sucursalId} rol={rol} />
+          <AccionesPwa />
           <div className="ops-sidebar-tools">
             <ThemeToggle />
             <Link className="ops-tool-link" to="/cuenta" onClick={onClose}>
@@ -638,6 +645,7 @@ function ClientShell({
 }) {
   const location = useLocation()
   const { cart, cartNotice, dismissCartNotice } = useStorefront()
+  const marca = useTiendaPublica()?.nombre ?? 'Vesta'
   const [menuOpen, setMenuOpen] = useState(false)
   const [megaOpen, setMegaOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -671,8 +679,8 @@ function ClientShell({
           >
             <Icon name="menu" />
           </button>
-          <Link className="brand-mark" to={home} aria-label="Vesta, inicio">
-            VESTA
+          <Link className="brand-mark" to={home} aria-label={`${marca}, inicio`}>
+            {marca.toUpperCase()}
           </Link>
           <nav className="desktop-shell-nav" aria-label="Navegación principal">
             <ShellLink end to="/inicio">
@@ -863,10 +871,11 @@ function OpsShell({
           </div>
           <div className="ops-topbar-actions">
             <NotificacionesBell variant="ops" />
-            <ConnectionIndicator />
+            <EstadoConexion />
           </div>
         </header>
         <main id="contenido-principal" className="ops-main" tabIndex={-1}>
+          <BannerOffline />
           <Outlet />
         </main>
       </div>

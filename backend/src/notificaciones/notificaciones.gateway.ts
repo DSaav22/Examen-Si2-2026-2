@@ -59,6 +59,7 @@ export class NotificacionesGateway implements OnGatewayConnection, OnGatewayDisc
         return;
       }
       const payload = this.tokens.verify(raw);
+      if (payload.tipo !== 'tienda') throw new Error('TOKEN_DE_CUENTA');
       client.data.userId = payload.sub;
       await client.join(this.room(payload.sub));
       client.emit('conectado', { ok: true, usuarioId: payload.sub });

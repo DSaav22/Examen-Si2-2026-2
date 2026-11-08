@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { exigirDeLaTienda } from '../tenancy/pertenencia';
+import { PlanLimitesService } from '../tenancy/plan-limites.service';
 import { ActualizarProductoDto, CrearProductoDto } from './dto/producto.dto';
 import { ActualizarVarianteDto, CrearVarianteDto } from './dto/variante.dto';
 import { UpsertStockDto } from './dto/stock.dto';
@@ -22,7 +24,10 @@ type ProductoCatalogo = Prisma.ProductoGetPayload<{
 
 @Injectable()
 export class CatalogoService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly limites: PlanLimitesService,
+  ) {}
 
   private productoPublico(producto: ProductoCatalogo) {
     return {
@@ -251,7 +256,13 @@ export class CatalogoService {
     }));
   }
 
-  crearProducto(dto: CrearProductoDto) {
+  async crearProducto(dto: CrearProductoDto) {
+    await this.limites.verificar('productos');
+    await exigirDeLaTienda(this.prisma, {
+      temporada: dto.temporadaId,
+      coleccion: dto.coleccionId,
+      proveedor: dto.proveedorId,
+    });
     return this.prisma.producto.create({
       data: {
         nombre: dto.nombre,
@@ -271,6 +282,11 @@ export class CatalogoService {
 
   async actualizarProducto(id: string, dto: ActualizarProductoDto) {
     await this.obtenerProducto(id);
+    await exigirDeLaTienda(this.prisma, {
+      temporada: dto.temporadaId,
+      coleccion: dto.coleccionId,
+      proveedor: dto.proveedorId,
+    });
     return this.prisma.producto.update({
       where: { id },
       data: {
@@ -345,6 +361,7 @@ export class CatalogoService {
 
   async upsertStock(dto: UpsertStockDto) {
     const qty = Math.max(0, dto.cantidad);
+    await exigirDeLaTienda(this.prisma, { variante: dto.varianteId, almacen: dto.almacenId });
     return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         { cantidad: number; reservado: number }[]

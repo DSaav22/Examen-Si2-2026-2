@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
-import { JwtPayload } from './jwt-payload';
+import { CuentaPayload, JwtPayload } from './jwt-payload';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -15,7 +15,7 @@ export class TokenService {
     return secret;
   }
 
-  sign(payload: JwtPayload): string {
+  sign(payload: JwtPayload | CuentaPayload): string {
     return jwt.sign(payload, this.secret(), { expiresIn: this.config.get<string>('JWT_EXPIRES_IN') ?? '12h' } as jwt.SignOptions);
   }
 
@@ -23,7 +23,7 @@ export class TokenService {
   async revoke(token: string) { await this.prisma.tokenRevocado.upsert({ where: { hash: this.hash(token) }, update: {}, create: { hash: this.hash(token) } }); }
   async isRevoked(token: string) { return Boolean(await this.prisma.tokenRevocado.findUnique({ where: { hash: this.hash(token) } })); }
 
-  verify(token: string): JwtPayload {
-    return jwt.verify(token, this.secret()) as JwtPayload;
+  verify(token: string): JwtPayload | CuentaPayload {
+    return jwt.verify(token, this.secret()) as JwtPayload | CuentaPayload;
   }
 }

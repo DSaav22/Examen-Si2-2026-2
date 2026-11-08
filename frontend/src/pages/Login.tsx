@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { homePorRol } from '../roles'
 import { Button } from '../shared/Button'
 import { FormField } from '../shared/FormField'
+import { useTiendaPublica } from '../shared/SelectorTienda'
 import { ThemeToggle } from '../shared/ThemeToggle'
 
 function safeNext(raw: string | null) {
@@ -22,6 +23,7 @@ function puedeSeguirNext(rol: string, next: string | null) {
 
 export function Login() {
   const { user, login } = useAuth()
+  const marca = useTiendaPublica()?.nombre ?? 'Vesta'
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const next = useMemo(() => safeNext(params.get('next')), [params])
@@ -39,8 +41,8 @@ export function Login() {
     try {
       const u = await login(email, password)
       navigate(next && puedeSeguirNext(u.rol, next) ? next : homePorRol(u.rol))
-    } catch {
-      setError('Correo o clave incorrectos.')
+    } catch (err) {
+      setError((err as Error).message || 'Correo o clave incorrectos.')
     } finally {
       setLoading(false)
     }
@@ -53,7 +55,7 @@ export function Login() {
       <form className="card login-card auth-card" onSubmit={onSubmit}>
         <div className="login-toolbar">
           <Link className="auth-brand" to="/inicio">
-            VESTA
+            {marca.toUpperCase()}
           </Link>
           <ThemeToggle />
         </div>
@@ -62,7 +64,7 @@ export function Login() {
         <p className="muted">
           {next === '/carrito'
             ? 'Entrá para confirmar tu pedido. Tu bolsa se mantiene.'
-            : 'Clienta de la tienda u operación EnsayAR.'}
+            : `Clienta o equipo de ${marca}.`}
         </p>
         <FormField
           label="Correo"
@@ -91,6 +93,9 @@ export function Login() {
         </p>
         <p className="hint auth-demo">
           Demo tienda: <code>clienta@ensayar.bo</code> / <code>diego</code>
+        </p>
+        <p className="hint">
+          ¿Sos dueña de una tienda? <Link to="/plataforma/login">Entrá a la plataforma</Link>
         </p>
         <Link className="auth-back" to="/inicio">
           ← Seguir mirando la tienda

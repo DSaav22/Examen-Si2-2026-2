@@ -5,6 +5,7 @@ import { homePorRol } from '../roles'
 import { Button } from '../shared/Button'
 import { FormField } from '../shared/FormField'
 import { ThemeToggle } from '../shared/ThemeToggle'
+import { useTiendaPublica } from '../shared/SelectorTienda'
 
 function safeNext(raw: string | null) {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return null
@@ -35,6 +36,7 @@ function isAdult(dateValue: string) {
 
 export function Registro() {
   const { user, register } = useAuth()
+  const marca = useTiendaPublica()?.nombre ?? 'Vesta'
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const next = useMemo(() => safeNext(params.get('next')), [params])
@@ -79,7 +81,7 @@ export function Registro() {
   return (
     <div className="login-screen auth-screen">
       <form className="card login-card auth-card" onSubmit={onSubmit} noValidate>
-        <div className="login-toolbar"><Link className="auth-brand" to="/inicio">VESTA</Link><ThemeToggle /></div>
+        <div className="login-toolbar"><Link className="auth-brand" to="/inicio">{marca.toUpperCase()}</Link><ThemeToggle /></div>
         <p className="eyebrow">Nueva clienta</p>
         <h1>Crear cuenta</h1>
         <p className="muted">Creá tu cuenta para pedir, guardar favoritos y ver tu historial.</p>

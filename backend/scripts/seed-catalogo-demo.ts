@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
-import { PrismaClient } from '@prisma/client';
+import { crearPrismaTenant } from '../src/tenancy/prisma-tenant.extension';
+import { TenantContext, TIENDA_VESTA_ID } from '../src/tenancy/tenant-context';
 
-const prisma = new PrismaClient();
+const prisma = crearPrismaTenant();
+const TIENDA = process.env.TIENDA_ID || TIENDA_VESTA_ID;
+/** Los ids estables son PK globales: fuera de Vesta llevan la tienda para no chocar. */
+const SUFIJO = TIENDA === TIENDA_VESTA_ID ? '' : `-${TIENDA}`;
 
 type DemoProduct = {
   name: string;
@@ -23,26 +27,26 @@ const products: DemoProduct[] = ([
 const stableId = (value: string) => { const hex = createHash('sha1').update(value).digest('hex'); return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`; };
 
 async function main() {
-  const temporada = await prisma.temporada.upsert({ where: { nombre: 'primavera-verano' }, update: {}, create: { nombre: 'primavera-verano' } });
-  const coleccion = await prisma.coleccion.upsert({ where: { nombre: 'Vesta mujer · catálogo demo' }, update: {}, create: { nombre: 'Vesta mujer · catálogo demo' } });
-  const proveedor = await prisma.proveedor.upsert({ where: { id: stableId('proveedor-vesta-demo') }, update: { nombre: 'Vesta Demo Imports' }, create: { id: stableId('proveedor-vesta-demo'), nombre: 'Vesta Demo Imports', contacto: 'demo@vesta.local' } });
+  const temporada = await prisma.temporada.upsert({ where: { tiendaId_nombre: { tiendaId: TIENDA, nombre: 'primavera-verano' } }, update: {}, create: { nombre: 'primavera-verano' } });
+  const coleccion = await prisma.coleccion.upsert({ where: { tiendaId_nombre: { tiendaId: TIENDA, nombre: 'Vesta mujer · catálogo demo' } }, update: {}, create: { nombre: 'Vesta mujer · catálogo demo' } });
+  const proveedor = await prisma.proveedor.upsert({ where: { id: stableId(`proveedor-vesta-demo${SUFIJO}`) }, update: { nombre: 'Vesta Demo Imports' }, create: { id: stableId(`proveedor-vesta-demo${SUFIJO}`), nombre: 'Vesta Demo Imports', contacto: 'demo@vesta.local' } });
   const almacenes = await prisma.almacen.findMany({ take: 2, orderBy: { nombre: 'asc' } });
   if (almacenes.length === 0) throw new Error('No hay almacenes. Ejecuta primero las migraciones y el seed base.');
 
   for (let index = 0; index < products.length; index += 1) {
-    const item = products[index]; const productoId = stableId(`producto-vesta-demo-${index + 1}`);
+    const item = products[index]; const productoId = stableId(`producto-vesta-demo-${index + 1}${SUFIJO}`);
     const material = ['accesorios', 'bolsos', 'calzado'].includes(item.category) ? 'cuero vegano' : item.category === 'jeans' ? 'denim de algodón' : item.category === 'sueteres' ? 'punto suave' : 'mezcla de algodón y viscosa';
     const ajuste = ['blazers', 'abrigos', 'chaquetas'].includes(item.category) ? 'estructurado' : item.category === 'pantalones' ? 'wide leg' : 'regular';
     const modelo = item.category === 'accesorios' ? 'Línea Vesta accesorios' : 'Editorial Vesta temporada';
     await prisma.producto.upsert({ where: { id: productoId }, update: { nombre: item.name, descripcion: `Producto demo femenino Vesta: ${item.name}. Imagen editorial de referencia.`, categoria: item.category, ocasion: item.occasion, precioBase: item.price, descuentoPct: item.discount, material, ajuste, composicion: material, cuidados: 'Lavar según etiqueta; conservar en lugar seco.', origen: 'Bolivia', modelo, popularidad: products.length - index, temporadaId: temporada.id, coleccionId: coleccion.id, proveedorId: proveedor.id }, create: { id: productoId, nombre: item.name, descripcion: `Producto demo femenino Vesta: ${item.name}. Imagen editorial de referencia.`, categoria: item.category, ocasion: item.occasion, precioBase: item.price, descuentoPct: item.discount, material, ajuste, composicion: material, cuidados: 'Lavar según etiqueta; conservar en lugar seco.', origen: 'Bolivia', modelo, popularidad: products.length - index, temporadaId: temporada.id, coleccionId: coleccion.id, proveedorId: proveedor.id } });
     for (const size of ['S', 'M']) {
       const sku = `VESTA-DEMO-${String(index + 1).padStart(3, '0')}-${size}`;
-      const variante = await prisma.variante.upsert({ where: { sku }, update: { productoId, talla: size, color: item.color, urlFoto: item.image, urlOverlay: '' }, create: { productoId, talla: size, color: item.color, sku, urlFoto: item.image, urlOverlay: '' } });
+      const variante = await prisma.variante.upsert({ where: { tiendaId_sku: { tiendaId: TIENDA, sku } }, update: { productoId, talla: size, color: item.color, urlFoto: item.image, urlOverlay: '' }, create: { productoId, talla: size, color: item.color, sku, urlFoto: item.image, urlOverlay: '' } });
       for (const almacen of almacenes) await prisma.stockAlmacen.upsert({ where: { varianteId_almacenId: { varianteId: variante.id, almacenId: almacen.id } }, update: { cantidad: 6 + ((index + almacen.id.length) % 8), reservado: 0 }, create: { varianteId: variante.id, almacenId: almacen.id, cantidad: 6 + ((index + almacen.id.length) % 8), reservado: 0 } });
     }
   }
   await prisma.producto.update({
-    where: { id: stableId('producto-vesta-demo-1') },
+    where: { id: stableId(`producto-vesta-demo-1${SUFIJO}`) },
     data: { precioMayorista: 480, minimoMayorista: 3 },
   });
   await prisma.variante.updateMany({
@@ -50,11 +54,11 @@ async function main() {
     data: { urlModelo: 'vesta-volumen' },
   });
   await prisma.cupon.upsert({
-    where: { codigo: 'VESTA10' },
+    where: { tiendaId_codigo: { tiendaId: TIENDA, codigo: 'VESTA10' } },
     update: { porcentaje: 10, activo: true, usoMaximo: 50 },
     create: { codigo: 'VESTA10', porcentaje: 10, usoMaximo: 50 },
   });
   console.log(`Catálogo demo cargado: ${products.length} productos femeninos, ${products.length * 2} variantes.`);
 }
 
-main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => prisma.$disconnect());
+TenantContext.enTienda(TIENDA, main).catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => prisma.$disconnect());

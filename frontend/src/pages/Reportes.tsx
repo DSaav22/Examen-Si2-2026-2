@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { homePorRol } from '../roles'
-import { OpsActions, OpsBtn, OpsEmpty, OpsField, OpsPage, OpsPanel, OpsTable } from '../shared/ops/OpsUi'
+import { OpsEmpty, OpsField, OpsPage, OpsPanel, OpsTable } from '../shared/ops/OpsUi'
+import { ReporteInteligente } from './reportes/ReporteInteligente'
 
 type Fila = Record<string, string | number | null>
 type Barra = { label: string; valor: number; pct?: number }
@@ -110,7 +111,6 @@ export function Reportes() {
   const [panel, setPanel] = useState<Panel | null>(null)
   const [ctx, setCtx] = useState<Contexto | null>(null)
   const [data, setData] = useState<Resultado | null>(null)
-  const [pregunta, setPregunta] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingPanel, setLoadingPanel] = useState(true)
@@ -170,25 +170,6 @@ export function Reportes() {
     }
   }
 
-  async function preguntaLibre(e: FormEvent) {
-    e.preventDefault()
-    if (pregunta.trim().length < 4) return
-    setLoading(true)
-    setError('')
-    try {
-      const result = await api<Resultado>('/reportes/generativo', {
-        method: 'POST',
-        body: JSON.stringify({ pregunta }),
-      })
-      setData(result)
-      setTipo('libre')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se entendió la pregunta')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const reportes = ctx?.filtros.reportes ?? [
     { id: 'sucursales', label: 'Ranking sucursales', desc: 'Cuál vende más y cuál menos' },
     { id: 'productos', label: 'Top productos', desc: 'Prendas y montos' },
@@ -202,8 +183,10 @@ export function Reportes() {
     <OpsPage
       eyebrow="Gestión"
       title="Reportes de negocio"
-      description="Ventas por sucursal, productos, medios de pago e inventario. Filtrá el período y explorá sin ver código técnico."
+      description="Pedí cualquier reporte en español, escrito o dictado, y bajalo en PDF o Excel. Abajo, los rankings rápidos del período."
     >
+      <ReporteInteligente />
+
       <div className="ops-report-filters">
         <OpsField label="Período" className="ops-report-filter">
           <select value={periodo} onChange={e => setPeriodo(e.target.value)}>
@@ -263,7 +246,7 @@ export function Reportes() {
         ))}
       </div>
 
-      <div className="ops-report-layout ops-report-layout--wide">
+      <div>
         <OpsPanel title={data?.titulo ?? 'Elegí un reporte'} eyebrow={loading || loadingPanel ? 'Cargando…' : 'Resultado'}>
           {loading || loadingPanel ? (
             <OpsEmpty title="Preparando cifras…" />
@@ -301,26 +284,6 @@ export function Reportes() {
           )}
         </OpsPanel>
 
-        <OpsPanel title="Pregunta libre" eyebrow={ctx?.modelo.configurado ? 'Asistente IA' : 'Reglas locales'}>
-          <p className="muted ops-moderation-help">
-            Opcional: pedí algo en español. La respuesta se muestra como tabla de negocio (sin código).
-          </p>
-          <form onSubmit={event => void preguntaLibre(event)}>
-            <OpsField label="Tu pregunta">
-              <textarea
-                rows={3}
-                value={pregunta}
-                onChange={e => setPregunta(e.target.value)}
-                placeholder="Ej. ¿qué sucursal vende menos?"
-              />
-            </OpsField>
-            <OpsActions>
-              <OpsBtn type="submit" disabled={loading || pregunta.trim().length < 4}>
-                {loading ? 'Consultando…' : 'Preguntar'}
-              </OpsBtn>
-            </OpsActions>
-          </form>
-        </OpsPanel>
       </div>
     </OpsPage>
   )

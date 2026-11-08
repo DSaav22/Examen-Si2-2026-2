@@ -9,7 +9,12 @@ import { precioEfectivo, stockCapacidad, stockDisponible } from '../types'
 import { catalogBannerImage } from '../shared/vestaAssets'
 import { useStorefront } from '../storefront'
 import { catalogLabel } from '../text'
+import { useTiendaPublica } from '../shared/SelectorTienda'
 import { OpsActions, OpsBtn, OpsEmpty, OpsField, OpsPage, OpsPanel, OpsStatus } from '../shared/ops/OpsUi'
+import { conCache } from '../offline/cache'
+import { encolar } from '../offline/cola'
+import { uuid } from '../offline/red'
+import { sincronizar } from '../offline/sync'
 
 type Sort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'novedades' | 'popularidad' | 'descuento'
 type Filters = {
@@ -278,6 +283,7 @@ function CatalogEditorialFilters({
 }
 
 function ComparePanel({ products, onClose }: { products: Producto[]; onClose: () => void }) {
+  const marca = useTiendaPublica()?.nombre ?? 'Vesta'
   if (products.length < 2) return null
   return (
     <div className="catalog-modal-backdrop" role="presentation" onClick={onClose}>
@@ -291,7 +297,7 @@ function ComparePanel({ products, onClose }: { products: Producto[]; onClose: ()
         <button type="button" className="catalog-modal-close" onClick={onClose} aria-label="Cerrar comparador">
           ×
         </button>
-        <p className="eyebrow">Selección Vesta</p>
+        <p className="eyebrow">Selección {marca}</p>
         <h2 id="compare-title">Comparar productos</h2>
         <div className="catalog-compare-table">
           <div className="catalog-compare-labels">
@@ -345,8 +351,14 @@ function AdminCreate({
   const [category, setCategory] = useState(categorias[0] ?? 'tops')
   const [occasion, setOccasion] = useState('casual')
   const [price, setPrice] = useState('99')
+  const [talla, setTalla] = useState('M')
+  const [color, setColor] = useState('único')
+  const [stock, setStock] = useState('0')
+  const [sucursales, setSucursales] = useState<Sucursal[]>([])
+  const [sucursalId, setSucursalId] = useState('')
   const [ok, setOk] = useState('')
   const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
     if (categorias.length && !categorias.includes(category)) {
@@ -354,26 +366,63 @@ function AdminCreate({
     }
   }, [categorias, category])
 
+  useEffect(() => {
+    void conCache('sucursales-catalogo', () => api<Sucursal[]>('/catalogo/sucursales'))
+      .then(({ datos }) => {
+        setSucursales(datos)
+        if (datos[0]) setSucursalId(datos[0].id)
+      })
+      .catch(() => undefined)
+  }, [])
+
+  /**
+   * El alta va como operación con UUID del dispositivo por /sync/lote, con o sin red:
+   * producto, variante y stock inicial se crean en una sola transacción y reintentar no duplica.
+   */
   async function create(event: FormEvent) {
     event.preventDefault()
+    if (guardando) return
     setOk('')
     setError('')
+    setGuardando(true)
+    const almacenId = sucursales.find(s => s.id === sucursalId)?.almacenes[0]?.id
+    const cantidad = Math.max(0, Math.floor(Number(stock) || 0))
+    const sku = `${name.slice(0, 3).toUpperCase()}-${color.slice(0, 3).toUpperCase()}-${talla.toUpperCase()}-${uuid().slice(0, 4).toUpperCase()}`
     try {
-      const created = await api<{ id: string }>('/catalogo/productos', {
-        method: 'POST',
-        body: JSON.stringify({
-          nombre: name,
+      const op = await encolar(
+        'producto',
+        {
+          id: uuid(),
+          nombre: name.trim(),
           categoria: category,
           ocasion: occasion,
           precioBase: Number(price),
-        }),
-      })
+          ...(cantidad && almacenId ? { almacenId } : {}),
+          variantes: [{ id: uuid(), talla, color, sku, ...(cantidad && almacenId ? { stock: cantidad } : {}) }],
+        },
+        `Producto ${name.trim()} · ${talla}/${color}`,
+      )
       setName('')
-      setOk('Producto creado. Abriendo ficha…')
-      onCreated()
-      if (created?.id) navigate(`/ficha/${created.id}`)
+      let r = (await sincronizar()).find(x => x.id === op.id)
+      // Si ya había un envío en curso, la operación nueva sale en el siguiente.
+      if (!r && navigator.onLine) r = (await sincronizar()).find(x => x.id === op.id)
+      if (r && ['aplicada', 'repetida'].includes(r.estado)) {
+        setOk('Producto creado. Abriendo ficha…')
+        onCreated()
+        if (r.recursoId) navigate(`/ficha/${r.recursoId}`)
+      } else if (r) {
+        setError(r.mensaje ?? r.codigo ?? 'No se pudo crear el producto.')
+      } else {
+        setOk(
+          navigator.onLine
+            ? 'Producto guardado; se termina de crear en la próxima sincronización.'
+            : 'Sin conexión: el producto quedó guardado en el dispositivo y se crea al volver la red.',
+        )
+      }
     } catch {
       setError('No se pudo crear el producto.')
+    } finally {
+      setGuardando(false)
     }
   }
 
@@ -419,8 +468,30 @@ function AdminCreate({
               required
             />
           </OpsField>
+          <OpsField label="Talla">
+            <input value={talla} onChange={event => setTalla(event.target.value)} required maxLength={20} />
+          </OpsField>
+          <OpsField label="Color">
+            <input value={color} onChange={event => setColor(event.target.value)} required maxLength={40} />
+          </OpsField>
+          <OpsField label="Stock inicial">
+            <input type="number" min={0} step={1} value={stock} onChange={event => setStock(event.target.value)} />
+          </OpsField>
+          {sucursales.length > 1 ? (
+            <OpsField label="Sucursal del stock">
+              <select value={sucursalId} onChange={event => setSucursalId(event.target.value)}>
+                {sucursales.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </OpsField>
+          ) : null}
         </div>
-        <OpsBtn type="submit">Crear y abrir ficha</OpsBtn>
+        <OpsBtn type="submit" disabled={guardando}>
+          {guardando ? 'Guardando…' : 'Crear y abrir ficha'}
+        </OpsBtn>
       </form>
     </OpsPanel>
   )

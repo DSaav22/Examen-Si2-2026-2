@@ -4,12 +4,15 @@ import './index.css'
 import './styles/vesta-typography.css'
 import './styles/ops.css'
 import App from './App.tsx'
+import { iniciarAutoSync } from './offline/sync'
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     void navigator.serviceWorker.register('/sw.js')
   })
 }
+
+iniciarAutoSync()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

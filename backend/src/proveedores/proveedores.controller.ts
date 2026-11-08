@@ -17,6 +17,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { exigirDeLaTienda } from '../tenancy/pertenencia';
+import { PlanLimitesService } from '../tenancy/plan-limites.service';
 
 class ProveedorDto {
   @IsString()
@@ -61,7 +63,10 @@ class ProductoProveedorDto {
 @Controller('proveedores')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProveedoresController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly limites: PlanLimitesService,
+  ) {}
 
   @Get('mis-productos')
   @Roles(Rol.PROVEEDOR)
@@ -94,6 +99,8 @@ export class ProveedoresController {
     const skuBase =
       dto.sku?.trim() ||
       `${dto.nombre.slice(0, 3).toUpperCase()}-${color.slice(0, 3).toUpperCase()}-${talla}-${Date.now().toString(36).slice(-4)}`;
+    await this.limites.verificar('productos');
+    await exigirDeLaTienda(this.prisma, { temporada: dto.temporadaId, coleccion: dto.coleccionId });
     return this.prisma.producto.create({
       data: {
         nombre: dto.nombre,
