@@ -347,6 +347,7 @@ export class CatalogoService {
       talla: variante.talla,
       color: variante.color,
       urlOverlay: variante.urlOverlay || '/overlay-polera.png',
+      urlFoto: variante.urlFoto,
       producto: variante.producto.nombre,
       urlModelo: variante.urlModelo,
     };

@@ -204,3 +204,27 @@ Verificado con `verificar:reportes` (24 chequeos) y recorrido en navegador:
 
 Detalle en [[Reportes generativos]]. Actualiza [[Brecha segundo parcial]] y [[Modo offline]]. Sigue: analítica, pagos, documento ICONIX.
 
+## [2026-11-08] query | Contexto y pendientes del segundo parcial
+
+Andrés compartió una lista de pedidos del docente para continuar EnsayAR en el segundo parcial. Registrada como fuente conversacional [[pedidos-segundo-parcial-2026-11-08]] y organizada en [[Pendientes segundo parcial]]: continuidad, POS, multitenancy, suscripciones, sincronización/offline, integridad, voz, aprendizaje automático, nube e ICONIX. La consigna original y sus detalles aún no están disponibles; se identificaron preguntas abiertas. El PUD del primer parcial permanece como antecedente histórico.
+
+## [2026-11-08] query | Comparación de pedidos y audios del segundo parcial
+
+Contrastados [[pedidos-segundo-parcial-2026-11-08]] y [[transcripcion-audio-segundo-parcial]] en [[Comparacion pedidos y audio segundo parcial]]. Se precisan los tres caminos, SaaS, offline/PWA, reportes, arquitectura, nube, pagos, ICONIX y entrega; se distinguen requisitos y limitaciones de la transcripción del estado de implementación.
+
+## [2026-11-09] query | Decisiones de arquitectura para el segundo parcial
+
+Andrés eligió una base PostgreSQL con un esquema por tienda, para implementar más adelante; PWA web; SQLite móvil; idempotencia y rollback. Registradas en [[decisiones-arquitectura-2026-11-09]], [[Pendientes segundo parcial]] y [[SaaS multi-tenant]], distinguiendo la decisión futura del modelo actual con `tiendaId`. También se dejó constancia de voz móvil, pagos simulados y monolito modular. No se modificó código ni base de datos.
+
+## [2026-11-09] query | Planes y suscripciones retail
+
+Decisiones y flujo propuesto, funcionalidades detectadas, fuentes de pagos y pruebas pendientes de baja de plan en [[Planes y suscripciones retail]].
+
+## [2026-11-09] query | Auditoría del flujo de suscripciones
+
+Se documentaron hallazgos, diseño propuesto, separación de pagos y pruebas en [[Auditoria suscripciones y ciclo de vida]].
+
+## [2026-11-09] query | Planes aceptados y pagos por país
+
+Se registran los tres planes y el flujo aprobados en [[Planes y suscripciones retail]], y las fuentes y restricciones en [[Metodos de pago por pais 2026]].
+

@@ -10,6 +10,7 @@ import {
   VerificarDto,
 } from './plataforma.dto';
 import { PlataformaService } from './plataforma.service';
+import { metodosSimuladosPorPais } from '../pagos/metodos-pais';
 
 @Controller('plataforma')
 export class PlataformaController {
@@ -18,6 +19,12 @@ export class PlataformaController {
   @Get('planes')
   planes() {
     return this.plataforma.planes();
+  }
+
+  /** Catálogo informativo: no ejecuta cobros ni garantiza disponibilidad real. */
+  @Get('paises/:pais/metodos-pago')
+  metodosPago(@Param('pais') pais: string) {
+    return { pais: pais.toUpperCase(), metodos: metodosSimuladosPorPais(pais), modo: 'simulado' };
   }
 
   @Get('slug-disponible')

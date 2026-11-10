@@ -578,6 +578,7 @@ td {
 
 .stage .cloth {
   position: absolute;
+  z-index: 1;
   pointer-events: none;
   transform-origin: top center;
 }

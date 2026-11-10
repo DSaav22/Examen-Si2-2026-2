@@ -3,12 +3,13 @@ import { Link, Navigate } from 'react-router-dom'
 import { apiCuenta } from '../api'
 import type { TiendaDeCuenta } from '../tienda'
 import { fecha, PERIODOS, usd, usePlataforma, type Periodo, type PlanPublico } from './comun'
-import { FormTarjeta, type Tarjeta } from './NuevaTienda'
+import { FormTarjeta, SelectorPagoPais, TARJETA_SIMULADA, type Tarjeta } from './NuevaTienda'
 
 type Detalle = {
   id: string
   slug: string
   nombre: string
+  pais: string
   vigente: boolean
   venceEn: string | null
   plan: { id: string; codigo: string; nombre: string; maxUsuarios: number; maxSucursales: number; maxProductos: number | null } | null
@@ -21,7 +22,7 @@ type Detalle = {
     inicio: string
     venceEn: string
     monto: number
-    pagos: { referencia: string; monto: number; estado: string; ultimos4: string; fecha: string }[]
+    pagos: { referencia: string; monto: number; estado: string; pasarela: string; ultimos4: string; fecha: string }[]
   }[]
 }
 
@@ -45,6 +46,7 @@ function Suscripcion({ tienda, onCambio }: { tienda: TiendaDeCuenta; onCambio: (
   const [planId, setPlanId] = useState('')
   const [periodo, setPeriodo] = useState<Periodo>('MENSUAL')
   const [tarjeta, setTarjeta] = useState<Tarjeta>({ titular: '', numero: '', vence: '', cvc: '' })
+  const [metodoPago, setMetodoPago] = useState('')
   const [clave, setClave] = useState(() => crypto.randomUUID())
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
@@ -64,7 +66,7 @@ function Suscripcion({ tienda, onCambio }: { tienda: TiendaDeCuenta; onCambio: (
     try {
       const d = await apiCuenta<Detalle>(`/plataforma/tiendas/${tienda.tiendaId}/renovar`, {
         method: 'POST',
-        body: JSON.stringify({ planId, periodo, pago: tarjeta, idempotencyKey: clave }),
+        body: JSON.stringify({ planId, periodo, metodoPago, pago: metodoPago === 'tarjeta' ? tarjeta : TARJETA_SIMULADA, idempotencyKey: clave }),
       })
       setDetalle(d)
       setAbierto(false)
@@ -123,11 +125,12 @@ function Suscripcion({ tienda, onCambio }: { tienda: TiendaDeCuenta; onCambio: (
               ? 'Mismo plan: el nuevo período se suma al vencimiento actual.'
               : 'Cambio de plan: empieza hoy y los nuevos límites se aplican al instante.'}
           </p>
-          <FormTarjeta tarjeta={tarjeta} onChange={setTarjeta} />
+          <SelectorPagoPais pais={detalle.pais} metodo={metodoPago} onChange={setMetodoPago} />
+          {metodoPago === 'tarjeta' ? <FormTarjeta tarjeta={tarjeta} onChange={setTarjeta} /> : null}
           {error ? <p className="pf-error" role="alert">{error}</p> : null}
           <div className="pf-actions">
             <button type="button" className="pf-btn pf-btn--ghost" onClick={() => setAbierto(false)}>Cancelar</button>
-            <button className="pf-btn">Pagar {elegido ? usd(elegido.precios[periodo]) : ''}</button>
+            <button className="pf-btn" disabled={!metodoPago}>Simular pago {elegido ? usd(elegido.precios[periodo]) : ''}</button>
           </div>
         </form>
       )}
@@ -135,12 +138,12 @@ function Suscripcion({ tienda, onCambio }: { tienda: TiendaDeCuenta; onCambio: (
         <details className="pf-history">
           <summary>Historial de pagos ({pagos.length})</summary>
           <table className="pf-table">
-            <thead><tr><th>Fecha</th><th>Plan</th><th>Período</th><th>Monto</th><th>Tarjeta</th><th>Referencia</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Plan</th><th>Período</th><th>Monto</th><th>Método simulado</th><th>Referencia</th></tr></thead>
             <tbody>
               {pagos.map(p => (
                 <tr key={p.referencia}>
                   <td>{fecha(p.fecha)}</td><td>{p.plan}</td><td>{p.periodo.toLowerCase()}</td>
-                  <td>{usd(p.monto)}</td><td>•••• {p.ultimos4}</td><td><code>{p.referencia}</code></td>
+                  <td>{usd(p.monto)}</td><td>{p.pasarela?.split(':')[1] ?? 'tarjeta'}{(p.pasarela?.endsWith(':tarjeta') || p.pasarela === 'simulada') ? ` · •••• ${p.ultimos4}` : ''}</td><td><code>{p.referencia}</code></td>
                 </tr>
               ))}
             </tbody>

@@ -9,6 +9,12 @@ tags: [saas, multi-tenant, arquitectura, segundo-parcial]
 
 [[EnsayAR]] pasa de una tienda a **muchas tiendas** bajo un modelo SaaS (Software as a Service). [[transcripcion-audio-segundo-parcial]]
 
+## Decisión actual — 9 de noviembre
+
+Andrés eligió **una base PostgreSQL con un esquema por tienda**, con tablas de plataforma compartidas donde corresponda. Se implementará más adelante: queda pendiente diseñar la creación de esquemas, el acceso aislado, las migraciones y los respaldos/restauraciones por tienda, y validar la compatibilidad con Prisma. [[decisiones-arquitectura-2026-11-09]]
+
+**Distinción:** el código integrado al 8 de noviembre sigue usando tablas compartidas con `tienda_id`. La sección de implementación más abajo describe ese estado histórico, no que la nueva decisión ya esté aplicada. No se han aplicado migraciones para convertirlo a esquemas por tienda.
+
 ## Qué pide el docente
 
 - El cliente no compra licencias ni infraestructura: paga por lo que usa.
@@ -29,7 +35,7 @@ tags: [saas, multi-tenant, arquitectura, segundo-parcial]
 | Esquema por tienda (misma base) | Aislamiento medio | Prisma maneja mal muchos esquemas; migraciones N veces |
 | Base compartida con `tenant_id` | Barato, alta instantánea, una migración | Riesgo de fuga si falta un filtro |
 
-Opción razonable con Prisma: **base compartida con `tenant_id`**, reforzada con **Row-Level Security** de PostgreSQL para que la base misma impida leer otra tienda aunque el código olvide el filtro. Se puede dejar como evolución un plan "dedicado" con base propia.
+Como alternativa se había considerado una base compartida con `tenant_id` y Row-Level Security. La dirección elegida posteriormente es un esquema por tienda; su viabilidad y aislamiento efectivo deben comprobarse durante el diseño e implementación. [[decisiones-arquitectura-2026-11-09]]
 
 ## Cómo encaja en NestJS
 
@@ -41,7 +47,7 @@ Opción razonable con Prisma: **base compartida con `tenant_id`**, reforzada con
 
 Migraciones `20261108120000_saas_multitenant` y `20261108130000_tienda_desde_sesion`. Verificado con `npm run verificar:tenancy` y `npm run verificar:saas` (15 chequeos HTTP), más recorrido en navegador.
 
-**Estrategia elegida (S8): base compartida con `tienda_id`**, defendida en capas:
+**Estrategia implementada en ese corte (S8): base compartida con `tienda_id`**, defendida en capas:
 
 1. **Resolución de la tienda por petición** (`TenantMiddleware`): primero la tienda del JWT; si no hay sesión, la cabecera `X-Tienda` (slug); si no, la tienda por defecto. Con sesión, la cabecera no puede cambiar de tienda. Tienda vencida → 402; inexistente → 404.
 2. **Contexto por petición** con `AsyncLocalStorage` (`TenantContext`).
@@ -50,7 +56,7 @@ Migraciones `20261108120000_saas_multitenant` y `20261108130000_tienda_desde_ses
 5. **SQL crudo de reportes**: corre en una transacción con `set_config('app.tienda_id', …)`; la vista `v_reporte_ventas` filtra por esa variable. El validador del SQL generado por IA prohíbe tocar tablas base, `set_config` y `current_setting`.
 6. **Pertenencia de ids recibidos** (`exigirDeLaTienda`): las claves foráneas no saben de tiendas, así que un id de variante, almacén o proveedor ajeno se rechaza con 404.
 
-Por qué no base ni esquema por tienda: el alta tiene que ser instantánea y automática tras el pago, y Prisma trabaja con un solo esquema y una sola migración. **RLS completa (políticas `CREATE POLICY`) queda como evolución**: hoy la base aporta el defecto y la vista filtrada, pero no hay políticas por tabla.
+En ese corte se eligió el modelo compartido para simplificar el alta y las migraciones. **RLS completa (políticas `CREATE POLICY`) queda como evolución de esa implementación**: la base aporta el defecto y la vista filtrada, pero no hay políticas por tabla. La decisión posterior de usar esquemas por tienda requiere revisar el aprovisionamiento y las migraciones; no se debe asumir que Prisma las resuelve automáticamente.
 
 **Identidad (S7):** `Cuenta` global (correo verificado, una clave) ↔ `Usuario` como perfil por tienda con su rol. JWT de tienda (`tipo: 'tienda'`) y de cuenta (`tipo: 'cuenta'`, plataforma). Selector de tienda en la barra lateral, sin re-login.
 

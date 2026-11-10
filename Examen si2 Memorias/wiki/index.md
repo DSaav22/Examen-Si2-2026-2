@@ -1,6 +1,6 @@
 ---
 tipo: index
-actualizado: 2026-11-08
+actualizado: 2026-11-09
 tags: [index]
 ---
 
@@ -10,6 +10,10 @@ Portal compilado. En cada query, empezar aquí.
 
 ## Segundo parcial (11 nov, PDF hasta las 8:00)
 
+- [[Planes y suscripciones retail]] — decisiones, flujo y pruebas de cambio de plan
+- [[Metodos de pago por pais 2026]] — investigación LATAM, PayPal y Binance Pay
+- [[Auditoria suscripciones y ciclo de vida]] — flujo actual, permisos, diseño y pruebas pendientes
+- [[decisiones-arquitectura-2026-11-09]] — esquema por tienda pendiente, PWA, SQLite, idempotencia y rollback
 - [[Mapa del segundo parcial]] — requisitos B/S/O/R/A/P/D extraídos de la clase
 - [[Brecha segundo parcial]] — requisitos vs código al 8 nov
 - [[ICONIX vs Proceso Unificado]] — contraste y qué se reutiliza
@@ -21,6 +25,7 @@ Portal compilado. En cada query, empezar aquí.
 
 ## Síntesis (primer parcial)
 
+- [[Pendientes segundo parcial]] — requisitos nuevos, backlog, riesgos y preguntas abiertas; metodología ICONIX
 - [[Mapa del examen]] — qué hay que entregar y qué es canónico
 - [[Contradicciones entre fuentes]] — audio vs Garzón vs stack vs código
 - [[MVP y alcance]] — esencial vs complemento
@@ -66,7 +71,9 @@ Portal compilado. En cada query, empezar aquí.
 
 ## Fuentes
 
+- [[decisiones-arquitectura-2026-11-09]] — decisiones de Andrés y estado pendiente de implementación
 - [[transcripcion-audio-segundo-parcial]] — **canon del segundo parcial** (SaaS, offline, reportes, ML, pagos, ICONIX)
+- [[pedidos-segundo-parcial-2026-11-08]] — resumen de pedidos comunicado por Andrés
 - [[transcripcion-audio-clase-ecommerce]] — problema e innovaciones (oral)
 - [[transcripcion-audio-stack-metodologia-parcial]] — stack, PUD, 3 partes (transcripción literal)
 - [[examen1-garzon-fashionstore]] — PDF otro docente (RF, actores, reservas)
@@ -80,6 +87,7 @@ Portal compilado. En cada query, empezar aquí.
 
 ## Queries archivadas
 
+- [[Comparacion pedidos y audio segundo parcial]] — acuerdos, precisiones y diferencias entre ambas fuentes
 - [[Factibilidad documentacion y producto]] — Inicio sí; RA 3D no entra
 - [[Huecos locales vs examen]] — RF vs madurez real (revisado 25 sep)
 

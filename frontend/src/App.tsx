@@ -35,6 +35,11 @@ import { NuevaTienda } from './plataforma/NuevaTienda'
 import { MetricasPlataforma } from './plataforma/Metricas'
 import { TiendaPorSlug } from './shared/SelectorTienda'
 
+/**
+ * Mapa de navegación web. Para localizar una pantalla de la exposición,
+ * buscá su ruta aquí y luego su componente en `pages/`. ProtectedRoute sólo
+ * controla UX: la API vuelve a validar JWT y rol en el backend.
+ */
 function loginPath(next?: string) {
   if (!next || next === '/login' || next === '/registro') return '/login'
   return `/login?next=${encodeURIComponent(next)}`

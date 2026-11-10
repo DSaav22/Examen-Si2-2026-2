@@ -59,7 +59,7 @@ export class TiendasService {
         where,
         include: {
           suscripciones: {
-            where: { estado: 'activa', venceEn: { gt: ahora } },
+            where: { estado: 'activa', inicio: { lte: ahora }, venceEn: { gt: ahora } },
             orderBy: { venceEn: 'desc' },
             take: 1,
             include: { plan: true },

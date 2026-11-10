@@ -19,6 +19,11 @@ import { SessionProvider, useSession } from './src/session'
 import { colors } from './src/theme'
 import { BottomNav, Capas, Header } from './src/ui'
 
+/**
+ * Punto de entrada móvil. La navegación se modela como una pila tipada en
+ * SessionProvider en vez de React Navigation; al sumar una pantalla hay que
+ * declararla en `Screen` (session.tsx) y renderizarla en este selector.
+ */
 function Root() {
   const s = useSession()
   if (!s.listo) {

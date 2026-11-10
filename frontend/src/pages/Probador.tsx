@@ -14,6 +14,7 @@ import { TryOn3DOverlay } from '../features/tryon3d/TryOn3DOverlay'
 import { poseFromMediaPipe } from '../features/tryon3d/mediapipePoseAdapter'
 import type { TryOnPose } from '../features/tryon3d/domain'
 import type { Producto } from '../types'
+import { anchorFromShoulders, cutoutLightBackground, projectToPreview, smoothAnchor, type GarmentAnchor } from '../features/tryon3d/garment2d'
 
 type Overlay = {
   varianteId: string
@@ -22,6 +23,7 @@ type Overlay = {
   urlOverlay: string
   producto: string
   urlModelo: string
+  urlFoto?: string
 }
 
 function soportaTransform3d(): boolean {
@@ -37,6 +39,8 @@ export function Probador() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const videoRef = useRef<HTMLVideoElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const anchorRef = useRef<GarmentAnchor | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [overlay, setOverlay] = useState<Overlay | null>(null)
   const [hermanas, setHermanas] = useState<Overlay[]>([])
@@ -54,6 +58,9 @@ export function Probador() {
   const [adminMsg, setAdminMsg] = useState('')
   const [sinCamara, setSinCamara] = useState(false)
   const [poseEnVivo, setPoseEnVivo] = useState<TryOnPose | null>(null)
+  const [recorte, setRecorte] = useState('')
+  const [estadoPrenda, setEstadoPrenda] = useState<'cargando' | 'lista' | 'error'>('cargando')
+  const [anchor, setAnchor] = useState<GarmentAnchor | null>(null)
   const puede3d = useMemo(() => soportaTransform3d(), [])
   const esAdmin = user?.rol === 'ADMIN' || user?.rol === 'SUPERADMIN'
   const tieneModelo = Boolean(overlay?.urlModelo?.trim())
@@ -64,24 +71,62 @@ export function Probador() {
     || overlay.urlOverlay.includes('overlay-polera')
   const mostrarCloth =
     Boolean(overlay) &&
-    !overlayEsPlaceholder &&
+    Boolean(recorte || !overlayEsPlaceholder) &&
     (fotoCuerpo || !sinCamara) &&
     !vistaIa &&
     !mostrando3d
 
   useEffect(() => {
     if (!varianteId) return
+    let active = true
+    setOverlay(null)
+    setRecorte('')
+    setEstadoPrenda('cargando')
+    setAviso('')
     setVista3d(false)
     setVistaIa('')
     api<Overlay>(`/catalogo/variantes/${varianteId}/overlay`)
-      .then(data => {
-        const next = { ...data, urlModelo: data.urlModelo ?? '' }
+      .then(async data => {
+        // Versiones anteriores del backend no devuelven urlFoto en /overlay.
+        // Recuperarla desde catálogo sin sustituirla por una prenda distinta.
+        let urlFoto = data.urlFoto
+        if (!urlFoto && (!data.urlOverlay || data.urlOverlay.includes('overlay-polera'))) {
+          const productos = await api<Producto[] | { items: Producto[] }>('/catalogo/productos')
+          const items = Array.isArray(productos) ? productos : productos.items
+          urlFoto = items.flatMap(p => p.variantes).find(v => v.id === varianteId)?.urlFoto
+        }
+        if (!active) return
+        const next = { ...data, urlFoto, urlModelo: data.urlModelo ?? '' }
         setOverlay(next)
-        if (next.urlModelo?.trim() && soportaTransform3d()) setVista3d(true)
-        setModo('Elegí una foto o usá la cámara')
       })
-      .catch(() => setError('No hay overlay para esta variante.'))
+      .catch(() => {
+        if (active) { setEstadoPrenda('error'); setError('No se pudo cargar la imagen de esta variante.') }
+      })
+    return () => { active = false }
   }, [varianteId])
+
+  useEffect(() => {
+    let active = true
+    setRecorte('')
+    anchorRef.current = null
+    setAnchor(null)
+    if (!overlay) return
+    if (!overlayEsPlaceholder) {
+      setEstadoPrenda('lista')
+      return
+    }
+    if (!overlay.urlFoto) {
+      setEstadoPrenda('error')
+      return
+    }
+    setEstadoPrenda('cargando')
+    void cutoutLightBackground(assetUrl(overlay.urlFoto)).then(url => {
+      if (active) { setRecorte(url); setEstadoPrenda('lista') }
+    }).catch(() => {
+      if (active) setEstadoPrenda('error')
+    })
+    return () => { active = false }
+  }, [overlay, overlayEsPlaceholder])
 
   useEffect(() => {
     api<Producto[]>('/catalogo/productos').then(productos => {
@@ -114,13 +159,14 @@ export function Probador() {
         stream = s
         setSinCamara(false)
         const video = videoRef.current
-        if (!video) return
+        if (!video || !alive) { s.getTracks().forEach(track => track.stop()); return }
         video.srcObject = s
         await video.play()
         try {
           const pose = await crearPose()
           const tick = () => {
-            if (!alive || !video.videoWidth) {
+            if (!alive) return
+            if (!video.videoWidth) {
               raf = requestAnimationFrame(tick)
               return
             }
@@ -128,13 +174,25 @@ export function Probador() {
             const lm = res.landmarks[0]
             if (lm) {
               setPoseEnVivo(poseFromMediaPipe(lm))
+              const stage = stageRef.current
+              if (stage && lm[11] && lm[12]) {
+                const rect = stage.getBoundingClientRect()
+                const left = projectToPreview(lm[11], video.videoWidth, video.videoHeight, rect.width, rect.height)
+                const right = projectToPreview(lm[12], video.videoWidth, video.videoHeight, rect.width, rect.height)
+                const current = anchorFromShoulders(left, right)
+                if (current) {
+                  anchorRef.current = smoothAnchor(anchorRef.current, current)
+                  setAnchor(anchorRef.current)
+                } else { anchorRef.current = null; setAnchor(null) }
+              }
               const next = cajaDesdeLandmarks(lm)
               if (next) {
                 setCaja(next)
-                setModo('Hombros detectados · overlay activo')
               }
             } else {
               setPoseEnVivo(null)
+              anchorRef.current = null
+              setAnchor(null)
             }
             raf = requestAnimationFrame(tick)
           }
@@ -294,6 +352,13 @@ export function Probador() {
   }
 
   const etapa = vistaIa ? 3 : tieneFoto || !sinCamara ? 2 : 1
+  const estadoCamara = sinCamara ? modo : estadoPrenda === 'cargando'
+    ? 'Preparando la imagen de la prenda…'
+    : estadoPrenda === 'error'
+      ? 'No hay una imagen compatible para esta prenda'
+      : anchor
+        ? 'Prenda superpuesta · seguimiento activo'
+        : 'Buscando hombros · alejate para ver ambos'
 
   return (
     <section className="tryon-page">
@@ -355,6 +420,7 @@ export function Probador() {
             </div>
           ) : (
             <div
+              ref={stageRef}
               className={`stage${sinCamara && !fotoCuerpo ? ' stage--empty' : ''}`}
               onClick={tocar}
             >
@@ -369,15 +435,19 @@ export function Probador() {
               ) : (
                 <video ref={videoRef} autoPlay muted playsInline />
               )}
-              {mostrarCloth ? (
+              {mostrarCloth && (fotoCuerpo || anchor) ? (
                 <img
                   className="cloth"
-                  src={assetUrl(overlay!.urlOverlay)}
+                  src={recorte || assetUrl(overlay!.urlOverlay)}
                   alt={overlay!.producto}
-                  style={caja}
+                  onError={() => setEstadoPrenda('error')}
+                  style={!fotoCuerpo && anchor ? {
+                    left: `${anchor.x}px`, top: `${anchor.y}px`, width: `${anchor.width}px`, height: 'auto',
+                    transformOrigin: '50% 15%', transform: `translate(-50%, -15%) rotate(${anchor.angle}rad)`,
+                  } : caja}
                 />
               ) : null}
-              <span className="tryon-badge">{modo}</span>
+              <span className="tryon-badge" role="status">{fotoCuerpo ? modo : estadoCamara}</span>
             </div>
           )}
         </div>
@@ -444,11 +514,10 @@ export function Probador() {
                 </button>
               </div>
               <p className="tryon-hint">De frente, buena luz. Ideal cuerpo completo.</p>
-              {overlayEsPlaceholder && tieneFoto ? (
+              {estadoPrenda === 'error' ? (
                 <p className="tryon-hint">
-                  Esta prenda no tiene recorte 2D propio (el placeholder de polera se
-                  oculta). Usá <strong>Ver vista realista</strong> para verla sobre tu
-                  foto.
+                  No se pudo cargar o recortar la foto de esta variante. Probá otra prenda
+                  o utilizá <strong>Ver vista realista</strong> con una foto.
                 </p>
               ) : null}
             </div>

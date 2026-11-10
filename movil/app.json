@@ -31,7 +31,6 @@
     "android": {
       "package": "bo.ensayar.vesta",
       "versionCode": 1,
-      "usesCleartextTraffic": true,
       "permissions": [
         "CAMERA",
         "INTERNET"

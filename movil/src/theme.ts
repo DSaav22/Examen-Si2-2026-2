@@ -21,6 +21,11 @@ export const colors = {
  * Emulador Android sin host LAN: 10.0.2.2 apunta al host.
  */
 export function apiPorDefecto(): string {
+  // En una APK instalada no existe `hostUri` de Expo. EXPO_PUBLIC_API_URL se
+  // inyecta al compilar y debe apuntar al mismo NestJS/PostgreSQL que usa web.
+  // No guardar credenciales aquí: el login obtiene su JWT desde ese backend.
+  const configured = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/$/, '')
+  if (configured) return configured
   const hostUri =
     Constants.expoConfig?.hostUri ??
     Constants.experienceUrl ??

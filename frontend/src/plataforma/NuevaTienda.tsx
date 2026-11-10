@@ -5,6 +5,38 @@ import type { SesionTienda } from '../auth'
 import { PAISES, PERIODOS, usd, usePlataforma, type Periodo, type PlanPublico } from './comun'
 
 export type Tarjeta = { titular: string; numero: string; vence: string; cvc: string }
+export type MetodoPagoPais = { codigo: string; nombre: string; simulado: boolean }
+export const TARJETA_SIMULADA: Tarjeta = { titular: 'Pago simulado', numero: '4242 4242 4242 4242', vence: '12/30', cvc: '123' }
+
+export function SelectorPagoPais({ pais, metodo, onChange }: { pais: string; metodo: string; onChange: (valor: string) => void }) {
+  const [metodos, setMetodos] = useState<MetodoPagoPais[]>([])
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let vigente = true
+    setMetodos([])
+    setError('')
+    apiCuenta<{ metodos: MetodoPagoPais[] }>(`/plataforma/paises/${encodeURIComponent(pais)}/metodos-pago`)
+      .then(r => {
+        if (!vigente) return
+        setMetodos(r.metodos)
+        onChange(r.metodos.some(m => m.codigo === metodo) ? metodo : r.metodos[0]?.codigo ?? '')
+      })
+      .catch(() => { if (vigente) { setError('No se pudieron cargar los métodos de pago.'); onChange('') } })
+    return () => { vigente = false }
+    // La selección se conserva al cambiar de país si el método está disponible.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pais])
+  return <div className="pf-form">
+    <label>Método de pago simulado
+      <select value={metodo} onChange={e => onChange(e.target.value)} required>
+        <option value="" disabled>Seleccioná un método</option>
+        {metodos.map(m => <option key={m.codigo} value={m.codigo}>{m.nombre} · Simulado</option>)}
+      </select>
+    </label>
+    <p className="pf-muted">Es una demostración: no se realiza ningún cobro ni conexión con el proveedor.</p>
+    {error ? <p className="pf-error" role="alert">{error}</p> : null}
+  </div>
+}
 
 const TARJETAS_PRUEBA = [
   { numero: '4242 4242 4242 4242', efecto: 'aprobada' },
@@ -78,6 +110,7 @@ export function NuevaTienda() {
   const [slugManual, setSlugManual] = useState<string | null>(null)
   const [consulta, setConsulta] = useState<{ slug: string; disponible: boolean } | null>(null)
   const [pais, setPais] = useState('BO')
+  const [metodoPago, setMetodoPago] = useState('')
   const [tarjeta, setTarjeta] = useState<Tarjeta>({ titular: sesion?.cuenta.nombre ?? '', numero: '', vence: '', cvc: '' })
   // Misma clave para reintentos del mismo intento (doble clic); nueva clave tras un rechazo.
   const [clave, setClave] = useState(() => crypto.randomUUID())
@@ -117,7 +150,8 @@ export function NuevaTienda() {
           planId,
           periodo,
           tienda: { nombre, slug, pais, moneda },
-          pago: tarjeta,
+          pago: metodoPago === 'tarjeta' ? tarjeta : TARJETA_SIMULADA,
+          metodoPago,
           idempotencyKey: clave,
         }),
       })
@@ -223,7 +257,8 @@ export function NuevaTienda() {
         <form className="pf-card pf-checkout" onSubmit={pagar}>
           <div>
             <h1>Pago</h1>
-            <FormTarjeta tarjeta={tarjeta} onChange={setTarjeta} />
+            <SelectorPagoPais pais={pais} metodo={metodoPago} onChange={setMetodoPago} />
+            {metodoPago === 'tarjeta' ? <FormTarjeta tarjeta={tarjeta} onChange={setTarjeta} /> : null}
           </div>
           <aside className="pf-summary">
             <h2>Resumen</h2>
@@ -238,7 +273,7 @@ export function NuevaTienda() {
             {error ? <p className="pf-error" role="alert">{error}</p> : null}
             <div className="pf-actions">
               <button type="button" className="pf-btn pf-btn--ghost" onClick={() => setPaso(2)}>Atrás</button>
-              <button className="pf-btn" disabled={pagando}>{pagando ? 'Procesando…' : `Pagar ${usd(plan.precios[periodo])}`}</button>
+              <button className="pf-btn" disabled={pagando || !metodoPago}>{pagando ? 'Procesando…' : `Simular pago ${usd(plan.precios[periodo])}`}</button>
             </div>
           </aside>
         </form>

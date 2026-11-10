@@ -75,6 +75,9 @@ export class DatosTiendaDto {
 }
 
 export class SuscribirDto {
+  @IsOptional()
+  @IsString()
+  metodoPago?: string;
   @IsString()
   planId!: string;
 
@@ -95,6 +98,9 @@ export class SuscribirDto {
 }
 
 export class RenovarDto {
+  @IsOptional()
+  @IsString()
+  metodoPago?: string;
   @IsString()
   planId!: string;
 

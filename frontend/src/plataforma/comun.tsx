@@ -44,10 +44,11 @@ export const MODULOS: Record<string, string> = {
   mayorista: 'Precios mayoristas',
 }
 
-/** Países hispanohablantes y su moneda local. */
+/** Países y territorios de Latinoamérica, además de España, con su moneda local. */
 export const PAISES: { codigo: string; nombre: string; moneda: string }[] = [
   { codigo: 'BO', nombre: 'Bolivia', moneda: 'BOB' },
   { codigo: 'AR', nombre: 'Argentina', moneda: 'ARS' },
+  { codigo: 'BR', nombre: 'Brasil', moneda: 'BRL' },
   { codigo: 'CL', nombre: 'Chile', moneda: 'CLP' },
   { codigo: 'CO', nombre: 'Colombia', moneda: 'COP' },
   { codigo: 'CR', nombre: 'Costa Rica', moneda: 'CRC' },
@@ -56,7 +57,7 @@ export const PAISES: { codigo: string; nombre: string; moneda: string }[] = [
   { codigo: 'SV', nombre: 'El Salvador', moneda: 'USD' },
   { codigo: 'ES', nombre: 'España', moneda: 'EUR' },
   { codigo: 'GT', nombre: 'Guatemala', moneda: 'GTQ' },
-  { codigo: 'GQ', nombre: 'Guinea Ecuatorial', moneda: 'XAF' },
+  { codigo: 'HT', nombre: 'Haití', moneda: 'HTG' },
   { codigo: 'HN', nombre: 'Honduras', moneda: 'HNL' },
   { codigo: 'MX', nombre: 'México', moneda: 'MXN' },
   { codigo: 'NI', nombre: 'Nicaragua', moneda: 'NIO' },

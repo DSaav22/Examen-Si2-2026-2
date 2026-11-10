@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  BadRequestException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -21,10 +22,17 @@ import { TiendasService } from '../tenancy/tiendas.service';
 import { PasarelaSuscripcion } from './pasarela-suscripcion';
 import { LoginCuentaDto, RegistroCuentaDto, RenovarDto, SuscribirDto } from './plataforma.dto';
 import { DESCUENTO, MESES, precioPeriodo, sumarMeses } from './precios';
+import { metodosSimuladosPorPais, monedaDePais } from '../pagos/metodos-pais';
 
 const SLUGS_RESERVADOS = new Set(['www', 'api', 'admin', 'plataforma', 'app', 'login', 'planes', 'soporte', 'ensayar']);
 
 const CATEGORIAS_BASE = ['Vestidos', 'Blusas', 'Pantalones', 'Faldas', 'Abrigos', 'Accesorios'];
+
+function validarMetodoPais(pais: string, metodo: string) {
+  if (!metodosSimuladosPorPais(pais).some((m) => m.codigo === metodo)) {
+    throw new BadRequestException({ codigo: 'METODO_NO_DISPONIBLE', message: 'El método de pago no está disponible para el país de la tienda.' });
+  }
+}
 
 function claveMes(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -131,13 +139,26 @@ export class PlataformaService {
   async suscribir(cuentaId: string, dto: SuscribirDto) {
     const cuenta = await this.prisma.cuenta.findUniqueOrThrow({ where: { id: cuentaId } });
     if (!cuenta.emailVerificado) throw new ForbiddenException({ codigo: 'EMAIL_NO_VERIFICADO' });
+    const pais = dto.tienda.pais ?? 'BO';
+    const moneda = monedaDePais(pais);
+    if (!moneda || (dto.tienda.moneda && dto.tienda.moneda !== moneda)) {
+      throw new BadRequestException({ codigo: 'PAIS_O_MONEDA_INVALIDOS', message: 'El país o la moneda de la tienda no son válidos.' });
+    }
+    validarMetodoPais(pais, dto.metodoPago ?? 'tarjeta');
 
     // Reintento del mismo pago (doble clic, red inestable): devuelve la tienda ya creada.
     const previo = await this.prisma.pagoSuscripcion.findUnique({
       where: { idempotencyKey: dto.idempotencyKey },
-      include: { suscripcion: true },
+      include: { suscripcion: { include: { tienda: true } } },
     });
     if (previo) {
+      const metodoAnterior = previo.pasarela.split(':')[1] ?? 'tarjeta';
+      if (previo.suscripcion.tienda.duenoCuentaId !== cuentaId ||
+          previo.suscripcion.tienda.slug !== dto.tienda.slug.toLowerCase() ||
+          previo.suscripcion.planId !== dto.planId || previo.suscripcion.periodo !== dto.periodo ||
+          metodoAnterior !== (dto.metodoPago ?? 'tarjeta')) {
+        throw new ConflictException({ codigo: 'IDEMPOTENCIA_DATOS_DISTINTOS' });
+      }
       if (previo.estado !== 'aprobado') throw new HttpException({ codigo: 'PAGO_RECHAZADO' }, HttpStatus.PAYMENT_REQUIRED);
       return { ...(await this.entrar(cuentaId, previo.suscripcion.tiendaId)), repetido: true };
     }
@@ -163,8 +184,8 @@ export class PlataformaService {
               id: tiendaId,
               slug,
               nombre: dto.tienda.nombre.trim(),
-              pais: dto.tienda.pais ?? 'BO',
-              moneda: dto.tienda.moneda ?? 'BOB',
+              pais,
+              moneda,
               duenoCuentaId: cuenta.id,
               suscripciones: {
                 create: {
@@ -178,7 +199,7 @@ export class PlataformaService {
                     create: {
                       monto,
                       moneda: plan.moneda,
-                      pasarela: cobro.pasarela,
+                      pasarela: `${cobro.pasarela}:${dto.metodoPago ?? 'tarjeta'}`,
                       referencia: cobro.referencia,
                       estado: 'aprobado',
                       ultimos4: cobro.ultimos4,
@@ -236,6 +257,7 @@ export class PlataformaService {
       id: tienda.id,
       slug: tienda.slug,
       nombre: tienda.nombre,
+      pais: tienda.pais,
       vigente: info?.vigente ?? false,
       venceEn: info?.venceEn ?? null,
       plan: info?.plan ?? null,
@@ -253,6 +275,7 @@ export class PlataformaService {
           referencia: p.referencia,
           monto: Number(p.monto),
           estado: p.estado,
+          pasarela: p.pasarela,
           ultimos4: p.ultimos4,
           fecha: p.creadoEn,
         })),
@@ -264,9 +287,26 @@ export class PlataformaService {
   async renovar(cuentaId: string, tiendaId: string, dto: RenovarDto) {
     const tienda = await this.prisma.tienda.findUnique({ where: { id: tiendaId } });
     if (!tienda || tienda.duenoCuentaId !== cuentaId) throw new ForbiddenException({ codigo: 'SOLO_DUENO' });
+    validarMetodoPais(tienda.pais, dto.metodoPago ?? 'tarjeta');
 
-    const previo = await this.prisma.pagoSuscripcion.findUnique({ where: { idempotencyKey: dto.idempotencyKey } });
-    if (previo) return { ...(await this.detalleTienda(cuentaId, tiendaId)), repetido: true };
+    const previo = await this.prisma.pagoSuscripcion.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+      include: { suscripcion: true },
+    });
+    if (previo) {
+      if (
+        previo.suscripcion.tiendaId !== tiendaId ||
+        previo.suscripcion.planId !== dto.planId ||
+        previo.suscripcion.periodo !== dto.periodo
+        || (previo.pasarela?.split(':')[1] ?? 'tarjeta') !== (dto.metodoPago ?? 'tarjeta')
+      ) {
+        throw new ConflictException({ codigo: 'IDEMPOTENCIA_DATOS_DISTINTOS' });
+      }
+      if (previo.estado !== 'aprobado') {
+        throw new HttpException({ codigo: 'PAGO_RECHAZADO' }, HttpStatus.PAYMENT_REQUIRED);
+      }
+      return { ...(await this.detalleTienda(cuentaId, tiendaId)), repetido: true };
+    }
 
     const plan = await this.prisma.plan.findFirst({ where: { id: dto.planId, activo: true } });
     if (!plan) throw new NotFoundException({ codigo: 'PLAN_NO_EXISTE' });
@@ -312,7 +352,7 @@ export class PlataformaService {
               create: {
                 monto,
                 moneda: plan.moneda,
-                pasarela: cobro.pasarela,
+                pasarela: `${cobro.pasarela}:${dto.metodoPago ?? 'tarjeta'}`,
                 referencia: cobro.referencia,
                 estado: 'aprobado',
                 ultimos4: cobro.ultimos4,

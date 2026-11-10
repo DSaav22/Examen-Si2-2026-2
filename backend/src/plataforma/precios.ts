@@ -9,6 +9,10 @@ export function precioPeriodo(precioMensual: number, periodo: PeriodoPlan) {
 
 export function sumarMeses(desde: Date, meses: number) {
   const d = new Date(desde);
-  d.setMonth(d.getMonth() + meses);
+  const dia = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + meses);
+  const finDelMes = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(dia, finDelMes));
   return d;
 }

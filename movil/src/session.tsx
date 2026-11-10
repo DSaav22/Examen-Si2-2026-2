@@ -28,6 +28,7 @@ export type Screen =
   | { name: 'asistente'; productoId?: string }
   | { name: 'operaciones' }
 
+/** Pantallas que comparten la barra inferior de clienta. */
 const TABS = new Set(['inicio', 'catalogo', 'favoritos', 'bolsa', 'cuenta'])
 
 export function esTab(screen: Screen) {

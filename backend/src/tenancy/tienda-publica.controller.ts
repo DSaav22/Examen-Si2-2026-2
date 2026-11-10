@@ -1,6 +1,7 @@
 import { Controller, Get, NotFoundException } from '@nestjs/common';
 import { TenantContext } from './tenant-context';
 import { TiendasService } from './tiendas.service';
+import { metodosSimuladosPorPais } from '../pagos/metodos-pais';
 
 /** Datos públicos de la tienda activa (vitrina: nombre, moneda, plan). */
 @Controller('tienda')
@@ -18,6 +19,7 @@ export class TiendaPublicaController {
       nombre: t.nombre,
       pais: t.pais,
       moneda: t.moneda,
+      metodosPagoSimulados: metodosSimuladosPorPais(t.pais),
       plan: t.plan ? { codigo: t.plan.codigo, nombre: t.plan.nombre, modulos: t.plan.modulos } : null,
     };
   }

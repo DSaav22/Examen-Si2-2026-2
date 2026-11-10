@@ -27,6 +27,13 @@ import { PushModule } from './push/push.module';
 import { SyncModule } from './sync/sync.module';
 import { CreditosModule } from './creditos/creditos.module';
 
+/**
+ * Composición de la API de EnsayAR.
+ *
+ * Este archivo no contiene reglas de negocio: es el índice para ubicar el
+ * módulo dueño de cada dominio. Las reglas viven en los services y los
+ * controladores sólo exponen sus endpoints HTTP con guards de JWT/rol.
+ */
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
