@@ -51,6 +51,47 @@ Además de los requisitos funcionales rigen restricciones que no son diálogos c
 
 ![Figura 9.1.5: Asignación de los requisitos de Pagos a casos de uso](../imagenes/ea/req-pagos.png)
 
+### Requisitos no funcionales
+
+Los requisitos no funcionales no son diálogos con un actor, pero condicionan a todos los casos. Cada uno se expresa como una propiedad verificable, junto con el mecanismo que la cumple en EnsayAR y la evidencia que la comprueba.
+
+| Código | Requisito | Cómo se cumple en EnsayAR | Evidencia |
+|---|---|---|---|
+| RNF01 | Seguridad: solo usuarios autenticados y con el rol adecuado operan, y las credenciales nunca se guardan en claro | Contraseñas con bcrypt; token JWT con expiración y revocación al cerrar sesión (TokenRevocado); guards de rol en cada ruta; validación estricta de la entrada (los campos no declarados se rechazan); los secretos solo en variables de entorno | Pruebas de roles en `verificar:saas`; auditoría de login, logout y cambio de clave |
+| RNF02 | Aislamiento: ninguna tienda lee ni modifica datos de otra | Base compartida con `tiendaId`; la extensión de Prisma filtra y completa la tienda desde el contexto de la petición y falla cerrada si no la hay; el SQL de reportes fija `app.tienda_id` con `set_config` dentro de la transacción | `verificar:tenancy`; capítulo 4 |
+| RNF03 | Persistencia offline: lo registrado sin red sobrevive al cierre de la aplicación y al reinicio del equipo | Cola en IndexedDB (web) y SQLite (móvil); una operación solo se borra cuando el servidor responde un estado definitivo | Recorrido manual con la red cortada y recarga del navegador; máquina de estados de 9.3 |
+| RNF04 | Integridad transaccional: una venta se guarda completa o no se guarda | Venta, líneas, movimiento de inventario y suma al turno en una sola transacción; descuento condicional de stock (nunca negativo) | `ventas.spike-b.spec.ts`; reversión en `verificar:offline` |
+| RNF05 | Idempotencia: repetir un envío no duplica ventas, cobros ni abonos | Clave `Idempotency-Key` en 11 rutas que cambian dinero o stock; en la sincronización el id de la operación es la clave (OperacionSync) | Reenvío sin duplicados en `verificar:offline`; doble pago en `verificar:saas`; abonos repetidos en `verificar:reportes` |
+| RNF06 | Recuperación ante fallos: un corte a mitad del envío no pierde ni duplica operaciones | El cliente reintenta con la misma clave; las respuestas `en_curso` y `error` dejan la operación pendiente; una operación en curso abandonada por más de un minuto se retoma | Envíos simultáneos y reintentos en `verificar:offline` |
+| RNF07 | Mantenibilidad: cada área se puede cambiar sin tocar las demás | Monolito modular NestJS con un módulo por área y dependencias explícitas por interfaz; TypeScript en los tres proyectos | Diagrama de componentes (9.3.2) |
+| RNF08 | Compatibilidad: funciona en los navegadores y teléfonos que usan las tiendas | PWA instalable en Chrome, Edge y Safari; app Android con Expo; interfaz adaptable a celular, tablet y PC | Diagrama de despliegue (9.3.2); guías del capítulo 10 |
+| RNF09 | Rendimiento: el punto de venta responde aunque la red sea lenta | Catálogo, stock y política offline en caché local; la sincronización envía lotes de hasta 50 operaciones en segundo plano | Recorridos del capítulo 10 |
+| RNF10 | Observabilidad: se puede saber qué pasó con cada operación | Application Insights y Log Analytics en Azure; tabla Auditoria para acciones sensibles; estado de cada operación offline visible en la Pantalla Sincronización | Pantalla Sincronización (9.1.3); diagrama de despliegue |
+| RNF11 | Calidad: el comportamiento crítico se verifica de forma automática | Pruebas unitarias y cuatro guiones de verificación de integración contra la API y una base real | 9.4 |
+| RNF12 | Coherencia documental: los diagramas representan la solución construida | El modelo de Enterprise Architect se regenera desde `casos.py`, `schema.prisma` y las firmas del código TypeScript | 9.4.6; anexo 14.6 |
+
+### Reglas de negocio
+
+Las reglas de negocio son políticas de la tienda que el sistema hace cumplir siempre, con o sin red. Se aplican en el backend, de modo que un cliente modificado no puede saltarlas. Las que dependen del dispositivo se validan dos veces: en el cliente para avisar a tiempo y en el servidor al sincronizar.
+
+| Código | Regla | Dónde se aplica | Casos de uso |
+|---|---|---|---|
+| RN01 | La tienda y la sucursal de una operación salen de la sesión, nunca de los datos que envía el cliente | Contexto de tienda y extensión de Prisma | Todos |
+| RN02 | No se cobra sin un turno de caja abierto en la sucursal | VentasService, también al sincronizar | UC06, UC07, UC42 |
+| RN03 | El stock nunca queda negativo: si dos cajas venden la última unidad, solo una venta se aplica | Actualización condicional de StockAlmacen | UC07, UC44, UC45 |
+| RN04 | Sin red solo se cobra en efectivo y sin cupón; QR, tarjeta y crédito requieren conexión | Pantalla Punto de venta y validación del lote | UC42 |
+| RN05 | Una operación offline solo se acepta si se creó dentro de la ventana de la tienda (1 a 30 días, 7 por defecto) | SyncService; política en la Pantalla Sincronización | UC44, UC46 |
+| RN06 | Cada operación tiene un id único generado en el dispositivo y se aplica una sola vez | uuid() en el cliente; OperacionSync en el servidor | UC42, UC43, UC44 |
+| RN07 | Una operación no desaparece del dispositivo por haber intentado enviarla: solo sale de la cola con un estado definitivo | Motor de sincronización del cliente | UC44 |
+| RN08 | Un conflicto lo resuelve una persona, vendiendo lo disponible o descartando; descartar en el servidor exige rol Encargado o Admin | Pantalla Sincronización y SyncService | UC45 |
+| RN09 | No se cierra la caja con operaciones offline pendientes o en conflicto | Pantalla Punto de venta | UC08 |
+| RN10 | Cada plan limita usuarios, sucursales y productos (Inicial: 3, 1 y 200) | PlanLimitesService | UC09, UC23, UC24 |
+| RN11 | La tienda se crea solo con el pago de la suscripción aprobado, y en una sola transacción | PlataformaService | UC38 |
+| RN12 | El correo del suscriptor se verifica antes de activar la cuenta | AuthService y CorreoService | UC36, UC37 |
+| RN13 | Un abono nunca deja el saldo de la cuenta por cobrar en negativo | Descuento condicional de CuentaCobrar | UC51 |
+| RN14 | No se devuelven más unidades que las vendidas; devolver una venta al crédito reduce la deuda y no saca efectivo | Devoluciones | UC33 |
+| RN15 | El modelo de lenguaje no accede a la base: solo propone una especificación que se valida contra la capa semántica y se compila a SQL parametrizado con la tienda fijada | ReportesService | UC48, UC49 |
+
 ## 9.1.2 Modelo de dominio
 
 El modelo de dominio fija el vocabulario: cada sustantivo que aparece en un caso de uso con mayúscula inicial (Venta, StockAlmacen, CuentaCobrar) es una clase de este modelo, escrita igual. Se construyó en dos pasos. Primero, por inspección gramatical de la consigna y de las fichas del primer ciclo; después, durante la robustez, se agregaron las clases que los casos nuevos necesitaban (Cuenta, Plan, Suscripcion, PagoSuscripcion, Dispositivo, OperacionSync, PushSuscripcion, CuentaCobrar, AbonoCredito). Los atributos y las multiplicidades se toman del esquema de Prisma, de modo que el dominio y la base no pueden divergir.
@@ -196,7 +237,7 @@ Servicio de IA, Pasarela de pago y Dispositivo sin red son actores secundarios: 
 
 ## 9.1.5 Diagramas de casos de uso
 
-Los casos se agrupan por lote. El lote 0 reúne los 35 casos heredados, divididos por paquete funcional; los lotes 1 a 5 son los nuevos del segundo ciclo. Las relaciones «include» y «extend» son las siguientes:
+Los casos se agrupan por lote. El lote 0 reúne los 35 casos heredados, divididos por paquete funcional; los lotes 1 a 5 son los nuevos del segundo ciclo. Cada diagrama dibuja el sujeto UML 2.5 (el rectángulo "EnsayAR: …"), que marca el límite del sistema: los casos de uso quedan dentro y los actores fuera. Los actores que inician casos van a la izquierda y los secundarios (Servicio de IA, Pasarela de pago y Dispositivo sin red) a la derecha. Las relaciones «include» y «extend» son las siguientes:
 
 | Caso | Relación | Caso base |
 |---|---|---|

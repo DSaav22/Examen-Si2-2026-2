@@ -221,3 +221,15 @@ Correcciones de paso:
 
 Actualiza [[ICONIX]] y [[Brecha segundo parcial]].
 
+## [2026-11-09] update | Diagramas en UML 2.5 y documento enriquecido con el informe de otro grupo
+
+Se tomó del PDF de otro grupo, con las mismas funcionalidades, solo la explicación funcional; sus tecnologías no se usaron. El modelo de EA pasa a 160 diagramas.
+
+- **Despliegue (`iconix/arquitectura.py`).** Nodos «device» anidados (PC o tablet, teléfono, grupo de recursos de Azure, App Service Plan y servidor PostgreSQL Flexible), con «executionEnvironment», artefactos, especificaciones de despliegue (nombres de variables, sin valores) y caminos de comunicación con protocolo.
+- **Componentes.** Backend y clientes con conectores de ensamblaje por interfaz y puerto «API REST». También se agregó la manifestación de artefactos.
+- **Máquinas de estado (`iconix/estados.py`).** La operación offline en el dispositivo (estado compuesto) y `OperacionSync` en el servidor.
+- **Secuencias.** Mensajes con argumentos leídos del TypeScript, `alt` en el paso donde decide cada alterno (`ALTERNOS` en `generar_ea.py`; los alternos de IA se recuperan con reglas) y `loop` en UC44.
+- **Casos de uso.** Sujeto del sistema dibujado. Las clases de diseño tienen firmas completas e inyección como asociación.
+- **Texto.** RNF01–RNF12, reglas RN01–RN15, plan de pruebas y casos CP01–CP19.
+- **Informe.** Figuras de arquitectura y estados en páginas horizontales; PDF de 274 páginas.
+

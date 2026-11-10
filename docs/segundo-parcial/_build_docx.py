@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from docx import Document
-from docx.enum.section import WD_SECTION
+from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml import OxmlElement
@@ -40,6 +40,11 @@ CAPITULOS = [
 
 ANCHO_MAX = Cm(16)
 ALTO_MAX = Cm(21)
+# Diagramas anchos (despliegue, componentes, máquinas de estado): van en página horizontal para que se lean.
+APAISADAS = ("arq-", "est-")
+ANCHO_H = Cm(24.7)
+ALTO_H = Cm(14.5)
+horizontal = False
 AZUL = RGBColor(0x1F, 0x2A, 0x44)
 TEXTO = RGBColor(0x1A, 0x1A, 0x1A)
 GRIS = RGBColor(0x55, 0x55, 0x55)
@@ -159,9 +164,9 @@ def add_image(doc, md_path, caption, src):
         return
     with Image.open(path) as im:
         w, h = im.size
-    ancho = ANCHO_MAX
-    if ancho * h / w > ALTO_MAX:
-        ancho = int(ALTO_MAX * w / h)
+    ancho, alto = (ANCHO_H, ALTO_H) if horizontal else (ANCHO_MAX, ALTO_MAX)
+    if ancho * h / w > alto:
+        ancho = int(alto * w / h)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.keep_with_next = True
@@ -187,9 +192,20 @@ def render_markdown(doc, md_path, text, desplazar=0, centrado=False):
         if chunk:
             add_paragraph(doc, chunk, align)
 
+    def es_apaisada(k):
+        m = IMAGEN.match(lines[k].strip()) if k < len(lines) else None
+        return bool(m) and Path(m.group(2)).name.startswith(APAISADAS)
+
     while i < len(lines):
         line = lines[i]
         s = line.strip()
+
+        if s and s != "---":
+            siguiente = next((k for k in range(i + 1, len(lines)) if lines[k].strip()), len(lines))
+            quiere = es_apaisada(i) or (s.startswith("#") and es_apaisada(siguiente))
+            if quiere != horizontal:
+                flush()
+                orientar(doc, quiere)
 
         if s.startswith("```"):
             flush()
@@ -304,6 +320,19 @@ def apply_margins(section):
     section.bottom_margin = Cm(2.5)
     section.left_margin = Cm(2.5)
     section.right_margin = Cm(2.5)
+
+
+def orientar(doc, apaisado):
+    global horizontal
+    horizontal = apaisado
+    s = doc.add_section(WD_SECTION.NEW_PAGE)
+    apply_margins(s)
+    for pg in s._sectPr.findall(qn("w:pgNumType")):
+        s._sectPr.remove(pg)
+    w, h = s.page_width, s.page_height
+    if apaisado != (w > h):
+        s.page_width, s.page_height = h, w
+    s.orientation = WD_ORIENT.LANDSCAPE if apaisado else WD_ORIENT.PORTRAIT
 
 
 def footer_with_number(section, start_at):

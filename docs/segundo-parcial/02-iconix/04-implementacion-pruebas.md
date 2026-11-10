@@ -2,7 +2,45 @@
 
 El código se escribió a partir del diseño de cada lote. ICONIX organiza las pruebas en dos niveles. Las unitarias verifican controles aislados, como el compilador de SQL seguro o los filtros del catálogo. Las de integración recorren un caso de uso completo contra el sistema en ejecución, con su curso básico y sus alternos.
 
-## 9.4.1 Pruebas de integración
+## 9.4.1 Plan de pruebas
+
+| Aspecto | Definición |
+|---|---|
+| Objetivo | Demostrar que cada caso de uso cumple su curso básico y sus alternos, y que se cumplen los requisitos no funcionales RNF02 a RNF06 (aislamiento, persistencia offline, integridad, idempotencia y recuperación) |
+| Niveles | Unitarias sobre controles aislados; integración por caso de uso contra la API y una base PostgreSQL real; sistema, con recorridos manuales en navegador y en Expo con la red cortada |
+| Datos | Semilla de demostración con al menos tres tiendas (Vesta, Aurora Boutique y Andes Moda) bajo una misma cuenta, más tiendas `demo-*` creadas por autoservicio; tarjetas de prueba de la pasarela sandbox |
+| Entorno | Backend en el puerto 3000 y web en el 5173, con la base local migrada (`prisma migrate deploy`) y la semilla cargada |
+| Escenarios críticos | Dos tiendas con datos parecidos (aislamiento); dos cajas que venden la última unidad sin red; el mismo lote enviado dos veces; un corte de red a mitad del envío; una operación fuera de la ventana offline; pedidos de reporte ambiguos o maliciosos |
+| Criterio de aceptación | Todos los chequeos de los cuatro guiones en verde, ninguna lectura con datos de otra tienda, ningún stock o saldo negativo y ninguna operación duplicada |
+| Registro | Cada guion imprime el escenario, el resultado esperado y el obtenido; los fallos detienen la ejecución con código distinto de cero |
+
+## 9.4.2 Casos de prueba
+
+Cada caso de prueba nombra el caso de uso y el curso que verifica, la entrada, el resultado esperado y el guion que lo automatiza. Se eligieron los que cubren los requisitos de mayor riesgo.
+
+| Id | Caso de uso (curso) | Entrada | Resultado esperado | Verificación |
+|---|---|---|---|---|
+| CP01 | UC01 (básico) | Usuario de Vesta lista productos | Solo aparecen productos de Vesta | `verificar:tenancy` |
+| CP02 | Transversal (RNF02) | Usuario de una tienda intenta leer o modificar un registro de otra por su id | No lo encuentra y no lo cambia | `verificar:tenancy` |
+| CP03 | Transversal (RNF02) | Consulta ejecutada sin tienda en el contexto | Error; la extensión falla cerrada y no devuelve datos | `verificar:tenancy` |
+| CP04 | UC37 (2b) | Cuenta nueva sin verificar intenta suscribirse | Se rechaza hasta abrir el enlace de verificación | `verificar:saas` |
+| CP05 | UC38 (3a) | Pago con la tarjeta de prueba de rechazo | No se crea la tienda; se puede reintentar | `verificar:saas` |
+| CP06 | UC38 (3b) | Dos pedidos de pago con la misma clave de idempotencia | Un solo cobro y una sola tienda | `verificar:saas` |
+| CP07 | UC23 (3a) | Alta de un usuario por encima del límite del plan | Rechazo con el límite del plan | `verificar:saas` |
+| CP08 | UC40 (básico) | La misma cuenta cambia de Vesta a Aurora Boutique | Token nuevo; solo ve datos de la tienda elegida | `verificar:saas` |
+| CP09 | UC42 (básico) | Venta en efectivo con la red cortada y recarga del navegador | La venta sigue en la cola como pendiente | Recorrido manual; `verificar:offline` |
+| CP10 | UC42 (1a) | Venta con QR sin red | No se permite y se explica el motivo | `verificar:offline` |
+| CP11 | UC44 (2a) | El mismo lote enviado dos veces | La segunda respuesta es repetida; no hay ventas duplicadas | `verificar:offline` |
+| CP12 | UC44 (3b) y UC45 | Dos cajas venden sin red la última unidad y sincronizan | Una venta aplicada y otra en conflicto; el stock queda en cero, no negativo | `verificar:offline` |
+| CP13 | UC42 (4a) | Operación creada antes de la ventana offline de siete días | Llega como vencida | `verificar:offline` |
+| CP14 | UC44 (transversal RNF04) | Falla dentro de la transacción de una operación | Rollback completo; nada parcial en la base | `verificar:offline` |
+| CP15 | UC48 (básico) | Pedido dictado con filtros, agrupación y orden | Reporte correcto con SQL parametrizado | `verificar:reportes` |
+| CP16 | UC48 (alterno) | Pedido con texto que intenta inyectar SQL | Se rechaza o se trata como texto; no se ejecuta nada extra | `verificar:reportes` |
+| CP17 | UC49 (básico) | Exportar el reporte a Excel y a PDF | Se descargan los dos archivos con los mismos datos | `verificar:reportes` |
+| CP18 | UC51 (3b) | Dos abonos simultáneos por el saldo total | Uno pasa y el otro se rechaza; el saldo no queda negativo | `verificar:reportes` |
+| CP19 | UC07 (básico, concurrencia) | Ventas concurrentes sobre el mismo stock | Nunca se vende más de lo disponible | `ventas.spike-b.spec.ts` |
+
+## 9.4.3 Pruebas de integración
 
 Los scripts de verificación del backend se ejecutan contra la API levantada y una base real. Cada chequeo nombra un escenario de un caso de uso y verifica su poscondición.
 
@@ -13,7 +51,7 @@ Los scripts de verificación del backend se ejecutan contra la API levantada y u
 | `npm run verificar:offline` | UC05 a UC07, UC09, UC35, UC42 a UC46 | 14 chequeos: uuid del dispositivo, última unidad en dos cajas, reversión, reenvío sin duplicados, envíos simultáneos, pago QR sin red rechazado y ventana de siete días |
 | `npm run verificar:reportes` | UC33, UC48 a UC51 | 24 chequeos: pedidos dictados complejos, agrupación y orden, parámetros separados del SQL, inyección, aislamiento, Excel y PDF, crédito y abonos repetidos o simultáneos |
 
-## 9.4.2 Pruebas unitarias
+## 9.4.4 Pruebas unitarias
 
 | Prueba | Control que verifica |
 |---|---|
@@ -22,7 +60,7 @@ Los scripts de verificación del backend se ejecutan contra la API levantada y u
 | `sql-seguro.spec.ts` | Validar consulta y fijar tienda (UC10) |
 | `ficha.spec.ts` | Armar contexto de la ficha y respuesta por reglas (UC04) |
 
-## 9.4.3 Matriz de trazabilidad
+## 9.4.5 Matriz de trazabilidad
 
 La matriz une cada caso con sus requisitos, la ruta que lo atiende, la clase y la operación que lo realizan y la prueba que lo verifica. Se lee en ambos sentidos: desde un requisito hasta su prueba, o desde una clase hasta el caso que la justifica.
 
@@ -83,6 +121,6 @@ La matriz une cada caso con sus requisitos, la ruta que lo atiende, la clase y l
 | UC53 Ver segmentación de clientas | A1, A2, A3 | `GET /analitica/segmentos` | AnaliticaService.segmentos | A definir con la parte de analítica. |
 | UC54 Pagar con pasarela internacional | P1, P2, P3, P4 | `POST /pagos/pasarela` | PagosService.cobrarPasarela | A definir con la parte de pagos. |
 
-## 9.4.4 Revisión de código y sincronización del modelo
+## 9.4.6 Revisión de código y sincronización del modelo
 
 Al cerrar cada lote, el modelo se regeneró desde `casos.py` y se comparó con el código: rutas, nombres de métodos y modelos de Prisma. Las diferencias encontradas se corrigieron en el modelo (por ejemplo, la operación del catálogo es `listarProductos` y el ingreso de mercadería es `ingresoProveedor`), y los módulos sin servicio quedaron registrados como deuda técnica. Como el dominio se lee de `schema.prisma` cada vez, una migración nueva aparece en el modelo sin trabajo manual.
