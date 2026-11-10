@@ -228,3 +228,32 @@ Se documentaron hallazgos, diseño propuesto, separación de pagos y pruebas en 
 
 Se registran los tres planes y el flujo aprobados en [[Planes y suscripciones retail]], y las fuentes y restricciones en [[Metodos de pago por pais 2026]].
 
+## [2026-11-09] query | Documento del segundo parcial con ICONIX
+
+Documento armado en `docs/segundo-parcial`:
+
+- **Fundamentación.** Capítulos 1 a 8: perfil del incremento, marco teórico del primer ciclo, SaaS, multi-tenant, offline/PWA/sync e IA para reportes. Pagos (5) y analítica (8) quedan como esqueleto para el compañero.
+- **ICONIX.** Capítulo 9, de 9.0 a 9.4, generado desde `iconix/casos.py`. El modelo de EA tiene 156 diagramas y se suma la Figura 9.0.1 del proceso.
+- **Adopción.** Capítulo 10: autoservicio, guías por rol y simulacros.
+- **Cierre.** Capítulos 11 a 14: conclusiones, recomendaciones, bibliografía y anexos con comandos y regeneración de EA.
+- **Capturas.** Seis capturas de GUI tomadas con Playwright (`iconix/capturas.py`).
+- **Salida.** `_build_docx.py` produce el `.docx` y, mediante Word, el `.pdf` (unas 240 páginas, con índice de campos).
+
+Correcciones de paso:
+- UC42 y UC43 ahora usan las clases reales del cliente (`Red`, `ColaOffline`, `CacheLocal`).
+- UC46 se hace en la Pantalla Sincronización.
+
+Actualiza [[ICONIX]] y [[Brecha segundo parcial]].
+
+## [2026-11-09] update | Diagramas en UML 2.5 y documento enriquecido con el informe de otro grupo
+
+Se tomó del PDF de otro grupo, con las mismas funcionalidades, solo la explicación funcional; sus tecnologías no se usaron. El modelo de EA pasa a 160 diagramas.
+
+- **Despliegue (`iconix/arquitectura.py`).** Nodos «device» anidados (PC o tablet, teléfono, grupo de recursos de Azure, App Service Plan y servidor PostgreSQL Flexible), con «executionEnvironment», artefactos, especificaciones de despliegue (nombres de variables, sin valores) y caminos de comunicación con protocolo.
+- **Componentes.** Backend y clientes con conectores de ensamblaje por interfaz y puerto «API REST». También se agregó la manifestación de artefactos.
+- **Máquinas de estado (`iconix/estados.py`).** La operación offline en el dispositivo (estado compuesto) y `OperacionSync` en el servidor.
+- **Secuencias.** Mensajes con argumentos leídos del TypeScript, `alt` en el paso donde decide cada alterno (`ALTERNOS` en `generar_ea.py`; los alternos de IA se recuperan con reglas) y `loop` en UC44.
+- **Casos de uso.** Sujeto del sistema dibujado. Las clases de diseño tienen firmas completas e inyección como asociación.
+- **Texto.** RNF01–RNF12, reglas RN01–RN15, plan de pruebas y casos CP01–CP19.
+- **Informe.** Figuras de arquitectura y estados en páginas horizontales; PDF de 274 páginas.
+

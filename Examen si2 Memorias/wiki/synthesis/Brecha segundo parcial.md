@@ -1,7 +1,7 @@
 ---
 tipo: synthesis
 fuentes: 3
-actualizado: 2026-11-08
+actualizado: 2026-11-09
 tags: [codigo, brecha, segundo-parcial, prioridades]
 ---
 
@@ -13,7 +13,9 @@ Contraste de los requisitos de [[Mapa del segundo parcial]] contra el repo al 8 
 
 El primer parcial deja una buena base para **offline e idempotencia** (venta con `uuid` único, bloqueo de stock con `FOR UPDATE`, cola del POS en IndexedDB, tablas `Dispositivo` y `OperacionSync`). El camino es el 2 del docente: modificar capas, no rehacer.
 
-Al 8 nov están cerrados el punto 1 (SaaS, filas S), el punto 2 (offline, filas O) y el punto 3 (reportes generativos, filas R). **Siguen en cero: analítica con ML y pasarelas reales.**
+Al 8 nov están cerrados el punto 1 (SaaS, filas S), el punto 2 (offline, filas O) y el punto 3 (reportes generativos, filas R). **Siguen en cero: analítica con ML y pasarelas reales**, que están a cargo del compañero.
+
+Al 9 nov el documento del segundo parcial está armado en `docs/segundo-parcial`. Tiene 14 capítulos, el proceso ICONIX completo y las capturas de GUI, y se genera a `.docx` y `.pdf` con `_build_docx.py`. Los capítulos 5 (pagos) y 8 (analítica) son esqueletos que debe llenar el compañero.
 
 ## Por requisito
 
