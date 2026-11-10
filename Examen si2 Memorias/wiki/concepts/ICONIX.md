@@ -1,7 +1,7 @@
 ---
 tipo: concept
 fuentes: 1
-actualizado: 2026-11-08
+actualizado: 2026-11-09
 tags: [metodologia, iconix, uml, segundo-parcial]
 ---
 
@@ -60,6 +60,14 @@ Prohibido: actor ↔ control o entidad, frontera ↔ entidad, frontera ↔ front
 ## Trazabilidad
 
 Cada paso del curso básico y de los alternos del caso de uso debe aparecer en el diagrama de robustez y luego en el de secuencia. Los controladores del diagrama de robustez se convierten en métodos o servicios en el diseño.
+
+## Cómo se aplicó en EnsayAR (9 nov)
+
+- **Alcance.** Los 54 casos de uso tienen robustez y secuencia completas: UC01 a UC35 del primer parcial y UC36 a UC54 del incremento. Se organizaron en lotes: 0 (primer parcial), 1 SaaS, 2 offline, 3 reportes, 4 analítica y 5 pagos.
+- **Fuente única.** El archivo `docs/segundo-parcial/iconix/casos.py` contiene actores, requisitos, entidades y casos de uso, cada uno con su curso básico, alternos, controles, ruta, clases, método, requisitos y prueba.
+- **Modelo EA.** `generar_ea.py` reconstruye por COM el paquete "ICONIX segundo parcial" dentro de `diagramas/EnsayAR-ICONIX.eapx`: 156 diagramas, exportados a `imagenes/ea`. Requiere `JET4=1` en el registro de EA.
+- **Capítulos.** `generar_md.py` escribe los capítulos 9.1 a 9.4: requisitos, robustez con hallazgos y PDR, secuencias con clases de diseño y CDR, e implementación con la matriz de trazabilidad.
+- **Correspondencia con el código.** Los controllers de NestJS hacen de fronteras del lado del servidor, y los controles de ICONIX son métodos de los services. Los casos que no pasan por la API (UC35, UC42, UC43) usan clases del cliente: `Red`, `ColaOffline` y `CacheLocal`.
 
 ## Críticas conocidas
 

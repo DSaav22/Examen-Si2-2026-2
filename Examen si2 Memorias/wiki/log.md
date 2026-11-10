@@ -204,3 +204,20 @@ Verificado con `verificar:reportes` (24 chequeos) y recorrido en navegador:
 
 Detalle en [[Reportes generativos]]. Actualiza [[Brecha segundo parcial]] y [[Modo offline]]. Sigue: analítica, pagos, documento ICONIX.
 
+## [2026-11-09] query | Documento del segundo parcial con ICONIX
+
+Documento armado en `docs/segundo-parcial`:
+
+- **Fundamentación.** Capítulos 1 a 8: perfil del incremento, marco teórico del primer ciclo, SaaS, multi-tenant, offline/PWA/sync e IA para reportes. Pagos (5) y analítica (8) quedan como esqueleto para el compañero.
+- **ICONIX.** Capítulo 9, de 9.0 a 9.4, generado desde `iconix/casos.py`. El modelo de EA tiene 156 diagramas y se suma la Figura 9.0.1 del proceso.
+- **Adopción.** Capítulo 10: autoservicio, guías por rol y simulacros.
+- **Cierre.** Capítulos 11 a 14: conclusiones, recomendaciones, bibliografía y anexos con comandos y regeneración de EA.
+- **Capturas.** Seis capturas de GUI tomadas con Playwright (`iconix/capturas.py`).
+- **Salida.** `_build_docx.py` produce el `.docx` y, mediante Word, el `.pdf` (unas 240 páginas, con índice de campos).
+
+Correcciones de paso:
+- UC42 y UC43 ahora usan las clases reales del cliente (`Red`, `ColaOffline`, `CacheLocal`).
+- UC46 se hace en la Pantalla Sincronización.
+
+Actualiza [[ICONIX]] y [[Brecha segundo parcial]].
+
