@@ -6,7 +6,7 @@
 
 **Correo transaccional.** En producción, configurar un servicio de correo para la verificación de cuentas y los avisos de vencimiento; hoy el envío es simulado cuando no hay servidor de correo.
 
-**Despliegue.** Volver a publicar la plataforma en la nube con dominio propio, HTTPS (requisito de la PWA y de Web Push) y base de datos administrada, y renovar la clave de Azure OpenAI del entorno de demostración.
+**Despliegue.** Llevar PostgreSQL de la instancia EC2 a un servicio administrado como Amazon RDS, con respaldos automáticos y sin competir por memoria con la API; registrar un dominio propio en lugar del subdominio de DuckDNS; y renovar la clave de Azure OpenAI del entorno de demostración.
 
 **Móvil.** Probar la cola SQLite y la sincronización en dispositivos Android físicos con cortes de red reales, no solo en Expo web, y medir el tamaño de la base local con la ventana offline máxima de 30 días.
 

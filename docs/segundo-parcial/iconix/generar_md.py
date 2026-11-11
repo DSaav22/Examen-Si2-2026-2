@@ -48,7 +48,7 @@ RNF = [
      "Catálogo, stock y política offline en caché local; la sincronización envía lotes de hasta 50 operaciones en segundo plano",
      "Recorridos del capítulo 10"),
     ("RNF10", "Observabilidad: se puede saber qué pasó con cada operación",
-     "Application Insights y Log Analytics en Azure; tabla Auditoria para acciones sensibles; estado de cada operación offline visible en la Pantalla Sincronización",
+     "Registros de la API en la instancia EC2; tabla Auditoria para acciones sensibles; estado de cada operación offline visible en la Pantalla Sincronización",
      "Pantalla Sincronización (9.1.3); diagrama de despliegue"),
     ("RNF11", "Calidad: el comportamiento crítico se verifica de forma automática",
      "Pruebas unitarias y cuatro guiones de verificación de integración contra la API y una base real",
@@ -394,18 +394,19 @@ def diseno():
           "guardan una cola local para operar sin red. La arquitectura se documenta con cuatro diagramas UML 2.5: "
           "despliegue, componentes del backend, componentes de los clientes y manifestación de artefactos.\n",
           "### Diagrama de despliegue\n",
-          fig("arq-despliegue", "Despliegue de EnsayAR en Azure y en los dispositivos"),
-          "El diagrama muestra dónde se ejecuta cada pieza en producción. Sigue `infra/app.bicep`, que crea toda la "
-          "infraestructura con `azd up`.\n",
+          fig("arq-despliegue", "Despliegue de EnsayAR en AWS y en los dispositivos"),
+          "El diagrama muestra dónde se ejecuta cada pieza en producción. La versión de la entrega corre en una sola "
+          "instancia Amazon EC2 con Linux, a la que apunta el dominio `examensi2.duckdns.org`; la instancia aloja el "
+          "proxy inverso con TLS, la API y PostgreSQL.\n",
           "| Elemento UML | Qué representa en EnsayAR |", "|---|---|",
-          "| Nodo «device» | Hardware físico o un recurso que se contrata como unidad: la PC o tablet de la tienda o de la clienta, el teléfono Android, el grupo de recursos de Azure y los servicios externos (Web Push, SMTP y pasarela de pago) |",
-          "| Nodo anidado | Recurso de Azure dentro del grupo: el App Service Plan Linux, el servidor PostgreSQL Flexible (Standard_B1ms), Application Insights con Log Analytics y Azure OpenAI |",
-          "| «executionEnvironment» | Software que hospeda a los artefactos: el navegador web, el runtime React Native con Hermes, Node.js 20 LTS (uno por App Service) y PostgreSQL 16 |",
+          "| Nodo «device» | Hardware físico o un recurso que se contrata como unidad: la PC o tablet de la tienda o de la clienta, el teléfono Android, la cuenta de AWS y los servicios externos (Azure OpenAI, Web Push, SMTP y pasarela de pago) |",
+          "| Nodo anidado | La instancia Amazon EC2 con Linux dentro de la cuenta de AWS |",
+          "| «executionEnvironment» | Software que hospeda a los artefactos: el navegador web, el runtime React Native con Hermes, el servidor web con TLS que actúa como proxy inverso y sirve la PWA, Node.js 20 LTS con la API y PostgreSQL 16 |",
           "| Artefacto | Archivo concreto que se despliega o se crea en el dispositivo: `dist/main.js`, el esquema y las migraciones de Prisma, `frontend/dist`, `sw.js`, `manifest.webmanifest`, la base IndexedDB `ensayar-offline`, Cache Storage, `localStorage`, el `.apk` y la base SQLite `ensayar-offline.db` |",
-          "| «deployment spec» | Configuración con la que se despliega un artefacto: `ensayar-api.env`, con las 11 variables que lee la API (sin valores, porque son secretos), y `ensayar-web.env`, con `VITE_API_URL` |",
-          "| Camino de comunicación | Enlace entre nodos con su protocolo como estereotipo y su puerto o uso como nombre: «HTTPS» REST/JSON con `Idempotency-Key` en el puerto 443, «TCP/TLS» Prisma en el 5432, «SMTP/TLS» en el 587 y «HTTPS» Web Push firmado con VAPID |",
+          "| «deployment spec» | Configuración con la que se despliega un artefacto: `ensayar-api.env`, con las 11 variables que lee la API (sin valores, porque son secretos), y `ensayar-web.env`, con `VITE_API_URL` igual a la ruta relativa `/api` |",
+          "| Camino de comunicación | Enlace entre nodos con su protocolo como estereotipo y su puerto o uso como nombre: «HTTPS» REST/JSON con `Idempotency-Key` en el puerto 443, «HTTP» del proxy a la API en `localhost:3000`, «TCP» Prisma en `localhost:5432`, «SMTP/TLS» en el 587 y «HTTPS» Web Push firmado con VAPID |",
           "",
-          "Se leen tres recorridos. El primero es la descarga de la PWA desde el App Service web y su instalación en el "
+          "Se leen tres recorridos. El primero es la descarga de la PWA desde el proxy inverso de la instancia y su instalación en el "
           "navegador. El segundo son las llamadas REST de ambos clientes a la API, que con red operan en línea y sin "
           "red guardan en IndexedDB o SQLite y luego reenvían por el mismo camino. El tercero es el aviso push: la API "
           "lo firma con VAPID, el servicio push del navegador lo entrega y el service worker lo muestra aunque la "

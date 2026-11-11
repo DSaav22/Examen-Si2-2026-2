@@ -362,3 +362,7 @@ Se migró sin borrar la fuente la tienda que carecía de esquema en `ensayar_cop
 
 - **Anexo.** La web queda en https://examensi2.duckdns.org y la API en https://examensi2.duckdns.org/api (mismo dominio; el frontend usa la ruta relativa `/api`). QR regenerado en `imagenes/qr-web.png`. Ya no quedan URL de azurewebsites en el informe. PDF de 383 páginas.
 - **Pendiente.** A las 7:20 el dominio resolvía a 192.223.107.245, pero los puertos 80 y 443 no respondían desde la máquina de documentación.
+
+## [2026-11-11] update | Despliegue en AWS en lugar de Azure
+
+- **Informe.** El despliegue de la entrega es una sola instancia Amazon EC2 con Linux (proxy inverso con TLS, API Node.js en :3000 y PostgreSQL 16 en la misma máquina) apuntada por examensi2.duckdns.org. Se actualizaron el diagrama de despliegue (`iconix/arquitectura.py`, figura "Despliegue de EnsayAR en AWS y en los dispositivos") y su texto en 9.3, la fila Nube del stack (2.1.7), la fila de infraestructura del perfil (1.10.2), el párrafo IaaS/PaaS de 3.2, RNF10, la recomendación de despliegue (pasar a Amazon RDS) y el anexo 14.2. Azure OpenAI se mantiene como servicio externo de IA. Las citas al Azure Architecture Center siguen como fuentes teóricas. PDF de 383 páginas.

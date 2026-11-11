@@ -66,7 +66,7 @@ Los requisitos no funcionales no son diálogos con un actor, pero condicionan a 
 | RNF07 | Mantenibilidad: cada área se puede cambiar sin tocar las demás | Monolito modular NestJS con un módulo por área y dependencias explícitas por interfaz; TypeScript en los tres proyectos | Diagrama de componentes (9.3.2) |
 | RNF08 | Compatibilidad: funciona en los navegadores y teléfonos que usan las tiendas | PWA instalable en Chrome, Edge y Safari; app Android con Expo; interfaz adaptable a celular, tablet y PC | Diagrama de despliegue (9.3.2); guías del capítulo 10 |
 | RNF09 | Rendimiento: el punto de venta responde aunque la red sea lenta | Catálogo, stock y política offline en caché local; la sincronización envía lotes de hasta 50 operaciones en segundo plano | Recorridos del capítulo 10 |
-| RNF10 | Observabilidad: se puede saber qué pasó con cada operación | Application Insights y Log Analytics en Azure; tabla Auditoria para acciones sensibles; estado de cada operación offline visible en la Pantalla Sincronización | Pantalla Sincronización (9.1.3); diagrama de despliegue |
+| RNF10 | Observabilidad: se puede saber qué pasó con cada operación | Registros de la API en la instancia EC2; tabla Auditoria para acciones sensibles; estado de cada operación offline visible en la Pantalla Sincronización | Pantalla Sincronización (9.1.3); diagrama de despliegue |
 | RNF11 | Calidad: el comportamiento crítico se verifica de forma automática | Pruebas unitarias y cuatro guiones de verificación de integración contra la API y una base real | 9.4 |
 | RNF12 | Coherencia documental: los diagramas representan la solución construida | El modelo de Enterprise Architect se regenera desde `casos.py`, `schema.prisma` y las firmas del código TypeScript | 9.4.6; anexo 14.6 |
 

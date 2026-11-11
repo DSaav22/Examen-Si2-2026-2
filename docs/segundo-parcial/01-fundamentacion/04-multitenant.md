@@ -239,7 +239,7 @@ En los clientes, la web guarda el slug de la tienda activa (frontend/src/tienda.
 
 | Alternativa | Motivo para no adoptarla hoy |
 |-------------|------------------------------|
-| Base por tienda | El alta debe ser instantánea tras el pago; crear y migrar una base por cada suscripción contradice el autoservicio y multiplica el costo en Azure para tiendas pequeñas |
+| Base por tienda | El alta debe ser instantánea tras el pago; crear y migrar una base por cada suscripción contradice el autoservicio y multiplica el costo en la nube para tiendas pequeñas |
 | Esquema por tienda como modo único | Prisma trabaja con un esquema por conexión y un historial de migraciones; exige versionar migraciones por esquema y mantener un cliente por tienda. Se implementó como modalidad piloto (sección 4.12), sin reemplazar todavía al pool en producción |
 | Pool sin capas adicionales | Un olvido de filtro sería una fuga; por eso el filtro se centraliza y la base aporta su propia barrera |
 

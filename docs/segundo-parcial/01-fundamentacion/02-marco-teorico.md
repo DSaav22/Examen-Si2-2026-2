@@ -57,7 +57,7 @@ Un **ciclo** produce una versión operativa (un incremento). Es análogo a un sp
 | Base de datos | PostgreSQL |
 | Web | React 19 y Vite |
 | Móvil | Expo 53 / React Native 0.79 |
-| Nube | Microsoft Azure: App Service, Static Web Apps, Flexible Server, Application Insights; infraestructura en Bicep |
+| Nube | Amazon Web Services: una instancia EC2 con Linux que aloja el proxy inverso con TLS, la API y PostgreSQL; dominio examensi2.duckdns.org |
 
 La autenticación usa JWT y el almacenamiento de contraseñas con hash. Los pagos del parcial son **simulados** (efectivo, QR de prueba, contra entrega): no se integra una pasarela productiva.
 

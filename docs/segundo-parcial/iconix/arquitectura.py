@@ -106,32 +106,29 @@ class Arquitectura:
         a_apk = n("ensayar.apk (bundle JS)", "Artifact", "", rn)
         a_sql = n("ensayar-offline.db (SQLite: operaciones, cache)", "Artifact", "", rn)
 
-        nube = n("Microsoft Azure: grupo de recursos ensayar", "Node", "device")
-        plan = n("App Service Plan Linux", "Node", "", nube)
-        node_api = n("Node.js 20 LTS: App Service ensayar-api", "ExecutionEnvironment", "", plan)
+        nube = n("Amazon Web Services (AWS)", "Node", "device")
+        ec2 = n("Instancia Amazon EC2 Linux (examensi2.duckdns.org)", "Node", "", nube)
+        proxy = n("Servidor web con TLS (proxy inverso :443)", "ExecutionEnvironment", "", ec2)
+        a_dist = n("frontend/dist (PWA compilada)", "Artifact", "", proxy)
+        spec_web = n("ensayar-web.env", "DeploymentSpecification", "", proxy)
+        self.atributos(spec_web, ["VITE_API_URL = /api"])
+        node_api = n("Node.js 20 LTS: ensayar-api :3000", "ExecutionEnvironment", "", ec2)
         a_api = n("ensayar-api: dist/main.js", "Artifact", "", node_api)
         a_prisma = n("prisma: schema.prisma + migraciones", "Artifact", "", node_api)
         spec_api = n("ensayar-api.env", "DeploymentSpecification", "", node_api)
         self.atributos(spec_api, VARIABLES_API)
-        node_web = n("Node.js 20 LTS: App Service ensayar-web", "ExecutionEnvironment", "", plan)
-        a_dist = n("frontend/dist (PWA compilada)", "Artifact", "", node_web)
-        spec_web = n("ensayar-web.env", "DeploymentSpecification", "", node_web)
-        self.atributos(spec_web, ["VITE_API_URL"])
-        pg_srv = n("Azure Database for PostgreSQL Flexible Server (Standard_B1ms)", "Node", "", nube)
-        pg = n("PostgreSQL 16", "ExecutionEnvironment", "", pg_srv)
+        pg = n("PostgreSQL 16", "ExecutionEnvironment", "", ec2)
         a_bd = n("base ensayar (tablas de negocio con tienda_id)", "Artifact", "", pg)
-        obs = n("Application Insights + Log Analytics", "Node", "", nube)
-        aoai = n("Azure OpenAI (despliegue del modelo)", "Node", "", nube)
 
+        aoai = n("Azure OpenAI (servicio externo de IA)", "Node", "device")
         push = n("Servicio Web Push del navegador (FCM, Mozilla, Apple)", "Node", "device")
         smtp = n("Servidor SMTP", "Node", "device")
         pasarela = n("Pasarela de pago (sandbox)", "Node", "device")
 
-        self.camino(nav, node_web, "HTTPS", "descarga de la PWA :443")
-        self.camino(nav, node_api, "HTTPS", "REST/JSON + Idempotency-Key :443")
-        self.camino(rn, node_api, "HTTPS", "REST/JSON + Idempotency-Key :443")
-        self.camino(node_api, pg, "TCP/TLS", "Prisma :5432")
-        self.camino(node_api, obs, "HTTPS", "telemetría")
+        self.camino(nav, proxy, "HTTPS", "PWA y REST/JSON /api + Idempotency-Key :443")
+        movil = self.camino(rn, proxy, "HTTPS", "REST/JSON /api + Idempotency-Key :443")
+        self.camino(proxy, node_api, "HTTP", "/api → localhost:3000")
+        self.camino(node_api, pg, "TCP", "Prisma localhost:5432")
         self.camino(node_api, aoai, "HTTPS", "chat completions")
         self.camino(node_api, push, "HTTPS", "Web Push (VAPID)")
         aviso = self.camino(push, nav, "HTTPS", "notificación push al service worker")
@@ -139,8 +136,8 @@ class Arquitectura:
         self.camino(node_api, pasarela, "HTTPS", "cobro + webhook")
 
         nota = self.nuevo("Nota despliegue", "Note", notas=(
-            "Despliegue definido como infraestructura como código en infra/app.bicep (azd up). "
-            "En desarrollo los mismos artefactos corren en localhost: API en :3000 y web en :5173. "
+            "Una sola instancia EC2 de AWS aloja el proxy inverso con TLS, la API y PostgreSQL; el dominio "
+            "examensi2.duckdns.org apunta a su IP pública. En desarrollo los mismos artefactos corren en localhost: API en :3000 y web en :5173. "
             "Sin red, el navegador y el teléfono siguen operando con IndexedDB y SQLite, y sincronizan "
             "por el mismo camino HTTPS al reconectar."))
 
@@ -152,16 +149,17 @@ class Arquitectura:
             (a_cache, 50, 305, 185, 60, 2), (a_ls, 245, 305, 185, 60, 2),
             (tel, 20, 500, 440, 230, 0), (rn, 35, 555, 410, 160, 1),
             (a_apk, 50, 610, 185, 50, 2), (a_sql, 245, 610, 185, 60, 2),
-            (nube, 540, 60, 700, 800, 0), (plan, 555, 110, 670, 520, 1),
-            (node_web, 570, 150, 640, 120, 2), (a_dist, 585, 195, 270, 50, 3), (spec_web, 880, 190, 310, 65, 3),
+            (nube, 540, 60, 700, 800, 0), (ec2, 555, 110, 670, 735, 1),
+            (proxy, 570, 150, 640, 120, 2), (a_dist, 585, 195, 270, 50, 3), (spec_web, 880, 190, 310, 65, 3),
             (node_api, 570, 290, 640, 320, 2), (a_api, 585, 340, 270, 45, 3), (a_prisma, 585, 400, 270, 45, 3),
             (spec_api, 880, 335, 310, 250, 3),
-            (pg_srv, 555, 665, 330, 175, 1), (pg, 570, 720, 300, 105, 2), (a_bd, 585, 765, 270, 50, 3),
-            (obs, 905, 665, 155, 90, 1), (aoai, 1075, 665, 150, 90, 1),
+            (pg, 570, 640, 640, 180, 2), (a_bd, 585, 700, 300, 50, 3),
+            (aoai, 1310, 90, 260, 90, 0),
             (push, 1310, 230, 260, 90, 0), (smtp, 1310, 380, 260, 80, 0), (pasarela, 1310, 520, 260, 80, 0),
             (nota, 20, 770, 440, 90, 0),
         ])
         self.ruta(d, aviso, [(1440, 25), (240, 25)])
+        self.ruta(d, movil, [(500, 630), (500, 250)])
         self.diagramas.append((d, "arq-despliegue"))
         return {"web": a_dist, "sw": a_sw, "api": a_api, "apk": a_apk, "bd": a_bd, "prisma": a_prisma}
 

@@ -6,7 +6,7 @@ El código está en https://github.com/DSaav22/Examen-Si2-2026-2 (backend, front
 
 ## 14.2 URL de despliegue y código QR
 
-La versión de la entrega está publicada en el dominio `examensi2.duckdns.org`. La aplicación web y la API comparten el dominio: la PWA llama a la API por la ruta relativa `/api`, de modo que no hay peticiones entre orígenes distintos. La infraestructura de Azure descrita en el diseño está definida en `infra/app.bicep`.
+La versión de la entrega está publicada en el dominio `examensi2.duckdns.org`. La aplicación web y la API comparten el dominio: la PWA llama a la API por la ruta relativa `/api`, de modo que no hay peticiones entre orígenes distintos. El servidor es una instancia Amazon EC2 con Linux en AWS (sección 9.3, diagrama de despliegue).
 
 | Componente | URL |
 |---|---|

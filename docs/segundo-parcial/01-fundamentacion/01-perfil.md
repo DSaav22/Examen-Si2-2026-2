@@ -123,7 +123,7 @@ La tabla siguiente resume cómo respondió cada capa de la arquitectura del prim
 | Cliente web | React con una cola de ventas en IndexedDB | Service worker, caché de datos, cola para clientas y productos, Web Push | Se amplió el mecanismo existente |
 | Cliente móvil | React Native con Expo | Base local SQLite y sincronización por lotes | Se agregó una capa de persistencia |
 | Reportes | Reportes predefinidos y consulta por voz simple | Capa semántica, compilador de SQL parametrizado y exportación | Se reemplazó el intérprete; la interfaz se conservó |
-| Infraestructura | App Service y PostgreSQL Flexible en Azure, definidos con Bicep | Sin cambios de topología | Adecuada para la escala actual |
+| Infraestructura | Una instancia EC2 de AWS con la API, la web y PostgreSQL | Sin cambios de topología | Adecuada para la escala actual |
 
 ### 1.10.3 Camino elegido
 
