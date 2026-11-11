@@ -1,6 +1,7 @@
+import { medioDeMetodo, useMetodosPago } from './pagos'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { api, esFalloRed } from './api'
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { api, esFalloRed, tiendaActiva } from './api'
 import { borrarCache, guardarCache, leerCache } from './offline/almacen'
 import { alSincronizar, cambiosReintento, descartar, encolar, motor, reintentar, sincronizar, textoReintento, useAutoSync, useSync, uuid } from './offline/sync'
 import type { OperacionLocal } from './offline/tipos'
@@ -66,12 +67,13 @@ export function OperacionesScreen() {
 
 /** Pide al backend y guarda la respuesta en SQLite; sin red devuelve la última copia guardada. */
 async function conCache<T>(clave: string, pedir: () => Promise<T>): Promise<{ datos: T; deCache: boolean }> {
+  const t = tiendaActiva()
   try {
     const datos = await pedir()
-    await guardarCache(clave, datos)
+    await guardarCache(clave, datos, t)
     return { datos, deCache: false }
   } catch (err) {
-    const copia = esFalloRed(err) ? await leerCache<T>(clave) : null
+    const copia = esFalloRed(err) ? await leerCache<T>(clave, t) : null
     if (copia === null) throw err
     return { datos: copia, deCache: true }
   }
@@ -79,7 +81,7 @@ async function conCache<T>(clave: string, pedir: () => Promise<T>): Promise<{ da
 
 function CajaPos({ onCambio }: { onCambio: () => void }) {
   const s = useSession()
-  useAutoSync(s.token)
+  useAutoSync(s.token, s.user?.cuentaId ?? s.user?.id)
   const sync = useSync()
   const [turno, setTurno] = useState<CajaTurno | null>(null)
   const [productos, setProductos] = useState<Producto[]>([])
@@ -88,7 +90,11 @@ function CajaPos({ onCambio }: { onCambio: () => void }) {
   const [ticket, setTicket] = useState<LineaPos[]>([])
   const [fondo, setFondo] = useState('0')
   const [declarado, setDeclarado] = useState('0')
-  const [medio, setMedio] = useState<'efectivo' | 'qr'>('efectivo')
+  const [medio, setMedio] = useState<'efectivo' | 'qr' | 'tarjeta' | 'transferencia'>('efectivo')
+  const pagos = useMetodosPago(s.token)
+  const [metodo, setMetodo] = useState('')
+  const [pagoPendiente, setPagoPendiente] = useState('')
+  const [cobrando, setCobrando] = useState(false)
   const [clientas, setClientas] = useState<Clienta[]>([])
   const [clientaId, setClientaId] = useState('')
   const [altaClienta, setAltaClienta] = useState(false)
@@ -105,7 +111,7 @@ function CajaPos({ onCambio }: { onCambio: () => void }) {
           const r = await api<{ items?: Producto[] } | Producto[]>('/catalogo/productos?limite=60', null)
           return Array.isArray(r) ? r : r.items ?? []
         }),
-        leerCache<Clienta[]>('clientas'),
+        leerCache<Clienta[]>('clientas', tiendaActiva()),
       ])
       setTurno(t.datos ?? null)
       setProductos(p.datos)
@@ -141,7 +147,7 @@ function CajaPos({ onCambio }: { onCambio: () => void }) {
   async function abrir() {
     try {
       const t = await api<CajaTurno>('/caja/abrir', s.token, { method: 'POST', headers: { 'Idempotency-Key': uuid() }, body: JSON.stringify({ sucursalId: s.sucursalId, fondoInicial: Number(fondo) || 0 }) })
-      await guardarCache(`turno:${s.user?.id}`, t)
+      await guardarCache(`turno:${s.user?.id}`, t, tiendaActiva())
       s.setAviso('Caja abierta'); await cargar(); onCambio()
     } catch (e) { s.setError(e instanceof Error ? e.message : 'No se abrió la caja') }
   }
@@ -149,47 +155,60 @@ function CajaPos({ onCambio }: { onCambio: () => void }) {
     if (!turno) return
     try {
       await api('/caja/cerrar', s.token, { method: 'POST', headers: { 'Idempotency-Key': uuid() }, body: JSON.stringify({ totalDeclarado: Number(declarado) || 0 }) })
-      await borrarCache(`turno:${s.user?.id}`)
+      await borrarCache(`turno:${s.user?.id}`, tiendaActiva())
       s.setAviso('Caja cerrada'); setTicket([]); await cargar(); onCambio()
     } catch (e) { s.setError(e instanceof Error ? e.message : 'No se cerró la caja') }
   }
   async function venderSinRed(payload: { uuid: string; almacenId: string; cajaTurnoId: string; clientaId?: string; lineas: { varianteId: string; cantidad: number }[] }) {
     const prendas = payload.lineas.reduce((n, l) => n + l.cantidad, 0)
-    await encolar('venta', { almacenId: payload.almacenId, cajaTurnoId: payload.cajaTurnoId, clientaId: payload.clientaId, medioPago: 'efectivo', lineas: payload.lineas }, `Venta Bs ${total.toFixed(2)} · ${prendas} prenda(s)`, { id: payload.uuid })
+    await encolar('venta', { almacenId: payload.almacenId, cajaTurnoId: payload.cajaTurnoId, clientaId: payload.clientaId, medioPago: 'efectivo', lineas: payload.lineas }, `Venta Bs ${total.toFixed(2)} · ${prendas} prenda(s)`, { id: payload.uuid, cuentaId: s.user?.cuentaId ?? s.user?.id })
     const resto = { ...stock }
     for (const l of payload.lineas) resto[l.varianteId] = Math.max(0, (resto[l.varianteId] ?? 0) - l.cantidad)
     setStock(resto)
-    if (turno?.sucursal?.id) await guardarCache(`inventario:${turno.sucursal.id}`, resto)
+    if (turno?.sucursal?.id) await guardarCache(`inventario:${turno.sucursal.id}`, resto, tiendaActiva())
     setTicket([])
     s.setAviso(`Venta ${payload.uuid.slice(0, 8)} guardada en el teléfono (${motor}); se sincroniza sola al volver la red.`)
-    void sincronizar(s.token)
+    void sincronizar(s.token, s.user?.cuentaId ?? s.user?.id)
   }
   async function cobrar() {
+    if (cobrando || pagoPendiente) return
+    if (medio !== 'efectivo' && !pagos.metodos.some(m => m.codigo === metodo)) { s.setError('Elegí un método disponible.'); return }
     if (!turno || !ticket.length || !almacenId) return
     const payload = { uuid: uuid(), almacenId, cajaTurnoId: turno.id, clientaId: clientaId || undefined, lineas: ticket.map(l => ({ varianteId: l.variante.id, cantidad: l.cantidad })) }
-    if (medio === 'qr' && !sync.online) { s.setError('El pago QR necesita red: el banco tiene que confirmarlo. Sin conexión cobrá en efectivo.'); return }
+    if (medio !== 'efectivo' && !sync.online) { s.setError('El pago simulado necesita conexión con el servidor. Sin conexión cobrá en efectivo.'); return }
     // Detrás de operaciones pendientes la venta también va a la cola, para respetar el orden (p. ej. una clienta recién creada).
     if (medio === 'efectivo' && (!sync.online || pendientes > 0)) { await venderSinRed(payload); return }
+    setCobrando(true)
     try {
-      const venta = await api<{ id: string; pago?: { id: string } }>('/ventas', s.token, { method: 'POST', headers: { 'Idempotency-Key': payload.uuid }, body: JSON.stringify({ ...payload, canal: 'pos', medioPago: medio }) })
-      if (medio === 'qr' && venta.pago?.id) await api(`/pagos/${venta.pago.id}/simular`, s.token, { method: 'POST', headers: { 'Idempotency-Key': uuid() }, body: JSON.stringify({ resultado: 'aprobado' }) })
+      const venta = await api<{ id: string; pago?: { id: string } }>('/ventas', s.token, { method: 'POST', headers: { 'Idempotency-Key': payload.uuid }, body: JSON.stringify({ ...payload, canal: 'pos', medioPago: medio, ...(medio !== 'efectivo' ? { metodoPasarela: metodo } : {}) }) })
+      if (venta.pago?.id) { setPagoPendiente(venta.pago.id); s.setAviso('Pago simulado pendiente: aprobá o rechazá el cobro.'); return }
       setTicket([]); s.setAviso(`Venta POS ${venta.id.slice(0, 8)} cobrada`); await cargar(); onCambio()
     } catch (e) {
       if (esFalloRed(e) && medio === 'efectivo') { await venderSinRed(payload); return }
       s.setError(e instanceof Error ? e.message : 'No se pudo cobrar')
-    }
+    } finally { setCobrando(false) }
+  }
+  async function resolverPago(resultado: 'aprobado' | 'rechazado') {
+    if (!pagoPendiente || cobrando) return
+    setCobrando(true)
+    try {
+      await api(`/pagos/${pagoPendiente}/simular`, s.token, { method: 'POST', headers: { 'Idempotency-Key': `${pagoPendiente}:${resultado}` }, body: JSON.stringify({ resultado }) })
+      setPagoPendiente(''); setTicket([]); await cargar(); onCambio()
+      s.setAviso(resultado === 'aprobado' ? 'Pago simulado aprobado' : 'Pago rechazado; stock liberado')
+    } catch (e) { s.setError(e instanceof Error ? e.message : 'No se pudo resolver el pago') }
+    finally { setCobrando(false) }
   }
   async function registrarClienta() {
     const nombre = nombreClienta.trim()
     const email = emailClienta.trim().toLowerCase()
     if (!nombre || !/^\S+@\S+\.\S+$/.test(email)) { s.setError('Completá nombre y un correo válido.'); return }
     const id = uuid()
-    await encolar('cliente', { id, nombre, email }, `Clienta ${nombre} · ${email}`, { id })
+    await encolar('cliente', { id, nombre, email }, `Clienta ${nombre} · ${email}`, { id, cuentaId: s.user?.cuentaId ?? s.user?.id })
     const lista = [...clientas, { id, nombre, email }]
-    setClientas(lista); await guardarCache('clientas', lista)
+    setClientas(lista); await guardarCache('clientas', lista, tiendaActiva())
     setClientaId(id); setAltaClienta(false); setNombreClienta(''); setEmailClienta('')
     s.setAviso(`${nombre} quedó registrada en el teléfono.`)
-    void sincronizar(s.token)
+    void sincronizar(s.token, s.user?.cuentaId ?? s.user?.id)
   }
 
   return <>
@@ -198,7 +217,9 @@ function CajaPos({ onCambio }: { onCambio: () => void }) {
     <Card><Text style={styles.cardTitle}>Punto de venta</Text><Text style={styles.muted}>Tocá una variante para añadirla al ticket.</Text>{productos.map(p => <View key={p.id} style={styles.row}><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{p.nombre}</Text><Text style={styles.muted}>Bs {precioEfectivo(p).toFixed(2)}</Text></View>{p.variantes.slice(0, 3).map(v => { const disp = stock[v.id]; const agotado = disp === 0; return <Pressable key={v.id} disabled={agotado} onPress={() => agregar(p, v)} style={[styles.pill, agotado && styles.disabled]}><Text style={styles.pillText}>{v.talla}/{v.color}{disp !== undefined ? ` · ${disp}` : ''}</Text></Pressable> })}</View>)}</Card>
     <Card><Text style={styles.cardTitle}>Ticket · Bs {total.toFixed(2)}</Text>{ticket.length ? ticket.map(l => <View key={l.variante.id} style={styles.row}><Text style={styles.rowTitle}>{l.producto.nombre} · {l.variante.talla}/{l.variante.color} × {l.cantidad}</Text><Pressable onPress={() => setTicket(p => p.flatMap(x => x.variante.id === l.variante.id ? x.cantidad === 1 ? [] : [{ ...x, cantidad: x.cantidad - 1 }] : [x]))}><Text style={styles.remove}>Quitar</Text></Pressable></View>) : <Text style={styles.muted}>Sin artículos.</Text>}
       <Text style={styles.rowTitle}>Clienta</Text>
-      <View style={styles.chips}><Pressable style={[styles.chip, !clientaId && styles.chipOn]} onPress={() => setClientaId('')}><Text>Sin clienta</Text></Pressable>{clientas.map(c => <Pressable key={c.id} style={[styles.chip, clientaId === c.id && styles.chipOn]} onPress={() => setClientaId(c.id)}><Text>{c.nombre}</Text></Pressable>)}<Pressable style={styles.chip} onPress={() => setAltaClienta(v => !v)}><Text>+ Nueva clienta</Text></Pressable></View>
+      <View style={styles.chips}><Pressable style={[styles.chip, medio === 'efectivo' && styles.chipOn]} onPress={() => { setMedio('efectivo'); setMetodo('') }}><Text>Efectivo</Text></Pressable>{pagos.metodos.map(m => <Pressable key={m.codigo} disabled={!sync.online || !!pagoPendiente} style={[styles.chip, metodo === m.codigo && styles.chipOn]} onPress={() => { setMetodo(m.codigo); setMedio(medioDeMetodo(m.codigo)) }}><Text>{m.nombre} - simulado</Text></Pressable>)}</View>
+      {pagos.error ? <Text>{pagos.error}</Text> : null}
+      {pagoPendiente ? <><Text>Pago simulado pendiente. No se cobra dinero real.</Text><Action label="APROBAR PAGO" disabled={cobrando} onPress={() => void resolverPago('aprobado')} /><Action label="RECHAZAR PAGO" disabled={cobrando} onPress={() => void resolverPago('rechazado')} secondary /></> : null}
       {altaClienta ? <View style={styles.row}><TextInput value={nombreClienta} onChangeText={setNombreClienta} style={styles.input} placeholder="Nombre" /><TextInput value={emailClienta} onChangeText={setEmailClienta} style={styles.input} placeholder="Correo" keyboardType="email-address" autoCapitalize="none" /><Action label="REGISTRAR CLIENTA" onPress={() => void registrarClienta()} /></View> : null}
       <View style={styles.chips}><Pressable style={[styles.chip, medio === 'efectivo' && styles.chipOn]} onPress={() => setMedio('efectivo')}><Text>Efectivo</Text></Pressable><Pressable style={[styles.chip, medio === 'qr' && styles.chipOn, !sync.online && styles.disabled]} disabled={!sync.online} onPress={() => setMedio('qr')}><Text>QR simulado{sync.online ? '' : ' (requiere red)'}</Text></Pressable></View>
       <Action label="COBRAR TICKET" disabled={!turno || !ticket.length} onPress={() => void cobrar()} />
@@ -258,11 +279,156 @@ function Proveedor({ onCambio }: { onCambio: () => void }) {
 }
 
 function Administrador({ onCambio }: { onCambio: () => void }) {
-  const s = useSession(); const [resumen, setResumen] = useState<Record<string, unknown> | null>(null); const [panel, setPanel] = useState<Record<string, unknown> | null>(null); const [usuarios, setUsuarios] = useState<{ id: string; nombre: string; email: string; rol: string; activo: boolean }[]>([]); const [opiniones, setOpiniones] = useState<{ id: string; comentario?: string; puntuacion?: number; producto?: { nombre: string }; usuario?: { nombre: string } }[]>([])
-  const cargar = useCallback(async () => { try { const [r, p, u, o] = await Promise.all([api<Record<string, unknown>>('/admin/resumen', s.token), api<Record<string, unknown>>('/reportes/panel', s.token), api<typeof usuarios>('/usuarios', s.token), api<typeof opiniones>('/admin/opiniones/pendientes', s.token)]); setResumen(r); setPanel(p); setUsuarios(u); setOpiniones(o) } catch (e) { s.setError(e instanceof Error ? e.message : 'No se cargó administración') } }, [s.token])
+  const s = useSession()
+  const sync = useSync()
+  const [resumen, setResumen] = useState<Record<string, unknown> | null>(null)
+  const [panel, setPanel] = useState<Record<string, unknown> | null>(null)
+  const [usuarios, setUsuarios] = useState<{ id: string; nombre: string; email: string; rol: string; activo: boolean }[]>([])
+  const [opiniones, setOpiniones] = useState<{ id: string; comentario?: string; puntuacion?: number; producto?: { nombre: string }; usuario?: { nombre: string } }[]>([])
+
+  const [nombreProd, setNombreProd] = useState('')
+  const [catProd, setCatProd] = useState('vestidos')
+  const [ocasionProd, setOcasionProd] = useState('casual')
+  const [precioProd, setPrecioProd] = useState('280')
+  const [descProd, setDescProd] = useState('')
+  const [tallaProd, setTallaProd] = useState('M')
+  const [colorProd, setColorProd] = useState('Negro')
+  const [stockProd, setStockProd] = useState('10')
+  const [creandoProd, setCreandoProd] = useState(false)
+
+  const cargar = useCallback(async () => {
+    try {
+      const [r, p, u, o] = await Promise.all([
+        api<Record<string, unknown>>('/admin/resumen', s.token),
+        api<Record<string, unknown>>('/reportes/panel', s.token),
+        api<typeof usuarios>('/usuarios', s.token),
+        api<typeof opiniones>('/admin/opiniones/pendientes', s.token),
+      ])
+      setResumen(r)
+      setPanel(p)
+      setUsuarios(u)
+      setOpiniones(o)
+    } catch (e) {
+      s.setError(e instanceof Error ? e.message : 'No se cargó administración')
+    }
+  }, [s.token])
+
   useEffect(() => { void cargar() }, [cargar])
-  async function moderar(id: string, aprobar: boolean) { try { await api(`/admin/opiniones/${id}/moderacion`, s.token, { method: 'PATCH', body: JSON.stringify({ aprobar }) }); s.setAviso(aprobar ? 'Opinión publicada' : 'Opinión rechazada'); await cargar(); onCambio() } catch (e) { s.setError(e instanceof Error ? e.message : 'No se moderó la opinión') } }
-  return <><Card><Text style={styles.cardTitle}>Resumen diario</Text><Text style={styles.pre}>{resumen ? JSON.stringify(resumen, null, 2) : 'Cargando…'}</Text></Card><Card><Text style={styles.cardTitle}>Reportes de negocio</Text><Text style={styles.pre}>{panel ? JSON.stringify(panel, null, 2) : 'Cargando…'}</Text></Card><Card><Text style={styles.cardTitle}>Usuarios · {usuarios.length}</Text>{usuarios.slice(0, 20).map(u => <View key={u.id} style={styles.row}><Text style={styles.rowTitle}>{u.nombre} · {u.rol}</Text><Text style={styles.muted}>{u.email} · {u.activo ? 'activo' : 'inactivo'}</Text></View>)}</Card><Card><Text style={styles.cardTitle}>Moderación · {opiniones.length}</Text>{opiniones.length ? opiniones.map(o => <View key={o.id} style={styles.row}><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{o.producto?.nombre ?? 'Producto'} · {o.puntuacion ?? 0}/5</Text><Text style={styles.muted}>{o.usuario?.nombre ?? ''}: {o.comentario ?? ''}</Text></View><Action label="APROBAR" onPress={() => void moderar(o.id, true)} /><Action label="RECHAZAR" secondary onPress={() => void moderar(o.id, false)} /></View>) : <Text style={styles.muted}>No hay opiniones pendientes.</Text>}</Card></>
+
+  async function registrarProducto() {
+    const nom = nombreProd.trim()
+    const precio = Number(precioProd)
+    if (!nom || isNaN(precio) || precio <= 0) {
+      s.setError('Completá nombre y un precio base válido.')
+      return
+    }
+    setCreandoProd(true)
+    const prodId = uuid()
+    const varId = uuid()
+    const sku = `${nom.slice(0, 3).toUpperCase()}-${tallaProd.toUpperCase()}-${colorProd.toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`
+    const payload = {
+      id: prodId,
+      nombre: nom,
+      categoria: catProd,
+      ocasion: ocasionProd,
+      precioBase: precio,
+      descripcion: descProd.trim() || undefined,
+      almacenId: s.almacenId || undefined,
+      variantes: [
+        {
+          id: varId,
+          talla: tallaProd.trim() || 'M',
+          color: colorProd.trim() || 'Negro',
+          sku,
+          stock: Number(stockProd) || 0,
+        },
+      ],
+    }
+    if (!sync.online) {
+      await encolar('producto', payload, `Producto ${nom} · Bs ${precio.toFixed(2)}`, { id: prodId, cuentaId: s.user?.cuentaId ?? s.user?.id })
+      s.setAviso(`Producto "${nom}" guardado en SQLite local (${motor}); se sincronizará al volver la red.`)
+      setNombreProd('')
+      setDescProd('')
+      setCreandoProd(false)
+      onCambio()
+      return
+    }
+    try {
+      await api('/sync/lote', s.token, {
+        method: 'POST',
+        body: JSON.stringify({
+          dispositivoId: 'movil-admin',
+          nombreDispositivo: `Admin ${Platform.OS} · ${motor}`,
+          operaciones: [{ id: prodId, tipo: 'producto', creadaEn: new Date().toISOString(), datos: payload }],
+        }),
+      })
+      s.setAviso(`Producto "${nom}" registrado exitosamente.`)
+      setNombreProd('')
+      setDescProd('')
+      onCambio()
+    } catch (err) {
+      if (esFalloRed(err)) {
+        await encolar('producto', payload, `Producto ${nom} · Bs ${precio.toFixed(2)}`, { id: prodId, cuentaId: s.user?.cuentaId ?? s.user?.id })
+        s.setAviso(`Sin red: producto "${nom}" guardado en la cola local (${motor}).`)
+        setNombreProd('')
+        setDescProd('')
+        onCambio()
+      } else {
+        s.setError(err instanceof Error ? err.message : 'No se pudo registrar el producto')
+      }
+    } finally {
+      setCreandoProd(false)
+    }
+  }
+
+  async function moderar(id: string, aprobar: boolean) {
+    try {
+      await api(`/admin/opiniones/${id}/moderacion`, s.token, { method: 'PATCH', body: JSON.stringify({ aprobar }) })
+      s.setAviso(aprobar ? 'Opinión publicada' : 'Opinión rechazada')
+      await cargar()
+      onCambio()
+    } catch (e) {
+      s.setError(e instanceof Error ? e.message : 'No se moderó la opinión')
+    }
+  }
+
+  return (
+    <>
+      <Card>
+        <Text style={styles.cardTitle}>Nuevo producto (en línea o sin conexión)</Text>
+        <Text style={styles.muted}>Crea prendas que se sincronizan con el catálogo y el esquema de la tienda activa.</Text>
+        <TextInput value={nombreProd} onChangeText={setNombreProd} style={styles.input} placeholder="Nombre de la prenda (ej. Vestido Noche)" />
+        <TextInput value={descProd} onChangeText={setDescProd} style={styles.input} placeholder="Descripción opcional" />
+        <View style={styles.chips}>
+          <Text style={styles.rowTitle}>Categoría:</Text>
+          {['vestidos', 'conjuntos', 'blusas', 'pantalones', 'calzados'].map(c => (
+            <Pressable key={c} onPress={() => setCatProd(c)} style={[styles.chip, catProd === c && styles.chipOn]}>
+              <Text style={{ textTransform: 'capitalize' }}>{c}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.chips}>
+          <Text style={styles.rowTitle}>Ocasión:</Text>
+          {['casual', 'fiesta', 'gala', 'trabajo', 'noche'].map(o => (
+            <Pressable key={o} onPress={() => setOcasionProd(o)} style={[styles.chip, ocasionProd === o && styles.chipOn]}>
+              <Text style={{ textTransform: 'capitalize' }}>{o}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          <TextInput value={precioProd} onChangeText={setPrecioProd} keyboardType="decimal-pad" style={[styles.input, { flex: 1 }]} placeholder="Precio Bs" />
+          <TextInput value={tallaProd} onChangeText={setTallaProd} style={[styles.input, { flex: 1 }]} placeholder="Talla (ej. M)" />
+          <TextInput value={colorProd} onChangeText={setColorProd} style={[styles.input, { flex: 1 }]} placeholder="Color (ej. Negro)" />
+          <TextInput value={stockProd} onChangeText={setStockProd} keyboardType="number-pad" style={[styles.input, { flex: 1 }]} placeholder="Stock" />
+        </View>
+        <Action label={creandoProd ? 'GUARDANDO…' : 'REGISTRAR PRODUCTO'} disabled={creandoProd || !nombreProd.trim() || !precioProd} onPress={() => void registrarProducto()} />
+      </Card>
+      <Card><Text style={styles.cardTitle}>Resumen diario</Text><Text style={styles.pre}>{resumen ? JSON.stringify(resumen, null, 2) : 'Cargando…'}</Text></Card>
+      <Card><Text style={styles.cardTitle}>Reportes de negocio</Text><Text style={styles.pre}>{panel ? JSON.stringify(panel, null, 2) : 'Cargando…'}</Text></Card>
+      <Card><Text style={styles.cardTitle}>Usuarios · {usuarios.length}</Text>{usuarios.slice(0, 20).map(u => <View key={u.id} style={styles.row}><Text style={styles.rowTitle}>{u.nombre} · {u.rol}</Text><Text style={styles.muted}>{u.email} · {u.activo ? 'activo' : 'inactivo'}</Text></View>)}</Card>
+      <Card><Text style={styles.cardTitle}>Moderación · {opiniones.length}</Text>{opiniones.length ? opiniones.map(o => <View key={o.id} style={styles.row}><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{o.producto?.nombre ?? 'Producto'} · {o.puntuacion ?? 0}/5</Text><Text style={styles.muted}>{o.usuario?.nombre ?? ''}: {o.comentario ?? ''}</Text></View><Action label="APROBAR" onPress={() => void moderar(o.id, true)} /><Action label="RECHAZAR" secondary onPress={() => void moderar(o.id, false)} /></View>) : <Text style={styles.muted}>No hay opiniones pendientes.</Text>}</Card>
+    </>
+  )
 }
 
 const styles = StyleSheet.create({

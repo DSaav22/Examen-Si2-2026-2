@@ -105,9 +105,11 @@ function textoReintento(op: OperacionOffline) {
 export function ColaDispositivo({ turnoId, vacio }: { turnoId?: string; vacio?: string }) {
   const ops = useColaLocal()
   const s = useEstadoSync()
+  const [errorAccion, setErrorAccion] = useState('')
   if (!ops.length) return vacio ? <p className="muted">{vacio}</p> : null
   return (
     <div className="cola-dispositivo">
+      {errorAccion && <p className="error" role="alert">{errorAccion}</p>}
       <ul className="cola-lista">
         {ops.map(op => {
           const cambios = op.estado === 'pendiente' ? null : cambiosReintento(op, turnoId)
@@ -127,7 +129,7 @@ export function ColaDispositivo({ turnoId, vacio }: { turnoId?: string; vacio?: 
               <OpsStatus state={op.estado === 'pendiente' ? 'warn' : 'muted'}>{ETIQUETA_ESTADO[op.estado]}</OpsStatus>
               <div className="cola-item-actions">
                 {cambios ? (
-                  <button type="button" className="ghost" onClick={() => void reintentar(op, cambios).then(() => sincronizar())}>
+                  <button type="button" className="ghost" onClick={() => { setErrorAccion(''); void reintentar(op, cambios).then(() => sincronizar()).catch(() => setErrorAccion('No se pudo reintentar. Revisá el estado de la cola antes de volver a intentar.')) }}>
                     {textoReintento(op)}
                   </button>
                 ) : null}
@@ -136,7 +138,7 @@ export function ColaDispositivo({ turnoId, vacio }: { turnoId?: string; vacio?: 
                   className="ghost"
                   onClick={() => {
                     if (op.estado !== 'pendiente' || window.confirm('¿Descartar esta operación? No se enviará al servidor.')) {
-                      void quitarOp(op.id)
+                      void quitarOp(op.id).catch(() => setErrorAccion('No se pudo descartar la operación.'))
                     }
                   }}
                 >

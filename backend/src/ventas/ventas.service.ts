@@ -1,6 +1,9 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { metodoDeVenta, validarPagoVenta } from '../pagos/metodos-pais';
+import { ConflictException, Injectable, Logger, Optional } from '@nestjs/common';
 import { Canal, EstadoVenta, Prisma, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
 import { InventarioService } from '../inventario/inventario.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { TenantContext } from '../tenancy/tenant-context';
@@ -29,10 +32,20 @@ export class VentasService {
     private readonly prisma: PrismaService,
     private readonly inventario: InventarioService,
     private readonly notificaciones: NotificacionesService,
+    @Optional() private readonly esquemas?: PrismaEsquemasService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
 
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && (this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas) {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
+
   historialClienta(clientaId: string) {
-    return this.prisma.venta.findMany({
+    return this.db().venta.findMany({
       where: { clientaId },
       include: {
         lineas: { include: { variante: { include: { producto: true } } } },
@@ -45,7 +58,7 @@ export class VentasService {
   }
 
   async ventasDeSucursal(sucursalId?: string) {
-    return this.prisma.venta.findMany({
+    return this.db().venta.findMany({
       where: {
         ...(sucursalId ? { almacen: { sucursalId } } : {}),
         estado: { in: ['cobrada', 'pendiente_pago', 'devuelta', 'devuelta_parcial'] },
@@ -69,8 +82,12 @@ export class VentasService {
       throw new TurnoRequeridoError();
     }
     const tiendaId = TenantContext.tiendaIdOrThrow();
+    const tienda = await ((this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas
+      ? this.esquemas.clientePlataforma()
+      : this.prisma).tienda.findUniqueOrThrow({ where: { id: tiendaId }, select: { pais: true } });
+    const metodo = validarPagoVenta(tienda.pais, dto.medioPago, dto.metodoPasarela);
 
-    const existente = await this.prisma.venta.findFirst({
+    const existente = await this.db().venta.findFirst({
       where: { uuid: dto.uuid },
       include: { lineas: true, pago: true },
     });
@@ -84,7 +101,7 @@ export class VentasService {
     const lineasConPrecio = await this.preciosDeLineas(dto);
     const codigoCupon = dto.cuponCodigo?.trim();
     const cupon = codigoCupon
-      ? await this.prisma.cupon.findFirst({
+      ? await this.db().cupon.findFirst({
           where: {
             codigo: codigoCupon,
             activo: true,
@@ -98,7 +115,7 @@ export class VentasService {
     if (cupon?.usoMaximo != null && cupon.usado >= cupon.usoMaximo) {
       throw new ConflictException({ codigo: 'CUPON_AGOTADO' });
     }
-    const pendientePago = dto.medioPago === 'qr' || dto.medioPago === 'tarjeta';
+    const pendientePago = ['qr', 'tarjeta', 'transferencia'].includes(dto.medioPago);
     const alCredito = dto.medioPago === 'credito';
     if (alCredito) {
       if (dto.canal !== Canal.pos || !dto.clientaId) {
@@ -107,7 +124,7 @@ export class VentasService {
           mensaje: 'La venta al crédito se hace en caja y a nombre de una clienta registrada.',
         });
       }
-      const clienta = await this.prisma.usuario.findFirst({
+      const clienta = await this.db().usuario.findFirst({
         where: { id: dto.clientaId, activo: true },
         select: { id: true },
       });
@@ -115,6 +132,7 @@ export class VentasService {
     }
 
     const creada = await this.transaccionVenta(dto, async (tx) => {
+      const tiendaId = TenantContext.tiendaId();
       if (dto.canal === Canal.pos && dto.cajaTurnoId) {
         await this.validarTurnoEnTx(
           tx,
@@ -188,6 +206,7 @@ export class VentasService {
 
       const venta = await tx.venta.create({
         data: {
+          ...(tiendaId ? { tiendaId } : {}),
           uuid: dto.uuid,
           canal: dto.canal,
           estado,
@@ -199,6 +218,7 @@ export class VentasService {
           clientaId: dto.clientaId,
           lineas: {
             create: lineasConPrecio.map((l) => ({
+              ...(tiendaId ? { tiendaId } : {}),
               varianteId: l.varianteId,
               cantidad: l.cantidad,
               precioUnitario: l.precioUnitario,
@@ -211,13 +231,15 @@ export class VentasService {
       if (pendientePago) {
         await tx.pagoSimulado.create({
           data: {
+            ...(tiendaId ? { tiendaId } : {}),
             ventaId: venta.id,
             estado: 'pendiente',
-            referencia: `PRUEBA-${dto.medioPago}-${venta.id.slice(0, 8)}`,
+            referencia: `SIM:${metodo}:${venta.id}`,
           },
         });
         for (const [varianteId, cantidad] of pedidas) {
           await this.inventario.registrar(tx, {
+            tiendaId,
             tipo: 'reserva',
             varianteId,
             almacenId: dto.almacenId,
@@ -230,6 +252,7 @@ export class VentasService {
       } else {
         for (const [varianteId, cantidad] of pedidas) {
           await this.inventario.registrar(tx, {
+            tiendaId,
             tipo: 'venta',
             varianteId,
             almacenId: dto.almacenId,
@@ -254,6 +277,7 @@ export class VentasService {
         plazo.setDate(plazo.getDate() + PLAZO_CREDITO_DIAS);
         await tx.cuentaCobrar.create({
           data: {
+            ...(tiendaId ? { tiendaId } : {}),
             ventaId: venta.id,
             clientaId: dto.clientaId!,
             monto: total,
@@ -263,7 +287,15 @@ export class VentasService {
         });
       }
 
-      await tx.auditoria.create({ data: { accion: 'venta_creada', recurso: venta.id, detalle: dto.canal, usuarioId: actor?.id ?? dto.clientaId } });
+      await tx.auditoria.create({
+        data: {
+          ...(tiendaId ? { tiendaId } : {}),
+          accion: 'venta_creada',
+          recurso: venta.id,
+          detalle: dto.canal,
+          usuarioId: actor?.id ?? dto.clientaId,
+        },
+      });
 
       if (estado === 'cobrada' && dto.canal === 'online' && dto.clientaId) {
         await this.abrirPedido(tx, {
@@ -300,10 +332,10 @@ export class VentasService {
    */
   private async transaccionVenta<T>(dto: CrearVentaDto, fn: (tx: Tx) => Promise<T>) {
     try {
-      return await this.prisma.$transaction(fn);
+      return await this.db().$transaction(fn);
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
-      const ganadora = await this.prisma.venta.findFirst({
+      const ganadora = await this.db().venta.findFirst({
         where: { uuid: dto.uuid },
         include: { lineas: true, pago: true },
       });
@@ -350,10 +382,10 @@ export class VentasService {
 
   private async preciosDeLineas(dto: CrearVentaDto) {
     const clienta = dto.clientaId
-      ? await this.prisma.usuario.findUnique({ where: { id: dto.clientaId } })
+      ? await this.db().usuario.findUnique({ where: { id: dto.clientaId } })
       : null;
     const mayorista = !!clienta?.mayorista;
-    const variantes = await this.prisma.variante.findMany({
+    const variantes = await this.db().variante.findMany({
       where: { id: { in: dto.lineas.map((l) => l.varianteId) } },
       include: { producto: true },
     });
@@ -388,6 +420,7 @@ export class VentasService {
 
   private mismoPayload(
     venta: {
+      pago?: { referencia: string | null } | null;
       canal: string;
       medioPago: string;
       almacenId: string;
@@ -398,6 +431,7 @@ export class VentasService {
     dto: CrearVentaDto,
   ): boolean {
     if (
+      (venta.pago?.referencia?.startsWith('SIM:') && venta.pago.referencia.split(':')[1] !== metodoDeVenta(dto.medioPago, dto.metodoPasarela)) ||
       venta.canal !== dto.canal ||
       venta.medioPago !== dto.medioPago ||
       venta.almacenId !== dto.almacenId ||
@@ -441,8 +475,10 @@ export class VentasService {
           where: { usuarioId: venta.clientaId },
           orderBy: { id: 'desc' },
         });
+    const tiendaId = TenantContext.tiendaId();
     return tx.pedido.create({
       data: {
+        ...(tiendaId ? { tiendaId } : {}),
         usuarioId: venta.clientaId,
         ventaId: venta.id,
         total: venta.total,

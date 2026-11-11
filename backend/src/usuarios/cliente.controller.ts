@@ -23,6 +23,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
 
 class DireccionDto {
   @IsString()
@@ -49,11 +52,23 @@ const avatarUploadDir = (() => {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Rol.CLIENTA)
 export class ClienteController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
 
   @Get('favoritos')
   favoritos(@CurrentUser() user: JwtPayload) {
-    return this.prisma.favorito
+    return this.db().favorito
       .findMany({
         where: { usuarioId: user.sub },
         select: { productoId: true },
@@ -67,7 +82,7 @@ export class ClienteController {
     @CurrentUser() user: JwtPayload,
     @Param('productoId') productoId: string,
   ) {
-    return this.prisma.favorito.upsert({
+    return this.db().favorito.upsert({
       where: {
         usuarioId_productoId: { usuarioId: user.sub, productoId },
       },
@@ -81,14 +96,14 @@ export class ClienteController {
     @CurrentUser() user: JwtPayload,
     @Param('productoId') productoId: string,
   ) {
-    return this.prisma.favorito.deleteMany({
+    return this.db().favorito.deleteMany({
       where: { usuarioId: user.sub, productoId },
     });
   }
 
   @Get('perfil')
   perfil(@CurrentUser() user: JwtPayload) {
-    return this.prisma.usuario.findUniqueOrThrow({
+    return this.db().usuario.findUniqueOrThrow({
       where: { id: user.sub },
       select: {
         id: true,
@@ -104,7 +119,7 @@ export class ClienteController {
 
   @Patch('perfil')
   async renombrar(@CurrentUser() user: JwtPayload, @Body() dto: PerfilDto) {
-    return this.prisma.usuario.update({
+    return this.db().usuario.update({
       where: { id: user.sub },
       data: { nombre: dto.nombre.trim() },
       select: { id: true, nombre: true, email: true, avatarUrl: true },
@@ -134,7 +149,7 @@ export class ClienteController {
       throw new BadRequestException({ codigo: 'AVATAR_REQUERIDO' });
     }
     const avatarUrl = `/uploads/avatars/${archivo.filename}`;
-    return this.prisma.usuario.update({
+    return this.db().usuario.update({
       where: { id: user.sub },
       data: { avatarUrl },
       select: { id: true, nombre: true, email: true, avatarUrl: true },
@@ -143,7 +158,7 @@ export class ClienteController {
 
   @Get('direcciones')
   direcciones(@CurrentUser() user: JwtPayload) {
-    return this.prisma.direccionCliente.findMany({
+    return this.db().direccionCliente.findMany({
       where: { usuarioId: user.sub },
       orderBy: { id: 'desc' },
     });
@@ -151,7 +166,7 @@ export class ClienteController {
 
   @Post('direcciones')
   direccion(@CurrentUser() user: JwtPayload, @Body() dto: DireccionDto) {
-    return this.prisma.direccionCliente.create({
+    return this.db().direccionCliente.create({
       data: { ...dto, usuarioId: user.sub },
     });
   }
@@ -162,16 +177,16 @@ export class ClienteController {
     @Param('id') id: string,
     @Body() dto: DireccionDto,
   ) {
-    const propia = await this.prisma.direccionCliente.findFirst({
+    const propia = await this.db().direccionCliente.findFirst({
       where: { id, usuarioId: user.sub },
     });
     if (!propia) throw new NotFoundException({ codigo: 'DIRECCION_NO' });
-    return this.prisma.direccionCliente.update({ where: { id }, data: dto });
+    return this.db().direccionCliente.update({ where: { id }, data: dto });
   }
 
   @Get('cupones')
   async cupones() {
-    const items = await this.prisma.cupon.findMany({
+    const items = await this.db().cupon.findMany({
       where: {
         activo: true,
         OR: [{ venceEn: null }, { venceEn: { gt: new Date() } }],

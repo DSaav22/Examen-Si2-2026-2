@@ -8,8 +8,9 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { api, cargarApiBase, esFalloRed } from './api'
-import type { Linea, Sucursal, User } from './types'
+import { api, cargarApiBase, esFalloRed, guardarTienda, tiendaActiva } from './api'
+import { fijarCuentaActiva } from './offline/sync'
+import type { Linea, Sucursal, TiendaAutorizada, TiendaInfo, User } from './types'
 
 export type FiltroCatalogo = 'novedades' | 'ofertas' | 'ocasiones'
 
@@ -39,6 +40,8 @@ type Sesion = {
   listo: boolean
   token: string | null
   user: User | null
+  tiendaActual: TiendaInfo | null
+  tiendasAutorizadas: TiendaAutorizada[]
   cart: Linea[]
   favs: string[]
   sucursales: Sucursal[]
@@ -62,6 +65,8 @@ type Sesion = {
   entrar: (email: string, password: string) => Promise<void>
   registrar: (nombre: string, email: string, password: string) => Promise<void>
   salir: () => Promise<void>
+  cambiarTienda: (tiendaId: string) => Promise<void>
+  refrescarTiendas: () => Promise<void>
   addToCart: (linea: Omit<Linea, 'cantidad'>) => void
   setQty: (varianteId: string, cantidad: number) => void
   vaciar: () => void
@@ -88,10 +93,17 @@ async function leerJson<T>(clave: string, fallback: T): Promise<T> {
   }
 }
 
+const claveCarrito = (t: string) => `ensayar_carrito_${t}`
+const claveFavs = (t: string) => `ensayar_favoritos_${t}`
+const claveSucursales = (t: string) => `ensayar_sucursales_${t}`
+const claveSucursal = (t: string) => `ensayar_sucursal_${t}`
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [listo, setListo] = useState(false)
   const [token, setToken] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
+  const [tiendaActual, setTiendaActual] = useState<TiendaInfo | null>(null)
+  const [tiendasAutorizadas, setTiendasAutorizadas] = useState<TiendaAutorizada[]>([])
   const [cart, setCart] = useState<Linea[]>([])
   const [favs, setFavs] = useState<string[]>([])
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
@@ -103,12 +115,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState('')
 
   const cargarSucursales = useCallback(async (preferida?: string) => {
+    const slug = tiendaActiva()
     let lista: Sucursal[]
     try {
       lista = await api<Sucursal[]>('/catalogo/sucursales', null)
-      await AsyncStorage.setItem('ensayar_sucursales', JSON.stringify(lista))
+      await AsyncStorage.setItem(claveSucursales(slug), JSON.stringify(lista))
     } catch (err) {
-      const guardadas = esFalloRed(err) ? await leerJson<Sucursal[]>('ensayar_sucursales', []) : []
+      const guardadas = esFalloRed(err) ? await leerJson<Sucursal[]>(claveSucursales(slug), []) : []
       if (!guardadas.length) throw err
       lista = guardadas
     }
@@ -124,16 +137,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void (async () => {
       await cargarApiBase()
-      const [tok, usuario, bolsa, favoritos, suc] = await Promise.all([
+      const slug = tiendaActiva()
+      const [tok, usuario, tActual, tAutorizadas, bolsa, favoritos, suc] = await Promise.all([
         AsyncStorage.getItem('ensayar_token'),
         leerJson<User | null>('ensayar_user', null),
-        leerJson<Linea[]>('ensayar_carrito', []),
-        leerJson<string[]>('ensayar_favoritos', []),
-        AsyncStorage.getItem('ensayar_sucursal'),
+        leerJson<TiendaInfo | null>('ensayar_tienda_info', null),
+        leerJson<TiendaAutorizada[]>('ensayar_tiendas_autorizadas', []),
+        leerJson<Linea[]>(claveCarrito(slug), []),
+        leerJson<string[]>(claveFavs(slug), []),
+        AsyncStorage.getItem(claveSucursal(slug)),
       ])
       setCart(bolsa)
       setFavs(favoritos)
+      if (tActual) setTiendaActual(tActual)
+      if (tAutorizadas.length) setTiendasAutorizadas(tAutorizadas)
       if (suc) setSucursalId(suc)
+      if (usuario) {
+        fijarCuentaActiva(usuario.cuentaId ?? usuario.id)
+      }
       if (tok && usuario) {
         try {
           const me = await api<{
@@ -141,6 +162,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             email: string
             nombre: string
             rol: string
+            cuentaId?: string
             sucursalId?: string | null
           }>('/auth/me', tok)
           const next = {
@@ -149,22 +171,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             email: me.email,
             nombre: me.nombre,
             rol: me.rol,
+            cuentaId: me.cuentaId ?? usuario.cuentaId,
             sucursalId: me.sucursalId ?? usuario.sucursalId,
           }
           setToken(tok)
           setUser(next)
+          fijarCuentaActiva(next.cuentaId ?? next.id)
           await AsyncStorage.setItem('ensayar_user', JSON.stringify(next))
           setStack([{ name: 'inicio' }])
         } catch (err) {
           if (esFalloRed(err)) {
-            // Sin red la sesión guardada sigue sirviendo para operar offline; el backend la valida al sincronizar.
             setToken(tok)
             setUser(usuario)
+            fijarCuentaActiva(usuario.cuentaId ?? usuario.id)
             setStack([{ name: 'inicio' }])
           } else {
             await AsyncStorage.multiRemove(['ensayar_token', 'ensayar_user'])
             setToken(null)
             setUser(null)
+            fijarCuentaActiva(undefined)
             setStack([{ name: 'login' }])
           }
         }
@@ -180,12 +205,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!listo) return
-    void AsyncStorage.setItem('ensayar_carrito', JSON.stringify(cart))
+    const slug = tiendaActiva()
+    void AsyncStorage.setItem(claveCarrito(slug), JSON.stringify(cart))
   }, [cart, listo])
 
   useEffect(() => {
     if (!listo) return
-    void AsyncStorage.setItem('ensayar_favoritos', JSON.stringify(favs))
+    const slug = tiendaActiva()
+    void AsyncStorage.setItem(claveFavs(slug), JSON.stringify(favs))
   }, [favs, listo])
 
   const sucursal = sucursales.find((s) => s.id === sucursalId) ?? sucursales[0]
@@ -217,55 +244,150 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setStack([{ name: 'catalogo', filtro, ocasion }])
   }, [])
 
-  const persistir = useCallback(async (accessToken: string, next: User) => {
-    setToken(accessToken)
-    setUser(next)
-    await AsyncStorage.multiSet([
-      ['ensayar_token', accessToken],
-      ['ensayar_user', JSON.stringify(next)],
-    ])
-    if (next.rol === 'CLIENTA') {
-      try {
-        const ids = await api<string[]>('/cliente/favoritos', accessToken)
-        setFavs(ids)
-      } catch {
-        /* se quedan los favoritos locales */
+  const persistir = useCallback(
+    async (
+      accessToken: string,
+      next: User,
+      tiendaInfo?: TiendaInfo | null,
+      tiendasList?: TiendaAutorizada[],
+    ) => {
+      setToken(accessToken)
+      setUser(next)
+      fijarCuentaActiva(next.cuentaId ?? next.id)
+      const slug = tiendaActiva()
+      const pairs: [string, string][] = [
+        ['ensayar_token', accessToken],
+        ['ensayar_user', JSON.stringify(next)],
+      ]
+      if (tiendaInfo) {
+        setTiendaActual(tiendaInfo)
+        pairs.push(['ensayar_tienda_info', JSON.stringify(tiendaInfo)])
       }
-    }
+      if (tiendasList && tiendasList.length) {
+        setTiendasAutorizadas(tiendasList)
+        pairs.push(['ensayar_tiendas_autorizadas', JSON.stringify(tiendasList)])
+      }
+      await AsyncStorage.multiSet(pairs)
+      const [bolsa, favoritos] = await Promise.all([
+        leerJson<Linea[]>(claveCarrito(slug), []),
+        leerJson<string[]>(claveFavs(slug), []),
+      ])
+      setCart(bolsa)
+      setFavs(favoritos)
+      if (next.rol === 'CLIENTA') {
+        try {
+          const ids = await api<string[]>('/cliente/favoritos', accessToken)
+          setFavs(ids)
+          await AsyncStorage.setItem(claveFavs(slug), JSON.stringify(ids))
+        } catch {
+          /* se quedan los favoritos locales */
+        }
+      }
+      try {
+        await cargarSucursales()
+      } catch {
+        /* sucursales se reintentan en inicio */
+      }
+      setStack([{ name: 'inicio' }])
+    },
+    [cargarSucursales],
+  )
+
+  const entrar = useCallback(
+    async (email: string, password: string) => {
+      setError('')
+      const res = await api<{
+        accessToken: string
+        user: User
+        tienda?: TiendaInfo
+        tiendas?: TiendaAutorizada[]
+      }>('/auth/login', null, {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      })
+      if (res.tienda?.slug) {
+        await guardarTienda(res.tienda.slug)
+      }
+      await persistir(res.accessToken, res.user, res.tienda, res.tiendas)
+    },
+    [persistir],
+  )
+
+  const registrar = useCallback(
+    async (nombre: string, email: string, password: string) => {
+      setError('')
+      const res = await api<{
+        accessToken: string
+        user: User
+        tienda?: TiendaInfo
+        tiendas?: TiendaAutorizada[]
+      }>('/auth/registro', null, {
+        method: 'POST',
+        body: JSON.stringify({ nombre, email, password }),
+      })
+      if (res.tienda?.slug) {
+        await guardarTienda(res.tienda.slug)
+      }
+      await persistir(res.accessToken, res.user, res.tienda, res.tiendas)
+    },
+    [persistir],
+  )
+
+  const cambiarTienda = useCallback(
+    async (tiendaId: string) => {
+      if (!token) return
+      setError('')
+      try {
+        const res = await api<{
+          accessToken: string
+          user: User
+          tienda?: TiendaInfo
+          tiendas?: TiendaAutorizada[]
+        }>('/auth/cambiar-tienda', token, {
+          method: 'POST',
+          body: JSON.stringify({ tiendaId }),
+        })
+        if (res.tienda?.slug) {
+          await guardarTienda(res.tienda.slug)
+        }
+        await persistir(res.accessToken, res.user, res.tienda, res.tiendas)
+        setAviso(`Tienda activa: ${res.tienda?.nombre ?? res.tienda?.slug ?? tiendaId}`)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'No se pudo cambiar de tienda')
+      }
+    },
+    [token, persistir],
+  )
+
+  const refrescarTiendas = useCallback(async () => {
+    if (!token) return
     try {
-      await cargarSucursales()
+      const lista = await api<TiendaAutorizada[]>('/auth/mis-tiendas', token)
+      setTiendasAutorizadas(lista)
+      await AsyncStorage.setItem('ensayar_tiendas_autorizadas', JSON.stringify(lista))
     } catch {
-      /* sucursales se reintentan en inicio */
+      /* no crítico */
     }
-    setStack([{ name: 'inicio' }])
-  }, [cargarSucursales])
-
-  const entrar = useCallback(async (email: string, password: string) => {
-    setError('')
-    const res = await api<{ accessToken: string; user: User }>('/auth/login', null, {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    })
-    await persistir(res.accessToken, res.user)
-  }, [persistir])
-
-  const registrar = useCallback(async (nombre: string, email: string, password: string) => {
-    setError('')
-    const res = await api<{ accessToken: string; user: User }>('/auth/registro', null, {
-      method: 'POST',
-      body: JSON.stringify({ nombre, email, password }),
-    })
-    await persistir(res.accessToken, res.user)
-  }, [persistir])
+  }, [token])
 
   const salir = useCallback(async () => {
     const actual = token
+    const slug = tiendaActiva()
     setToken(null)
     setUser(null)
     setCart([])
+    setTiendaActual(null)
+    setTiendasAutorizadas([])
     setMenu(false)
+    fijarCuentaActiva(undefined)
     setStack([{ name: 'login' }])
-    await AsyncStorage.multiRemove(['ensayar_token', 'ensayar_user', 'ensayar_carrito'])
+    await AsyncStorage.multiRemove([
+      'ensayar_token',
+      'ensayar_user',
+      'ensayar_tienda_info',
+      'ensayar_tiendas_autorizadas',
+      claveCarrito(slug),
+    ])
     if (actual) {
       try {
         await api('/auth/logout', actual, { method: 'POST' })
@@ -311,9 +433,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [favs, token, user?.rol])
 
   const elegirSucursal = useCallback(async (id: string) => {
+    const slug = tiendaActiva()
     setSucursalId(id)
     setElegir(false)
-    await AsyncStorage.setItem('ensayar_sucursal', id)
+    await AsyncStorage.setItem(claveSucursal(slug), id)
   }, [])
 
   const total = cart.reduce((a, l) => a + l.precio * l.cantidad, 0)
@@ -323,6 +446,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       listo,
       token,
       user,
+      tiendaActual,
+      tiendasAutorizadas,
       cart,
       favs,
       sucursales,
@@ -346,6 +471,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       entrar,
       registrar,
       salir,
+      cambiarTienda,
+      refrescarTiendas,
       addToCart,
       setQty,
       vaciar,
@@ -354,9 +481,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       total,
     }),
     [
-      listo, token, user, cart, favs, sucursales, sucursal, almacenId, stack, screen,
-      menu, elegir, aviso, error, push, back, goTab, abrirCatalogo, entrar, registrar,
-      salir, addToCart, setQty, vaciar, toggleFav, elegirSucursal, total,
+      listo,
+      token,
+      user,
+      tiendaActual,
+      tiendasAutorizadas,
+      cart,
+      favs,
+      sucursales,
+      sucursal,
+      almacenId,
+      stack,
+      screen,
+      menu,
+      elegir,
+      aviso,
+      error,
+      push,
+      back,
+      goTab,
+      abrirCatalogo,
+      entrar,
+      registrar,
+      salir,
+      cambiarTienda,
+      refrescarTiendas,
+      addToCart,
+      setQty,
+      vaciar,
+      toggleFav,
+      elegirSucursal,
+      total,
     ],
   )
 

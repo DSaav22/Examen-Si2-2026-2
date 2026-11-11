@@ -150,9 +150,9 @@ Toda clase de negocio pertenece a una Tienda. En el esquema eso es un campo tien
 | OperacionSync | Operación offline recibida con su estado (aplicada, duplicada, conflicto...). |
 | PushSuscripcion | Suscripción Web Push (endpoint y claves) de un usuario. |
 | EventoAnalitica | Evento de comportamiento usado para analítica. |
-| ModeloPredictivo | Modelo supervisado entrenado y sus métricas (lote 4, a confirmar con el código de analítica). |
-| SegmentoCliente | Grupo de clientas obtenido por clustering (lote 4, a confirmar con el código de analítica). |
-| TransaccionPasarela | Transacción en la pasarela externa en modo sandbox (lote 5, a confirmar con el código de pagos). |
+| ModeloPredictivo | Modelo supervisado de demanda (regresión lineal) con sus métricas de evaluación sobre datos sintéticos. |
+| SegmentoCliente | Grupo de clientas obtenido con k-medias a partir de recencia, frecuencia y monto. |
+| TransaccionPasarela | Cobro con un método habilitado para el país de la tienda, procesado por la pasarela simulada con clave de idempotencia. |
 
 ## 9.1.3 Prototipos de interfaz
 
@@ -1094,12 +1094,12 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 **Curso básico**
 
 1. El Administrador abre el Dashboard de analítica.
-2. El sistema consulta el ModeloPredictivo entrenado con datos sintéticos de la tienda.
-3. El sistema muestra la predicción (por ejemplo, demanda o ventas por período) con sus métricas de error.
+2. El sistema aplica el ModeloPredictivo, entrenado con datos sintéticos, a las ventas de 7 y 28 días de cada variante.
+3. El sistema muestra la demanda estimada de los próximos 7 días junto al stock disponible y el error del modelo.
 
 **Cursos alternos**
 
-- **2a.** No hay modelo entrenado: el sistema ofrece entrenarlo con los datos disponibles.
+- **2a.** La tienda no tiene ventas en el período: el sistema muestra un estado vacío explicativo.
 
 #### UC53 Ver segmentación de clientas
 
@@ -1108,12 +1108,12 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 **Curso básico**
 
 1. El Administrador abre la segmentación en el Dashboard de analítica.
-2. El sistema agrupa a las clientas con un modelo no supervisado a partir de compras y comportamiento.
-3. El sistema muestra cada SegmentoCliente con su tamaño y sus rasgos.
+2. El sistema asigna cada clienta con compras en los últimos 90 días a un grupo de k-medias según recencia, frecuencia y monto.
+3. El sistema muestra cada SegmentoCliente con su tamaño y su centro, sin exponer identidades.
 
 **Cursos alternos**
 
-- **2a.** Pocos datos: el sistema avisa que la segmentación no es confiable.
+- **2a.** No hay clientas con compras identificadas: el sistema muestra los grupos vacíos.
 
 ### Lote 5: Pagos para países hispanohablantes
 
@@ -1123,15 +1123,15 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 
 **Curso básico**
 
-1. La Clienta elige pagar con tarjeta o billetera en la Pantalla Pago.
-2. El sistema crea la TransaccionPasarela en modo sandbox con una clave de idempotencia.
-3. La Pasarela de pago autoriza el cobro y notifica el resultado.
+1. La Clienta elige en la Pantalla Pago un método habilitado para el país de la tienda.
+2. El sistema valida el método contra el catálogo del país y registra la TransaccionPasarela pendiente con una clave de idempotencia.
+3. La Pasarela de pago, simulada, aprueba o rechaza el cobro.
 4. Con el pago aprobado, la Venta continúa su cobro (UC05).
 
 **Cursos alternos**
 
-- **3a.** La pasarela rechaza el cobro: la venta no se confirma.
-- **3b.** La notificación llega dos veces: el sistema la procesa una sola vez.
+- **3a.** La pasarela rechaza el cobro: la venta no se confirma y se liberan las unidades reservadas.
+- **3b.** La confirmación llega dos veces: el sistema la procesa una sola vez.
 
 ## 9.1.7 Revisión de requisitos
 

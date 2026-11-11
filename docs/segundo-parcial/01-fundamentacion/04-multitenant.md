@@ -240,7 +240,7 @@ En los clientes, la web guarda el slug de la tienda activa (frontend/src/tienda.
 | Alternativa | Motivo para no adoptarla hoy |
 |-------------|------------------------------|
 | Base por tienda | El alta debe ser instantánea tras el pago; crear y migrar una base por cada suscripción contradice el autoservicio y multiplica el costo en Azure para tiendas pequeñas |
-| Esquema por tienda | Prisma trabaja con un esquema por conexión y un historial de migraciones; repetir migraciones por esquema y cambiar search_path por petición agrega complejidad sin ganancia proporcional |
+| Esquema por tienda como modo único | Prisma trabaja con un esquema por conexión y un historial de migraciones; exige versionar migraciones por esquema y mantener un cliente por tienda. Se implementó como modalidad piloto (sección 4.12), sin reemplazar todavía al pool en producción |
 | Pool sin capas adicionales | Un olvido de filtro sería una fuga; por eso el filtro se centraliza y la base aporta su propia barrera |
 
 El perfil del cliente refuerza la decisión: tiendas pequeñas y medianas, con volúmenes modestos y sensibles al precio, para quienes la eficiencia del modelo pool se traduce en planes baratos. El costo de una base por tienda se trasladaría al precio y dejaría a EnsayAR en desventaja frente a competidores. La extensión de Prisma convierte el riesgo principal del pool en una regla automática, y el diseño deja abierta la evolución hacia RLS completa, inquilinos dedicados y sharding sin reescribir los servicios, porque todos los datos ya están marcados con su tienda.
@@ -258,3 +258,34 @@ En NestJS la tienda se resuelve en el borde de la petición y se aplica de forma
 - Las tablas de negocio no tienen clave foránea hacia tiendas ni una restricción que impida un tienda_id vacío. Se recomienda agregarlas, porque en una conexión reutilizada donde ya se ejecutó un set_config local, la variable de sesión puede quedar definida con un valor vacío y el valor por defecto dejaría de fallar.
 - La resolución por subdominio no está implementada; la tienda se elige por token, cabecera o ruta del frontend.
 - La caché de tiendas de 30 segundos es local a cada instancia de la API; con varias réplicas, una suspensión puede tardar hasta ese plazo en aplicarse en todas.
+
+## 4.12 Evolución implementada: un esquema PostgreSQL por tienda
+
+### 4.12.1 Motivación
+
+El modelo pool concentra el aislamiento en la aplicación. Para reforzarlo físicamente y permitir el respaldo y la restauración de cada tienda por separado, se implementó una segunda modalidad de aislamiento basada en el modelo bridge de la sección 4.3: una sola base PostgreSQL, con los datos de plataforma en el esquema `public` y los datos operativos de cada tienda en un esquema propio. La modalidad se activa mediante variables de configuración y convive con el modelo pool, que sigue siendo el modo de operación en producción.
+
+### 4.12.2 Clasificación de los datos
+
+El contrato de `backend/src/tenancy/dominio-ambitos.ts` clasifica los 45 modelos de Prisma en dos ámbitos, y sus pruebas lo contrastan con el esquema generado. Seis modelos son de plataforma y permanecen en `public`: `Cuenta`, `Tienda`, `Plan`, `Suscripcion`, `PagoSuscripcion` y `TokenRevocado`. Los 39 restantes pertenecen a una sola tienda y se ubican en su esquema, desde perfiles, catálogo e inventario hasta ventas, créditos, reportes y sincronización. La relación entre ámbitos se limita a la referencia del perfil local `Usuario` hacia la `Cuenta` global; las demás claves foráneas de negocio apuntan siempre a tablas del mismo esquema.
+
+### 4.12.3 Componentes
+
+| Componente | Responsabilidad |
+|---|---|
+| Nombre del esquema | Se deriva del UUID de la tienda con el formato `tienda_<uuid>`, nunca de un texto enviado por el cliente; se rechazan identificadores no válidos |
+| `PrismaEsquemasService` | Mantiene un cliente de Prisma por esquema con un límite de clientes y desalojo del menos usado; nunca desaloja un cliente con operaciones en curso |
+| `AprovisionadorEsquemaService` | Durante el alta crea, en la misma transacción que la tienda, la suscripción y el pago simulado, el esquema con sus 39 tablas, enums, claves, vistas y datos iniciales; ante un error se revierte todo |
+| `TransaccionesMixtasService` | Ejecuta en una sola transacción operaciones de plataforma y de tienda, como un pago global junto con un registro local |
+| Registro de versiones | La tabla `_ensayar_migraciones_tienda` registra qué migraciones se aplicaron a cada esquema |
+| Scripts de migración y auditoría | `migrar-tiendas-aisladas.ts` copia los datos de cada tienda a su esquema sin borrar el origen y `auditar-migracion-esquemas.ts` compara el contenido fila por fila |
+
+Los módulos de catálogo, inventario, ventas, caja, pagos simulados, sincronización offline, reservas, pedidos, devoluciones, reportes, créditos, usuarios y analítica se enrutan al esquema de la tienda autenticada cuando la modalidad está activa. La tienda se sigue resolviendo en el middleware y el guard descritos en la sección 4.7; lo único que cambia es el cliente de base de datos que recibe cada servicio.
+
+### 4.12.4 Verificación
+
+La modalidad se validó en una base de laboratorio independiente de la de producción. Se respaldó la base con `pg_dump` y se restauró en una base aislada, con 28 esquemas de tienda íntegros. Las pruebas de punta a punta comprobaron que las escrituras operativas no tocan las tablas compartidas de `public` y que una tienda no puede leer productos ni variantes de otra. Con dos ventas simultáneas de la última unidad de stock, una se aprobó (201) y la otra se rechazó con 409 `STOCK_INSUFICIENTE`, con el stock final exacto.
+
+### 4.12.5 Alcance y límites
+
+La modalidad permanece desactivada por defecto. Antes de adoptarla en producción falta ejecutar la migración sobre la base desplegada, conectar la aplicación con un rol sin privilegios de administración y aplicar las migraciones versionadas a todos los esquemas existentes en cada despliegue. Con muchos miles de tiendas, la cantidad de esquemas y de clientes de conexión también exige medir el consumo de memoria del servidor. Por eso EnsayAR mantiene el modelo pool como modo principal y conserva el esquema por tienda como la evolución preparada para las tiendas que requieran aislamiento físico.

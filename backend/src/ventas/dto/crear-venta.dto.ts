@@ -21,6 +21,10 @@ export class LineaVentaDto {
 }
 
 export class CrearVentaDto {
+  @IsOptional()
+  @IsString()
+  metodoPasarela?: string;
+
   @IsString()
   uuid!: string;
 

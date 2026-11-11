@@ -22,6 +22,9 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Idempotente } from '../sync/idempotencia.interceptor';
 import { InventarioService } from '../inventario/inventario.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
 
 class LineaDevolucionDto {
   @IsString()
@@ -46,7 +49,17 @@ export class DevolucionesController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventario: InventarioService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
+
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && (this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config.get<string>('TENANT_SCHEMAS_VENTAS') === 'true')) {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
 
   @Post()
   @Idempotente()
@@ -55,7 +68,8 @@ export class DevolucionesController {
     if (!dto.lineas?.length) {
       throw new ConflictException({ codigo: 'CANTIDAD_INVALIDA' });
     }
-    return this.prisma.$transaction(async (tx) => {
+    return this.db().$transaction(async (tx) => {
+      const tiendaId = TenantContext.tiendaId();
       const venta = await tx.venta.findUnique({
         where: { id: dto.ventaId },
         include: { lineas: true, pago: true, cajaTurno: true },
@@ -86,10 +100,12 @@ export class DevolucionesController {
 
       const devolucion = await tx.devolucion.create({
         data: {
+          ...(tiendaId ? { tiendaId } : {}),
           ventaId: venta.id,
           usuarioId: user.sub,
           lineas: {
             create: dto.lineas.map((l) => ({
+              ...(tiendaId ? { tiendaId } : {}),
               lineaVentaId: l.lineaId,
               cantidad: l.cantidad,
             })),
@@ -111,6 +127,7 @@ export class DevolucionesController {
             },
           },
           create: {
+            ...(tiendaId ? { tiendaId } : {}),
             varianteId: linea.varianteId,
             almacenId: venta.almacenId,
             cantidad: pedida.cantidad,

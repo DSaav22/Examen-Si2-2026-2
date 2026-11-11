@@ -27,6 +27,9 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { Idempotente } from '../sync/idempotencia.interceptor';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
 import { PlanLimitesService } from '../tenancy/plan-limites.service';
 
 class CrearUsuarioDto {
@@ -86,7 +89,17 @@ export class UsuariosController {
     private readonly prisma: PrismaService,
     private readonly cuentas: CuentasService,
     private readonly limites: PlanLimitesService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
+
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
 
   private assertPuedeAsignarRol(actor: JwtPayload, rol: Rol) {
     if (rol === Rol.SUPERADMIN && !esSuperadmin(actor.rol)) {
@@ -96,7 +109,7 @@ export class UsuariosController {
 
   @Get()
   listar() {
-    return this.prisma.usuario.findMany({
+    return this.db().usuario.findMany({
       select: {
         id: true,
         email: true,
@@ -118,9 +131,9 @@ export class UsuariosController {
   @Idempotente()
   async crear(@CurrentUser() user: JwtPayload, @Body() dto: CrearUsuarioDto) {
     this.assertPuedeAsignarRol(user, dto.rol);
-    if (dto.rol !== Rol.CLIENTA) await this.limites.verificar('usuarios');
+    if (dto.rol !== Rol.CLIENTA) await this.limites.verificar('usuarios', this.db());
     const email = this.cuentas.normalizar(dto.email);
-    if (await this.prisma.usuario.findFirst({ where: { email }, select: { id: true } })) {
+    if (await this.db().usuario.findFirst({ where: { email }, select: { id: true } })) {
       throw new ConflictException({ codigo: 'EMAIL_EN_USO', message: 'Ese correo ya tiene un perfil en esta tienda.' });
     }
     const { cuenta, nueva } = await this.cuentas.obtenerOCrear({
@@ -129,7 +142,7 @@ export class UsuariosController {
       password: dto.password,
       exigirClave: false,
     });
-    const usuario = await this.prisma.usuario.create({
+    const usuario = await this.db().usuario.create({
       data: {
         cuentaId: cuenta.id,
         email,
@@ -156,7 +169,7 @@ export class UsuariosController {
     @Param('id') id: string,
     @Body() dto: PatchUsuarioDto,
   ) {
-    const target = await this.prisma.usuario.findUniqueOrThrow({
+    const target = await this.db().usuario.findUniqueOrThrow({
       where: { id },
       select: { rol: true, activo: true },
     });
@@ -166,8 +179,8 @@ export class UsuariosController {
     if (dto.rol !== undefined) this.assertPuedeAsignarRol(user, dto.rol);
     const pasaAStaff = dto.rol !== undefined && dto.rol !== Rol.CLIENTA && target.rol === Rol.CLIENTA;
     const reactiva = dto.activo === true && !target.activo && (dto.rol ?? target.rol) !== Rol.CLIENTA;
-    if (pasaAStaff || reactiva) await this.limites.verificar('usuarios');
-    return this.prisma.usuario.update({
+    if (pasaAStaff || reactiva) await this.limites.verificar('usuarios', this.db());
+    return this.db().usuario.update({
       where: { id },
       data: {
         ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),

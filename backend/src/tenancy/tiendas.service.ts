@@ -6,6 +6,7 @@ export type TiendaInfo = {
   id: string;
   slug: string;
   nombre: string;
+  logo?: string | null;
   pais: string;
   moneda: string;
   activa: boolean;
@@ -59,25 +60,28 @@ export class TiendasService {
         where,
         include: {
           suscripciones: {
-            where: { estado: 'activa', inicio: { lte: ahora }, venceEn: { gt: ahora } },
-            orderBy: { venceEn: 'desc' },
-            take: 1,
+            where: { estado: 'activa', venceEn: { gt: ahora } },
+            orderBy: [{ inicio: 'desc' }, { venceEn: 'desc' }],
             include: { plan: true },
           },
         },
       }),
     );
-    const sus = tienda?.suscripciones[0];
+    const sus = tienda?.suscripciones.find((s) => s.inicio <= ahora) ?? tienda?.suscripciones[0];
+    const ultima = tienda?.suscripciones?.length
+      ? tienda.suscripciones.slice().sort((a, b) => b.venceEn.getTime() - a.venceEn.getTime())[0]
+      : null;
     const info: TiendaInfo | null = tienda
       ? {
           id: tienda.id,
           slug: tienda.slug,
           nombre: tienda.nombre,
+          logo: tienda.logo,
           pais: tienda.pais,
           moneda: tienda.moneda,
           activa: tienda.estado === 'activa',
           vigente: tienda.estado === 'activa' && Boolean(sus),
-          venceEn: sus?.venceEn ?? null,
+          venceEn: ultima?.venceEn ?? sus?.venceEn ?? null,
           plan: sus
             ? {
                 id: sus.plan.id,

@@ -1,10 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 import { api, apiArchivo } from './api'
 import { useSession } from './session'
 import { colors } from './theme'
+
+interface ReconocimientoVoz {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null
+  onerror: ((e: { error: string }) => void) | null
+  onend: (() => void) | null
+  start(): void
+  stop(): void
+}
+
+function crearReconocimiento(): ReconocimientoVoz | null {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as { SpeechRecognition?: new () => ReconocimientoVoz; webkitSpeechRecognition?: new () => ReconocimientoVoz }
+  const Clase = w.SpeechRecognition ?? w.webkitSpeechRecognition
+  return Clase ? new Clase() : null
+}
 
 type Tipo = 'texto' | 'entero' | 'numero' | 'dinero' | 'fecha' | 'fechahora' | 'logico'
 type Columna = { clave: string; etiqueta: string; tipo: Tipo; totalizable: boolean }
@@ -54,6 +72,48 @@ export function ReporteInteligenteMovil() {
   const [resultado, setResultado] = useState<Resultado | null>(null)
   const [cargando, setCargando] = useState(false)
   const [exportando, setExportando] = useState<Formato | null>(null)
+  const [escuchando, setEscuchando] = useState(false)
+  const recRef = useRef<ReconocimientoVoz | null>(null)
+
+  useEffect(() => {
+    return () => {
+      recRef.current?.stop()
+    }
+  }, [])
+
+  function toggleVoz() {
+    if (escuchando) {
+      recRef.current?.stop()
+      setEscuchando(false)
+      s.setAviso('Dictado por voz finalizado.')
+      return
+    }
+    const rec = crearReconocimiento()
+    if (!rec) {
+      s.setAviso('Micrófono nativo: podés usar la tecla de micrófono del teclado de tu teléfono para dictar.')
+      return
+    }
+    rec.continuous = true
+    rec.interimResults = true
+    rec.lang = 'es-BO'
+    rec.onresult = (e) => {
+      let texto = ''
+      for (let i = 0; i < e.results.length; i++) {
+        texto += e.results[i][0].transcript + ' '
+      }
+      if (texto.trim()) setPregunta(texto.trim())
+    }
+    rec.onerror = () => setEscuchando(false)
+    rec.onend = () => setEscuchando(false)
+    try {
+      rec.start()
+      recRef.current = rec
+      setEscuchando(true)
+      s.setAviso('Escuchando dictado por voz... hablá para formular tu reporte.')
+    } catch {
+      setEscuchando(false)
+    }
+  }
 
   useEffect(() => {
     api<{ ejemplos: string[] }>('/reportes/inteligente/catalogo', s.token)
@@ -108,7 +168,7 @@ export function ReporteInteligenteMovil() {
     <View style={styles.card}>
       <Text style={styles.eyebrow}>REPORTE INTELIGENTE · TEXTO O VOZ</Text>
       <Text style={styles.cardTitle}>¿Qué reporte necesitás?</Text>
-      <Text style={styles.muted}>Escribilo o tocá el micrófono del teclado para dictarlo. Agregá “en PDF” o “en Excel” para descargarlo.</Text>
+      <Text style={styles.muted}>Escribilo o usá el botón de voz/micrófono del teclado para dictarlo. Agregá “en PDF” o “en Excel” para descargarlo.</Text>
       <TextInput
         value={pregunta}
         onChangeText={setPregunta}
@@ -117,9 +177,16 @@ export function ReporteInteligenteMovil() {
         placeholder="Ej. clientes con su dirección y email que me deben de 500 a 3000 Bs por ventas al crédito"
         placeholderTextColor={colors.taupe}
       />
-      <Pressable disabled={cargando || pregunta.trim().length < 3} onPress={() => void generar()} style={[styles.action, (cargando || pregunta.trim().length < 3) && styles.disabled]}>
-        <Text style={styles.actionText}>{cargando ? 'GENERANDO…' : 'GENERAR REPORTE'}</Text>
-      </Pressable>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+        <Pressable disabled={cargando || pregunta.trim().length < 3} onPress={() => void generar()} style={[styles.action, { flex: 2 }, (cargando || pregunta.trim().length < 3) && styles.disabled]}>
+          <Text style={styles.actionText}>{cargando ? 'GENERANDO…' : 'GENERAR REPORTE'}</Text>
+        </Pressable>
+        <Pressable onPress={toggleVoz} style={[styles.action, styles.secondary, { flex: 1 }, escuchando && { borderColor: '#d32f2f', backgroundColor: '#fde8e8' }]}>
+          <Text style={[styles.actionText, styles.secondaryText, escuchando && { color: '#d32f2f' }]}>
+            {escuchando ? '⏹ PARAR' : '🎤 DICTAR'}
+          </Text>
+        </Pressable>
+      </View>
       {ejemplos.length ? (
         <View style={styles.chips}>
           {ejemplos.map(ej => (

@@ -104,6 +104,7 @@ model Tienda {
   id            String        @id @default(uuid())
   slug          String        @unique
   nombre        String
+  logo          String?
   pais          String        @default("BO")
   moneda        String        @default("BOB")
   estado        EstadoTienda  @default(activa)

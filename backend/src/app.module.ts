@@ -26,6 +26,7 @@ import { PlataformaModule } from './plataforma/plataforma.module';
 import { PushModule } from './push/push.module';
 import { SyncModule } from './sync/sync.module';
 import { CreditosModule } from './creditos/creditos.module';
+import { AnaliticaModule } from './analitica/analitica.module';
 
 /**
  * Composición de la API de EnsayAR.
@@ -60,6 +61,7 @@ import { CreditosModule } from './creditos/creditos.module';
     PushModule,
     SyncModule,
     CreditosModule,
+    AnaliticaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

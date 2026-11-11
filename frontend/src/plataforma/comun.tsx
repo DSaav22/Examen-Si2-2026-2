@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth, type SesionTienda } from '../auth'
 import { apiCuenta } from '../api'
 import { homePorRol } from '../roles'
@@ -105,6 +105,10 @@ export function usePlataforma() {
 }
 
 export function PlataformaLayout() {
+  const ruta = useLocation().pathname
+  const esPlanes = ruta === '/planes'
+  const esWizard = ruta === '/plataforma/nueva'
+  const esMarketing = esPlanes || ruta === '/empezar' || ruta === '/verificar' || ruta === '/plataforma/login' || ruta === '/plataforma' || esWizard
   const [sesion, setSesion] = useState<SesionCuenta | null>(leerCuenta)
   const { abrirSesion } = useAuth()
   const navigate = useNavigate()
@@ -156,19 +160,21 @@ export function PlataformaLayout() {
   const ctx: Plataforma = { sesion, guardar, refrescar, salir, entrar, irATienda }
 
   return (
-    <div className="pf">
+    <div className={`pf${esMarketing ? ' pf--planes' : ''}${esWizard ? ' pf--wizard' : ''}`}>
       <header className="pf-top">
         <Link to="/planes" className="pf-brand">
           <span className="pf-brand-mark">EnsayAR</span>
-          <span className="pf-brand-sub">Cloud para tiendas de moda</span>
+          {!esMarketing && <span className="pf-brand-sub">Cloud para tiendas de moda</span>}
         </Link>
-        <nav className="pf-nav" aria-label="Plataforma">
-          <NavLink to="/planes">Planes</NavLink>
+        {!esWizard && <nav className="pf-nav" aria-label="Plataforma">
+          {esMarketing && <a href={esPlanes ? '#funcionalidades' : '/planes#funcionalidades'}>Funcionalidades</a>}
+          {esMarketing ? <a href={esPlanes ? '#planes' : '/planes#planes'}>Planes</a> : <NavLink to="/planes">Planes</NavLink>}
+          {esMarketing && <a href={esPlanes ? '#ayuda' : '/planes#ayuda'}>Ayuda</a>}
           {sesion ? <NavLink to="/plataforma" end>Mis tiendas</NavLink> : null}
           {sesion?.cuenta.plataforma ? <NavLink to="/plataforma/admin">Métricas</NavLink> : null}
-          <Link to="/t/vesta">Ver tienda demo</Link>
-        </nav>
-        <div className="pf-top-actions">
+          {!esMarketing && <Link to="/t/vesta">Ver tienda demo</Link>}
+        </nav>}
+        {!esWizard && <div className="pf-top-actions">
           {sesion ? (
             <>
               <span className="pf-who" title={sesion.cuenta.email}>{sesion.cuenta.nombre || sesion.cuenta.email}</span>
@@ -176,11 +182,11 @@ export function PlataformaLayout() {
             </>
           ) : (
             <>
-              <Link className="pf-btn pf-btn--ghost" to="/plataforma/login">Entrar</Link>
+              <Link className={esMarketing ? 'pf-login-link' : 'pf-btn pf-btn--ghost'} to="/plataforma/login">Iniciar sesión</Link>
               <Link className="pf-btn" to="/empezar">Crear mi tienda</Link>
             </>
           )}
-        </div>
+        </div>}
       </header>
       <main className="pf-main">
         <Outlet context={ctx} />

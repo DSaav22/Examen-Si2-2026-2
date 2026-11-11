@@ -257,6 +257,84 @@ Se tomó del PDF de otro grupo, con las mismas funcionalidades, solo la explicac
 - **Texto.** RNF01–RNF12, reglas RN01–RN15, plan de pruebas y casos CP01–CP19.
 - **Informe.** Figuras de arquitectura y estados en páginas horizontales; PDF de 274 páginas.
 
+## [2026-11-10] query | Pruebas SaaS, offline y reportes
+
+Se registraron resultados y límites de la revisión sobre la copia de demostración en [[Pruebas SaaS offline y reportes 2026-11-10]].
+
+## [2026-11-10] update | Clasificación de datos multitenant
+
+Se clasificaron los modelos globales y locales y se documentaron las relaciones y el alta futura en `docs/DOMINIO_MULTITENANT.md`. El contrato se contrasta con el modelo Prisma; el aislamiento físico sigue pendiente.
+
+## [2026-11-10] update | Clientes Prisma por esquema
+
+Se añadió un servicio experimental de clientes de plataforma y por tienda, con pruebas de lectura concurrente en el laboratorio. El tráfico real, la autorización y las transacciones mixtas siguen pendientes; ver `docs/MIGRACION_ESQUEMAS_TIENDA.md`.
+
+## [2026-11-10] update | Enums por ámbito
+
+Se verificaron enums y valores por defecto en plataforma y dos esquemas de tienda del laboratorio; lecturas y escrituras por cliente funcionaron con rollback. El aprovisionamiento definitivo, acceso a relaciones y transacciones mixtas siguen pendientes.
+
+## [2026-11-10] update | Plan para completar conexiones por esquema
+
+Se documentaron el estado de los pilotos, los trabajos pendientes, la estrategia de implementación y los criterios de prueba en [[Pendientes conexiones por esquema]].
+
+## [2026-11-11] update | Seguridad y versión de esquemas
+
+Se probó aislamiento SQL con un rol temporal y se incorporó un registro inicial de migraciones por tienda, con una primera migración aplicada en el laboratorio. El backend sigue usando una cuenta privilegiada y faltan migraciones y pruebas operativas adicionales; ver [[Pendientes conexiones por esquema]].
+
+## [2026-11-11] update | Persistencia offline web
+
+Se hicieron atómicos el reintento, la fusión y la migración de la cola web; se probaron en IndexedDB y se verificó reapertura de una página sin red. La sincronización se bloquea explícitamente en modo por esquemas hasta migrar el servidor; ver [[Modo offline]].
+
+## [2026-11-11] update | Analítica sintética
+
+Se añadieron dos modelos entrenados con datos sintéticos y un tablero web con pruebas HTTP de plan, roles y aislamiento. Las métricas se refieren solo a datos sintéticos y queda pendiente la validación real; ver [[Analitica con IA]].
+
+
+## [2026-11-11] query | Avance de los cinco bloques
+
+Se contrastaron los requisitos con el código local y las pruebas previas. Estimaciones y verificaciones actuales en [[Avance cinco bloques 2026-11-11]].
+
+## [2026-11-11] query | Auditoría funcional UC36 a UC54
+
+Se ejecutaron pruebas unitarias, compilación y suites HTTP sobre una copia exclusiva. SaaS/offline/reportes/crédito pasan en tablas compartidas y analítica en esquemas, pero no están integrados en el mismo modo. Se reprodujeron 503 de sincronización/analítica y 500 de sesión en una transición parcial. Push inactivo y pagos simulados. Ver [[Auditoria funcional UC36 a UC54 2026-11-11]]; el informe distingue pruebas actuales de pendientes visuales/móviles.
+
+
+## [2026-11-11] update | Integración completa de Analítica con IA en modo habitual y por esquemas
+
+Se resolvió el bloqueo `HTTP 503 (ANALITICA_REQUIERE_ESQUEMAS)` en `AnaliticaService`. El servicio ahora admite funcionamiento seguro dual:
+1. **Modo habitual (tablas compartidas / `public` con `tienda_id`):** utiliza `PrismaService` con aislamiento estricto por `tiendaId` en ventas, líneas y variantes, y cálculo de disponibilidad descontando reservas y devoluciones.
+2. **Modo por esquemas (`TENANT_SCHEMAS_PERFILES=true`):** utiliza `PrismaEsquemasService.clienteTienda(tiendaId)`.
+
+Se implementaron pruebas unitarias de servicio (`analitica.service.spec.ts`) y se validó en laboratorio `ensayar_copia` (puerto 55443):
+- 401 sin sesión / token ausente.
+- 403 para roles no autorizados (ej. CAJERO).
+- 403 para planes sin módulo `analitica` (ej. Plan Inicial y Crecimiento).
+- 200 para tienda con Plan Cadena autorizada (ej. Vesta en tablas compartidas y tiendas sintéticas en esquemas).
+- Resistencia a manipulación de cabecera `X-Tienda`.
+- Manejo correcto de tiendas sin ventas en los últimos 28/90 días (estado vacío informativo).
+- Ambos modelos de ML (regresión lineal y k-means) mantienen entrenamiento reproducible y evaluación en conjunto separado de prueba.
+- Compilación de backend y frontend verificadas. Panel web accesible en `/analitica`. Ver [[Analitica con IA]].
+
+## [2026-11-11] update | Auditoría de fuentes académicas y alcance documental ICONIX
+
+Auditoría integral de fuentes canónicas (docente titular, audio 8 nov), contraste con la wiki y delimitación del alcance formal del informe ICONIX del segundo parcial.
+- **Pagos simulados:** Se rectificó la afirmación de la wiki que exigía un sandbox externo vivo (Stripe/PayPal/Libélula). Conforme a la aclaración confirmada por el dueño del proyecto, el docente acepta pagos simulados integrales y realistas (`docs/PAGOS_SIMULADOS.md`, `metodos-pais.ts`, `pagos.controller.ts`) con reglas por país (BO, PE, BR), reservas de inventario e idempotencia. Se actualizaron [[Pasarelas de pago]], [[Mapa del segundo parcial]], [[Brecha segundo parcial]] y [[Contradicciones entre fuentes]].
+- **Arquitectura y brechas:** Se formalizó la distinción entre la arquitectura operativa de tablas compartidas con `tienda_id` (donde corren SaaS, offline y reportes) y el piloto de esquemas PostgreSQL independientes.
+- **Entregable formal:** Se generó el documento de homologación y matriz de requisitos en `docs/segundo-parcial/05-verificacion/iconix-01-fuentes-y-alcance.md` con la redacción propuesta para la sección «Alcance» del informe académico.
+
+## [2026-11-11] update | Operación offline web/PWA completada y verificada en navegador real
+
+Se finalizaron y probaron de extremo a extremo las capacidades offline de la web PWA:
+- **Service Worker v3:** Inclusión de `/api/catalogo/disponibilidad`, `/api/pagos/metodos` y `/api/usuarios` en la lista de lectura cacheada (`API_LECTURA`), con limpieza de versiones obsoletas y reapertura sin red confirmada en Edge.
+- **Restricción de operaciones en línea:** El POS bloquea medios de pago digitales (QR, tarjeta, transferencia, crédito) al desconectarse la red, defaulting seguro a efectivo. En el carrito web se previene el checkout sin conexión con mensajes descriptivos.
+- **Aislamiento multitienda en IndexedDB:** Reactividad ante cambio de tienda (`ensayar:tienda_cambiada`), garantizando que la cola local no mezcle operaciones entre tiendas diferentes.
+- **Resolución de conflictos y remap de clientas:** Detección de `STOCK_INSUFICIENTE` con opción de reintento "Vender lo disponible" atómico con nuevo UUID, y fusión automática de clientas con correo preexistente.
+- **Batería de pruebas automatizadas en Microsoft Edge:** Se incorporó el script `frontend/scripts/run-edge-tests.mjs` (`npm --prefix frontend run test:offline`) que valida contra el navegador real en perfil aislado:
+  1. Activación de SW y navegación offline (`verificar-pwa-offline.mjs`).
+  2. Integridad transaccional y rollback de IndexedDB (`verificar-cola-idb.mjs`).
+  3. Flujo completo offline: registro triple (venta, cliente, producto), supervivencia a recarga sin red, aislamiento por tienda, conflicto de stock con reintento, e idempotencia (`verificar-flujo-offline-completo.mjs`).
+- **Verificación backend:** 14 pruebas de `backend/scripts/verificar-offline.ts` superadas sobre la base de datos `ensayar_copia`. Ver [[Modo offline]].
+
 ## [2026-11-11] update | Informe completo en formato APA 7 con carátula oficial
 
 - **Contenido.** Capítulo 5 (pagos: métodos por país, costos con fuentes, Bolivia/PayPal, PCI DSS, saga con reembolso) y capítulo 8 (analítica: pronóstico de demanda con Random Forest y segmentación RFM con k-means sobre datos sintéticos) completos. Sección 1.10 con la evaluación de la arquitectura heredada y los tres caminos (se eligió modificar capas). Anexo 14.2 con URL de Azure y código QR (URL antigua; pendiente la nueva).

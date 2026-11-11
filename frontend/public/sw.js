@@ -1,12 +1,12 @@
-const VERSION = 'v2'
+const VERSION = 'v3'
 const SHELL = `ensayar-shell-${VERSION}`
 const ESTATICOS = `ensayar-estaticos-${VERSION}`
 const API = `ensayar-api-${VERSION}`
 const VIGENTES = [SHELL, ESTATICOS, API]
 
 /**
- * Lecturas de la API que se guardan para consultarlas sin red. La disponibilidad de stock
- * no está: el POS la guarda aparte porque la descuenta localmente con cada venta sin red.
+ * Lecturas de la API que se guardan para consultarlas sin red. El POS además
+ * mantiene su propia copia de inventario para descontar localmente con cada venta.
  */
 const API_LECTURA = [
   '/api/tienda',
@@ -14,11 +14,14 @@ const API_LECTURA = [
   '/api/catalogo/sucursales',
   '/api/catalogo/categorias',
   '/api/catalogo/stock',
+  '/api/catalogo/disponibilidad',
   '/api/sucursales',
   '/api/temporadas',
   '/api/colecciones',
   '/api/caja/turno-abierto',
   '/api/sync/politica',
+  '/api/pagos/metodos',
+  '/api/usuarios',
 ]
 const ESPERA_API_MS = 4000
 
@@ -31,7 +34,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => !VIGENTES.includes(key)).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('ensayar-') && !VIGENTES.includes(key)).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   )
 })

@@ -10,9 +10,11 @@ Portal compilado. En cada query, empezar aquí.
 
 ## Segundo parcial (11 nov, PDF hasta las 8:00)
 
+- [[Auditoria funcional UC36 a UC54 2026-11-11]] — pruebas actuales de los 19 casos, bloqueos por esquemas y límites de verificación
 - [[Planes y suscripciones retail]] — decisiones, flujo y pruebas de cambio de plan
 - [[Metodos de pago por pais 2026]] — investigación LATAM, PayPal y Binance Pay
 - [[Auditoria suscripciones y ciclo de vida]] — flujo actual, permisos, diseño y pruebas pendientes
+- [[Pruebas SaaS offline y reportes 2026-11-10]] — resultados de la revisión en la base de demostración
 - [[decisiones-arquitectura-2026-11-09]] — esquema por tienda pendiente, PWA, SQLite, idempotencia y rollback
 - [[Mapa del segundo parcial]] — requisitos B/S/O/R/A/P/D extraídos de la clase
 - [[Brecha segundo parcial]] — requisitos vs código al 8 nov
@@ -26,6 +28,7 @@ Portal compilado. En cada query, empezar aquí.
 ## Síntesis (primer parcial)
 
 - [[Pendientes segundo parcial]] — requisitos nuevos, backlog, riesgos y preguntas abiertas; metodología ICONIX
+- [[Pendientes conexiones por esquema]] — estado, implementación y pruebas necesarias para migrar las conexiones por tienda
 - [[Mapa del examen]] — qué hay que entregar y qué es canónico
 - [[Contradicciones entre fuentes]] — audio vs Garzón vs stack vs código
 - [[MVP y alcance]] — esencial vs complemento
@@ -96,3 +99,5 @@ Portal compilado. En cada query, empezar aquí.
 1. Deja un archivo en `raw/inbox/`.
 2. En Cursor: `ingiere <nombre>`.
 3. Revisa el grafo en Obsidian.
+
+- [[Avance cinco bloques 2026-11-11]] — estimación técnica y límites de validación de los cinco bloques.

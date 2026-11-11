@@ -333,13 +333,13 @@ Ruta `POST /creditos/:id/abonos`, realizada por `CreditosController.abonar`.
 
 ![Figura 9.3.52: Secuencia de UC52 Ver dashboard predictivo](../imagenes/ea/seq-uc52.png)
 
-Ruta `GET /analitica/prediccion`, realizada por `AnaliticaService.prediccion`.
+Ruta `GET /analitica/panel`, realizada por `AnaliticaService.panel`.
 
 ### Secuencia UC53 Ver segmentación de clientas
 
 ![Figura 9.3.53: Secuencia de UC53 Ver segmentación de clientas](../imagenes/ea/seq-uc53.png)
 
-Ruta `GET /analitica/segmentos`, realizada por `AnaliticaService.segmentos`.
+Ruta `GET /analitica/panel`, realizada por `AnaliticaService.panel`.
 
 ## Lote 5: Pagos para países hispanohablantes
 
@@ -347,7 +347,7 @@ Ruta `GET /analitica/segmentos`, realizada por `AnaliticaService.segmentos`.
 
 ![Figura 9.3.54: Secuencia de UC54 Pagar con pasarela internacional](../imagenes/ea/seq-uc54.png)
 
-Ruta `POST /pagos/pasarela`, realizada por `PagosService.cobrarPasarela`.
+Ruta `POST /pagos/:id/simular`, realizada por `PagosController.simular`.
 
 ## 9.3.1 Modelo estático de diseño
 

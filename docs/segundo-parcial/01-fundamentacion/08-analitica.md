@@ -32,60 +32,92 @@ Una tienda que se suscribe a EnsayAR no tiene historia en la plataforma, y las t
 
 ### 8.3.2 Proceso de generación
 
-El generador produce dos años de ventas semanales por variante para una tienda de demostración. La demanda de cada variante se construye como el producto de varios componentes. Un nivel base depende de la categoría (las blusas y los pantalones venden más que los abrigos). Un componente estacional sigue el calendario del hemisferio sur: los abrigos y las prendas de lana suben entre mayo y agosto, y las prendas livianas entre octubre y febrero. Un componente de eventos agrega picos en fechas comerciales, como el Día de la Madre y las fiestas de fin de año. Un componente de precio reduce la demanda cuando el precio sube y la aumenta en las semanas de promoción. La distribución de tallas sigue una curva centrada en M, y los colores tienen preferencias distintas por temporada. Sobre ese valor esperado se extrae la cantidad vendida de una distribución de Poisson, que reproduce el carácter entero y la variabilidad de las ventas reales de pocas unidades.
+Los datos sintéticos se generan en memoria, dentro del propio backend, con un generador congruencial lineal de semilla fija (`backend/src/analitica/modelos.ts`). Cada ejecución produce exactamente los mismos ejemplos, de modo que las métricas informadas en este capítulo son reproducibles.
 
-Para la segmentación, el generador crea clientas pertenecientes a cinco perfiles ocultos con comportamientos distintos (compradoras frecuentes de alto gasto, compradoras de temporada, compradoras de ofertas, clientas nuevas y clientas inactivas) y simula sus compras a lo largo de los dos años. Los perfiles no se guardan como variables del conjunto de entrenamiento; solo se usan después para comprobar si el modelo no supervisado los reencuentra.
+Para el modelo de demanda se generan 600 ejemplos. Cada ejemplo representa una variante con sus unidades vendidas en los últimos 7 días y en los últimos 28 días; la etiqueta es la demanda de los 7 días siguientes. La relación de fondo es lineal, con mayor peso para la venta reciente, y se le suma un ruido uniforme que imita la variabilidad de las ventas de pocas unidades. El valor se acota en cero, porque no existen ventas negativas.
+
+Para la segmentación se generan 180 clientas repartidas en partes iguales entre tres perfiles ocultos, descritos con las variables de recencia, frecuencia y monto de la sección 8.5.
+
+| Perfil oculto | Días desde la última compra | Número de compras | Monto acumulado |
+|---|---|---|---|
+| Frecuente de alto gasto | 3 a 20 | 6 a 13 | 700 a 1700 |
+| Ocasional | 20 a 50 | 2 a 6 | 150 a 650 |
+| Inactiva | 50 a 90 | 1 a 3 | 20 a 180 |
+
+El monto se expresa en unidades sintéticas, no en la moneda de una tienda. El perfil no forma parte de las variables de entrada: solo sirve para comprobar después si el agrupamiento reencuentra la estructura conocida.
 
 ### 8.3.3 Separación de los datos reales
 
-Los datos sintéticos se generan en una tienda de demostración propia y cada registro lleva una marca de origen. Por el aislamiento multi-tenant descrito en el capítulo 4, esos datos no son visibles desde ninguna otra tienda, y la marca de origen impide que se mezclen con ventas reales si una tienda decide combinar ambos para entrenar. Los tableros indican explícitamente cuando un resultado proviene de un modelo entrenado con datos sintéticos.
+Los ejemplos sintéticos solo existen en memoria durante el entrenamiento; no se insertan en las tablas de ventas ni de clientas de ninguna tienda, por lo que no pueden mezclarse con la operación real. Los modelos ya entrenados se aplican a los datos reales de la tienda autenticada, siempre a través del contexto multi-tenant descrito en el capítulo 4, y el tablero muestra un aviso permanente que indica que los modelos se entrenaron y evaluaron con datos sintéticos. Para las pruebas de integración se crearon tiendas, productos y ventas sintéticos en la base de laboratorio, separada de la base de producción.
 
 ## 8.4 Modelo supervisado: pronóstico de demanda
 
 ### 8.4.1 Formulación
 
-El problema se formula como una regresión: predecir las unidades que se venderán de cada variante en cada una de las próximas cuatro semanas. Las variables de entrada son la categoría, la talla y el color de la variante; la semana del año y el mes, que capturan la estacionalidad; un indicador de fecha comercial; el precio relativo respecto del precio de lista; y las ventas rezagadas de la misma variante en las semanas 1, 2, 4 y 52 anteriores, junto con su media móvil de cuatro semanas.
+El problema se formula como una regresión: estimar las unidades que se venderán de cada variante en los próximos 7 días a partir de dos variables, las unidades vendidas en los últimos 7 días y en los últimos 28 días. Las ventas se toman netas de devoluciones. Se eligieron pocas variables porque son las únicas que cualquier tienda tiene desde sus primeras semanas en la plataforma; variables como la estacionalidad anual o el efecto de las fechas comerciales exigen al menos un año de historia.
 
 ### 8.4.2 Algoritmo
 
-Se compara una línea base ingenua estacional, que predice para cada semana lo vendido en la misma semana del año anterior, con un bosque aleatorio de regresión (Breiman, 2001). El bosque aleatorio combina muchos árboles de decisión entrenados sobre muestras distintas de los datos y promedia sus predicciones. Se elige por tres razones: captura relaciones no lineales e interacciones (por ejemplo, que el efecto de la temporada depende de la categoría) sin necesidad de especificarlas, es poco sensible a la escala de las variables y permite estimar la importancia de cada variable, lo que ayuda a explicar el pronóstico a la dueña de la tienda. La implementación de referencia es la biblioteca scikit-learn (Pedregosa et al., 2011).
+Se utiliza una regresión lineal ajustada por descenso de gradiente sobre variables estandarizadas. La media y la desviación estándar de cada variable se calculan solo con el conjunto de entrenamiento y se aplican después al de prueba, para que ninguna información de la prueba influya en el ajuste. El modelo parte de la media de la etiqueta y ajusta sus pesos durante 600 épocas con una tasa de aprendizaje de 0,05; las predicciones negativas se llevan a cero.
+
+La regresión lineal se eligió por tres razones: es interpretable, porque cada peso indica cuánto aporta cada variable a la estimación; no requiere bibliotecas externas, lo que permite ejecutarla dentro del mismo backend NestJS; y su costo de entrenamiento y de predicción es despreciable. Como referencia se usa una línea base que predice siempre la media del entrenamiento. Un modelo solo aporta valor si mejora claramente esa referencia (Hastie et al., 2009).
 
 ### 8.4.3 Entrenamiento y evaluación
 
-Los primeros 18 meses se usan para entrenar, los tres siguientes para ajustar los hiperparámetros (número de árboles y profundidad máxima) y los últimos tres para la prueba final. El modelo se acepta si su MAE sobre el conjunto de prueba es menor que el de la línea base estacional; en caso contrario, el tablero muestra la línea base, que siempre está disponible. Las métricas se guardan junto con cada versión del modelo en la entidad `ModeloPredictivo`, que registra la tienda, la fecha de entrenamiento, el algoritmo, los hiperparámetros y los errores obtenidos.
+Los 600 ejemplos se dividen antes de estimar cualquier parámetro: los primeros 480 se usan para entrenar y los 120 restantes para la prueba. Los resultados sobre el conjunto de prueba son los siguientes.
+
+| Modelo | MAE en prueba (unidades) |
+|---|---|
+| Línea base: media del entrenamiento | 6,21 |
+| Regresión lineal | 1,23 |
+
+La regresión reduce el error absoluto medio en un 80 % respecto de la línea base. Estas cifras miden el ajuste del modelo a la distribución sintética generada; no estiman la precisión con ventas reales, que deberá medirse con una validación cronológica cuando las tiendas acumulen historia suficiente (sección 8.2.3). Las pruebas unitarias de `modelos.spec.ts` verifican que el entrenamiento sea reproducible y que el modelo supere a la línea base.
 
 ### 8.4.4 Uso del resultado
 
-El pronóstico se transforma en una sugerencia de reposición. Para cada variante y sucursal se compara la demanda prevista para las próximas cuatro semanas con el stock disponible y lo ya reservado; si el disponible no alcanza, el tablero sugiere la cantidad a reponer. La sugerencia no se ejecuta automáticamente: la decisión de compra sigue siendo del encargado.
+El tablero aplica el modelo a las ventas cobradas de los últimos 28 días de la tienda y muestra hasta 20 variantes, ordenadas por demanda estimada, junto con sus ventas de 7 y 28 días y el stock disponible, calculado como la cantidad menos lo reservado y sumado en todas las sucursales. La comparación entre la demanda estimada y el disponible orienta la reposición, pero el sistema no genera compras automáticamente: la decisión sigue siendo del encargado.
 
 ## 8.5 Modelo no supervisado: segmentación de clientas
 
 ### 8.5.1 Variables RFM
 
-La segmentación se basa en el análisis RFM, una técnica clásica del marketing de bases de datos que describe a cada cliente con tres variables: recencia (días desde la última compra), frecuencia (número de compras en el período) y monto (gasto total) (Fader et al., 2005). Se agregan dos variables propias de una tienda de moda: la proporción de compras realizadas en promoción y la proporción de compras en línea frente a compras en tienda física. Como las variables tienen escalas muy distintas, se estandarizan antes del agrupamiento, y el monto se transforma con un logaritmo para reducir el peso de las pocas clientas de gasto muy alto.
+La segmentación se basa en el análisis RFM, una técnica clásica del marketing de bases de datos que describe a cada cliente con tres variables: recencia, frecuencia y monto (Fader et al., 2005). En EnsayAR se calculan sobre las ventas cobradas de los últimos 90 días: días desde la última compra, número de compras y monto acumulado. Como el monto tiene una escala mucho mayor que las otras dos variables y dominaría el cálculo de distancias, las tres se estandarizan con la media y la desviación del conjunto de entrenamiento.
 
 ### 8.5.2 Algoritmo
 
-Se utiliza el algoritmo k-medias (Lloyd, 1982), que divide las observaciones en k grupos de forma que cada una pertenezca al grupo con el centro más cercano. Parte de k centros iniciales, asigna cada clienta al centro más próximo, recalcula cada centro como el promedio de sus clientas y repite hasta que las asignaciones dejan de cambiar. Es eficiente, fácil de explicar y sus centros pueden leerse directamente como el perfil promedio de cada segmento.
+Se utiliza el algoritmo k-medias (Lloyd, 1982), que divide las observaciones en k grupos de forma que cada una pertenezca al grupo con el centro más cercano. Parte de k centros iniciales, asigna cada clienta al centro más próximo, recalcula cada centro como el promedio de sus clientas y repite hasta que los centros dejan de moverse. La implementación toma como centros iniciales los tres primeros ejemplos y se detiene cuando el desplazamiento máximo de los centros es menor que 10⁻⁸ o tras 100 iteraciones. Es un algoritmo eficiente y fácil de explicar, y sus centros pueden leerse directamente como el perfil promedio de cada segmento.
 
-### 8.5.3 Elección del número de grupos
+### 8.5.3 Número de grupos y evaluación
 
-El número de grupos no se fija de antemano. Se entrena el modelo para k entre 2 y 8 y se elige el valor con mayor coeficiente de silueta (Rousseeuw, 1987), siempre que ningún grupo resulte demasiado pequeño para ser útil comercialmente. Con los datos sintéticos, el valor esperado es k = 5, porque los datos se generaron a partir de cinco perfiles; que el procedimiento llegue a ese valor y que los grupos coincidan mayoritariamente con los perfiles originales es la prueba de que el modelo funciona.
+Se fijó k = 3, el número de perfiles con que se generaron los datos. Las 180 clientas sintéticas se dividen en 135 para entrenar y 45 para evaluar, y sobre estas últimas se calcula el coeficiente de silueta medio, que resulta de 0,55. Según Rousseeuw (1987), un valor superior a 0,5 indica una estructura de grupos razonable, de modo que el algoritmo recupera los tres perfiles generados. Cuando existan datos reales, el número de grupos deberá elegirse comparando la silueta para valores de k entre 2 y 8, porque la cantidad de perfiles reales no se conoce de antemano.
 
 ### 8.5.4 Interpretación
 
-Cada grupo se describe por su centro expresado en las unidades originales (por ejemplo, "compra cada 20 días, gasta en promedio 450 Bs, 10 % en promoción") y recibe un nombre comercial asignado a partir de esos rasgos. El resultado se guarda en la entidad `SegmentoCliente`, con el tamaño del grupo, sus rasgos y la fecha del cálculo. Algunas acciones posibles son una campaña de reactivación para las clientas inactivas, un aviso anticipado de nueva colección para las compradoras frecuentes y alertas de oferta para quienes compran casi siempre en promoción.
+El tablero clasifica en uno de los tres grupos a cada clienta con compras identificadas en los últimos 90 días y muestra, para cada grupo, la cantidad de clientas y su centro expresado en las tres variables. Los grupos se presentan numerados y nunca se exponen las identidades de las clientas. La lectura comercial es orientativa: el grupo de compras frecuentes y gasto alto es el destinatario natural de un aviso anticipado de nueva colección, el de compras ocasionales responde mejor a promociones y el de clientas inactivas a una campaña de reactivación.
 
-## 8.6 Tableros
+## 8.6 Tablero
 
-El tablero de analítica se dirige al administrador de la tienda y se organiza en dos vistas, que corresponden a los casos de uso UC52 y UC53. La vista de demanda muestra, para la categoría o variante elegida, la serie de ventas de las últimas semanas junto con el pronóstico de las cuatro siguientes y su intervalo de error, una tabla de sugerencias de reposición ordenada por urgencia y las métricas del modelo comparadas con la línea base. La vista de segmentos muestra el tamaño de cada grupo, un gráfico de dispersión de recencia frente a monto coloreado por segmento y una ficha por segmento con sus rasgos y la acción sugerida.
+El tablero se encuentra en la página `/analitica` de la aplicación web y corresponde a los casos de uso UC52 y UC53. Solo pueden abrirlo el administrador y el superadministrador de una tienda cuyo plan vigente incluya el módulo de analítica. Presenta un resumen de los datos usados (ventas cobradas en los 90 días, clientas con compras y variantes con ventas en los últimos 28 días), la tabla de demanda estimada con el stock disponible, la tabla de segmentos y las métricas de evaluación de ambos modelos, junto con el aviso de que se entrenaron con datos sintéticos.
 
-El diseño sigue el principio de que un tablero debe permitir comprender la situación de un vistazo, con pocos indicadores bien elegidos y sin decoración superflua (Few, 2006). Por eso cada vista abre con una sola cifra principal (unidades a reponer esta semana, clientas en riesgo de abandono) y deja el detalle para debajo. Como el resto de la aplicación, las consultas del tablero se filtran por tienda mediante el contexto multi-tenant, de modo que una tienda nunca ve los modelos ni los segmentos de otra.
+El diseño sigue el principio de que un tablero debe permitir comprender la situación de un vistazo, con pocos indicadores bien elegidos y sin decoración superflua (Few, 2006). Cuando la tienda no tiene ventas en el período, el tablero muestra un estado vacío explicativo. Si el período supera las 5000 ventas, el servicio responde con el error 422 `DEMASIADAS_VENTAS` en lugar de calcular sobre una muestra truncada que daría resultados engañosos.
 
 ## 8.7 Arquitectura del módulo
 
-El entrenamiento de modelos tiene requisitos distintos a los del resto del sistema: usa bibliotecas del ecosistema de Python, consume mucho procesador durante minutos y no necesita responder en tiempo real. Por eso el módulo de analítica es el primer candidato a separarse del monolito modular como un servicio independiente, tal como anticipa la sección 6.10. El diseño contempla un servicio de entrenamiento en Python con scikit-learn que lee las ventas de una tienda, entrena ambos modelos y escribe los resultados en las tablas `ModeloPredictivo` y `SegmentoCliente`. El backend NestJS expone los endpoints `GET /analitica/prediccion` y `GET /analitica/segmentos`, que solo leen esos resultados ya calculados, de modo que el tablero responde en milisegundos aunque el entrenamiento haya tardado minutos. Si una tienda no tiene modelo entrenado, el tablero ofrece entrenarlo con los datos disponibles; si los datos son insuficientes para una segmentación confiable, lo advierte (cursos alternos de UC52 y UC53).
+La analítica es un módulo más del monolito modular NestJS (`backend/src/analitica/`), compuesto por un controlador, un servicio y el archivo de modelos. El endpoint `GET /analitica/panel` está protegido por `JwtAuthGuard` y `RolesGuard`, que exigen una sesión válida con rol `ADMIN` o `SUPERADMIN`; además, el servicio verifica que la suscripción esté vigente y que el plan incluya el módulo, y en caso contrario responde 403 `MODULO_NO_INCLUIDO`. Ambos modelos se entrenan una sola vez al cargar el módulo, en milisegundos, y quedan en memoria; cada consulta solo aplica los modelos a los datos de la tienda.
 
-## 8.8 Estado de implementación
+La lectura de datos funciona en los dos modos de aislamiento descritos en el capítulo 4. En el modo habitual usa `PrismaService` sobre las tablas compartidas, filtrando por `tiendaId`; cuando se activa el modo de esquema por tienda, usa el cliente del esquema de la tienda autenticada que entrega `PrismaEsquemasService` (sección 4.12). La tienda se obtiene siempre del contexto de la petición, nunca de un parámetro del cliente.
 
-El módulo de analítica está especificado en el modelo ICONIX con sus casos de uso, diagramas de robustez y de secuencia, y con las entidades `ModeloPredictivo`, `SegmentoCliente` y `EventoAnalitica` del modelo de dominio. El generador de datos sintéticos, el servicio de entrenamiento y los tableros descritos en este capítulo no forman parte todavía de la versión desplegada del sistema y constituyen el siguiente incremento del proyecto.
+En esta versión, las predicciones y los segmentos se calculan en cada consulta; las entidades `ModeloPredictivo` y `SegmentoCliente` del modelo de dominio quedan reservadas para persistir versiones de los modelos cuando se entrenen con datos reales. Si en el futuro se adoptan modelos más complejos, como un bosque aleatorio de regresión (Breiman, 2001) implementado con scikit-learn (Pedregosa et al., 2011), el entrenamiento será el primer candidato a separarse del monolito como un servicio independiente, tal como anticipa la sección 6.10.
+
+## 8.8 Estado de implementación y verificación
+
+El módulo está implementado en el backend y en la web. Las pruebas unitarias de `modelos.spec.ts` y `analitica.service.spec.ts` cubren la reproducibilidad del entrenamiento, la comparación con la línea base y el comportamiento del servicio. El script `backend/scripts/verificar-analitica-http.ts`, ejecutado sobre la base de laboratorio, comprobó por HTTP los siguientes casos:
+
+- Una petición sin sesión recibe 401.
+- Un rol no autorizado, como el cajero, recibe 403.
+- Una tienda cuyo plan no incluye el módulo de analítica recibe 403.
+- Una tienda con el plan Cadena recibe el tablero completo (200), tanto en tablas compartidas como en esquemas por tienda.
+- La cabecera `X-Tienda` no permite consultar los datos de otra tienda.
+- Una tienda sin ventas en el período recibe el estado vacío.
+
+Los resultados son exploratorios. Falta la validación cronológica con ventas reales, el tratamiento de varias monedas, la estacionalidad anual y la medición de la capacidad con volúmenes de producción; por ello el tablero no debe usarse por sí solo para decidir compras ni para evaluar personas.

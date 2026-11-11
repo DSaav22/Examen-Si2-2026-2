@@ -1,6 +1,9 @@
 import { ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Rol, Usuario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { crearPrismaTenant } from '../tenancy/prisma-tenant.extension';
 import { TenantContext } from '../tenancy/tenant-context';
 import { TiendaInfo, TiendasService } from '../tenancy/tiendas.service';
 import { CuentasService } from './cuentas.service';
@@ -16,7 +19,18 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly cuentas: CuentasService,
     private readonly tiendas: TiendasService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
+
+  private esquemasActivos(): boolean {
+    return this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config.get<string>('TENANT_SCHEMAS_ALTA') === 'true';
+  }
+
+  private clientePerfiles(): PrismaService {
+    if (!this.esquemasActivos()) return this.prisma;
+    return crearPrismaTenant(this.esquemas.clienteTienda(TenantContext.tiendaIdOrThrow())) as unknown as PrismaService;
+  }
 
   /** Clienta que se registra en la tienda activa (cabecera X-Tienda). */
   async registro(dto: RegistroDto) {
@@ -27,9 +41,10 @@ export class AuthService {
       password: dto.password,
       exigirClave: true,
     });
-    const ya = await this.prisma.usuario.findFirst({ where: { cuentaId: cuenta.id } });
+    const prisma = this.clientePerfiles();
+    const ya = await prisma.usuario.findFirst({ where: { cuentaId: cuenta.id } });
     if (ya) throw new ConflictException({ codigo: 'EMAIL_EN_USO' });
-    const usuario = await this.prisma.usuario.create({
+    const usuario = await prisma.usuario.create({
       data: { cuentaId: cuenta.id, email: cuenta.email, nombre: dto.nombre, rol: Rol.CLIENTA },
     });
     return this.sesion(usuario, tienda);
@@ -40,7 +55,8 @@ export class AuthService {
     const tienda = await this.tiendaActual();
     const cuenta = await this.cuentas.validarClave(dto.email, dto.password);
     if (!cuenta) throw new UnauthorizedException({ codigo: 'CREDENCIALES' });
-    const usuario = await this.prisma.usuario.findFirst({ where: { cuentaId: cuenta.id } });
+    const prisma = this.clientePerfiles();
+    const usuario = await prisma.usuario.findFirst({ where: { cuentaId: cuenta.id } });
     if (!usuario) {
       throw new ForbiddenException({
         codigo: 'SIN_ACCESO_TIENDA',
@@ -48,7 +64,7 @@ export class AuthService {
       });
     }
     if (!usuario.activo) throw new UnauthorizedException({ codigo: 'CREDENCIALES' });
-    await this.prisma.auditoria.create({
+    await prisma.auditoria.create({
       data: { accion: 'login', recurso: 'auth', detalle: usuario.email, usuarioId: usuario.id },
     });
     return this.sesion(usuario, tienda);
@@ -65,7 +81,9 @@ export class AuthService {
       );
     }
     const usuario = await TenantContext.enTienda(tiendaId, () =>
-      this.prisma.usuario.findFirst({ where: { cuentaId, activo: true } }),
+      (this.esquemasActivos()
+        ? this.esquemas.clienteTienda(tiendaId)
+        : this.prisma).usuario.findFirst({ where: { cuentaId, activo: true, tiendaId } }),
     );
     if (!usuario) throw new ForbiddenException({ codigo: 'SIN_ACCESO_TIENDA' });
     return this.sesion(usuario, tienda);
@@ -76,7 +94,10 @@ export class AuthService {
   }
 
   async me(userId: string) {
-    return this.prisma.usuario.findUniqueOrThrow({
+    const cliente = this.esquemasActivos()
+      ? this.esquemas.clienteTienda(TenantContext.tiendaIdOrThrow())
+      : this.prisma;
+    return cliente.usuario.findUniqueOrThrow({
       where: { id: userId },
       select: {
         id: true,
@@ -92,17 +113,18 @@ export class AuthService {
   }
 
   async cambiarClave(userId: string, actual: string, nueva: string) {
-    const usuario = await this.prisma.usuario.findUniqueOrThrow({ where: { id: userId } });
+    const prisma = this.clientePerfiles();
+    const usuario = await prisma.usuario.findUniqueOrThrow({ where: { id: userId } });
     const cuenta = await this.prisma.cuenta.findUniqueOrThrow({ where: { id: usuario.cuentaId } });
     if (!(await this.cuentas.validarClave(cuenta.email, actual))) throw new UnauthorizedException({ codigo: 'CREDENCIALES' });
     await this.cuentas.cambiarClave(cuenta.id, nueva);
-    await this.prisma.auditoria.create({ data: { accion: 'cambio_clave', recurso: 'auth', usuarioId: userId } });
+    await prisma.auditoria.create({ data: { accion: 'cambio_clave', recurso: 'auth', usuarioId: userId } });
     return { ok: true };
   }
 
   async logout(token: string) {
     await this.tokens.revoke(token);
-    await this.prisma.auditoria.create({ data: { accion: 'logout', recurso: 'auth' } });
+    await this.clientePerfiles().auditoria.create({ data: { accion: 'logout', recurso: 'auth' } });
   }
 
   private async tiendaActual(): Promise<TiendaInfo> {
@@ -122,6 +144,12 @@ export class AuthService {
       tiendaId: tienda.id,
       cuentaId: usuario.cuentaId,
     };
+    const tiendas = await this.cuentas.tiendasDe(usuario.cuentaId);
+    if (this.esquemasActivos() && !tiendas.some((t) => t.tiendaId === tienda.id)) {
+      const global = await this.prisma.tienda.findUnique({ where: { id: tienda.id }, select: { duenoCuentaId: true } });
+      tiendas.push({ tiendaId: tienda.id, slug: tienda.slug, nombre: tienda.nombre, rol: usuario.rol,
+        vigente: tienda.vigente, plan: tienda.plan?.nombre ?? null, esDueno: global?.duenoCuentaId === usuario.cuentaId });
+    }
     return {
       accessToken: this.tokens.sign(payload),
       user: {
@@ -135,7 +163,7 @@ export class AuthService {
         avatarUrl: usuario.avatarUrl ?? '',
       },
       tienda: { id: tienda.id, slug: tienda.slug, nombre: tienda.nombre, plan: tienda.plan?.nombre ?? null },
-      tiendas: await this.cuentas.tiendasDe(usuario.cuentaId),
+      tiendas,
     };
   }
 }

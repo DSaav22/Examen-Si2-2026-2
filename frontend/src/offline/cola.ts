@@ -47,7 +47,8 @@ async function enStore<T>(modo: IDBTransactionMode, fn: (s: IDBObjectStore) => I
     const tx = db.transaction(STORE, modo)
     const req = fn(tx.objectStore(STORE))
     tx.oncomplete = () => resolve(req.result)
-    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error ?? new Error('La transacción de la cola fue cancelada.'))
+    tx.onerror = () => reject(tx.error ?? req.error)
   })
 }
 
@@ -55,6 +56,10 @@ const eventos = new EventTarget()
 
 function avisar() {
   eventos.dispatchEvent(new Event('cambio'))
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('ensayar:tienda_cambiada', () => avisar())
 }
 
 export function alCambiarCola(fn: () => void) {
@@ -101,37 +106,93 @@ export async function encolar(
  * respuesta definitiva en el servidor). Conserva la fecha original de la operación.
  */
 export async function reintentar(op: OperacionOffline, cambios: Record<string, unknown> = {}) {
-  await quitarOp(op.id)
-  return encolar(op.tipo, { ...op.datos, ...cambios }, op.resumen, { creadaEn: op.creadaEn })
+  const nuevo: OperacionOffline = { ...op, id: uuid(), datos: { ...op.datos, ...cambios }, estado: 'pendiente', error: undefined }
+  const db = await abrir()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    const store = tx.objectStore(STORE)
+    const actual = store.get(op.id)
+    actual.onsuccess = () => {
+      const guardada = actual.result as OperacionOffline | undefined
+      if (!guardada || guardada.tienda !== op.tienda || guardada.estado === 'pendiente') { tx.abort(); return }
+      store.add(nuevo)
+      store.delete(op.id)
+    }
+    tx.oncomplete = () => resolve()
+    tx.onabort = () => reject(tx.error ?? new Error('No se pudo reintentar la operación; se conservó la original.'))
+    tx.onerror = () => reject(tx.error ?? new Error('No se pudo reintentar la operación.'))
+  })
+  avisar()
+  return nuevo
+}
+
+/** Confirma una operación y actualiza sus ventas dependientes en una sola transacción. */
+export async function confirmarOp(op: OperacionOffline, clienteDefinitivo?: string) {
+  const db = await abrir()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    const store = tx.objectStore(STORE)
+    if (op.tipo === 'cliente' && clienteDefinitivo && clienteDefinitivo !== op.datos.id) {
+      const cursor = store.index('tienda').openCursor(IDBKeyRange.only(op.tienda))
+      cursor.onsuccess = () => {
+        const fila = cursor.result
+        if (!fila) return
+        const otra = fila.value as OperacionOffline
+        if (otra.tipo === 'venta' && otra.estado === 'pendiente' && otra.datos.clientaId === op.datos.id) {
+          fila.update({ ...otra, datos: { ...otra.datos, clientaId: clienteDefinitivo } })
+        }
+        fila.continue()
+      }
+    }
+    try { store.delete(op.id) } catch (error) { tx.abort(); reject(error); return }
+    tx.oncomplete = () => resolve()
+    tx.onabort = () => reject(tx.error ?? new Error('No se pudo confirmar la operación.'))
+    tx.onerror = () => reject(tx.error ?? new Error('No se pudo confirmar la operación.'))
+  })
+  avisar()
 }
 
 /** Pasa a la cola nueva las ventas guardadas por la versión anterior del POS. */
 export async function migrarColaVieja() {
   const raw = localStorage.getItem(COLA_VIEJA)
   if (!raw) return
-  try {
-    const viejas = JSON.parse(raw) as {
+  const viejas = JSON.parse(raw) as {
       uuid: string
       almacenId: string
       cajaTurnoId: string
       clientaId?: string
       lineas: { varianteId: string; cantidad: number }[]
     }[]
-    for (const v of viejas) {
-      await encolar(
-        'venta',
-        {
+  if (!Array.isArray(viejas) || viejas.some(v => !v || typeof v.uuid !== 'string' || !v.uuid || !Array.isArray(v.lineas))) {
+    throw new Error('La cola anterior tiene datos inválidos y se conservó para su recuperación.')
+  }
+  const tienda = tiendaActiva()
+  const ops: OperacionOffline[] = viejas.map(v => ({
+    id: v.uuid, tipo: 'venta', creadaEn: new Date().toISOString(), tienda, estado: 'pendiente',
+    datos: {
           almacenId: v.almacenId,
           cajaTurnoId: v.cajaTurnoId,
           clientaId: v.clientaId,
           medioPago: 'efectivo',
           lineas: v.lineas,
-        },
-        `Venta · ${v.lineas.length} línea(s)`,
-        { id: v.uuid },
-      )
+    }, resumen: `Venta · ${v.lineas.length} línea(s)`,
+  }))
+  const db = await abrir()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    const store = tx.objectStore(STORE)
+    for (const op of ops) {
+      const req = store.get(op.id)
+      req.onsuccess = () => {
+        const existente = req.result as OperacionOffline | undefined
+        if (!existente) store.add(op)
+        else if (existente.tipo !== op.tipo || existente.tienda !== op.tienda || JSON.stringify(existente.datos) !== JSON.stringify(op.datos)) tx.abort()
+      }
     }
-  } finally {
-    localStorage.removeItem(COLA_VIEJA)
-  }
+    tx.oncomplete = () => resolve()
+    tx.onabort = () => reject(tx.error ?? new Error('La cola anterior se conservó: hay operaciones incompatibles.'))
+    tx.onerror = () => reject(tx.error ?? new Error('No se pudo migrar la cola anterior.'))
+  })
+  if (localStorage.getItem(COLA_VIEJA) === raw) localStorage.removeItem(COLA_VIEJA)
+  avisar()
 }

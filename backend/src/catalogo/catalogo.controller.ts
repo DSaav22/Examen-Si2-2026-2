@@ -17,6 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Rol } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import { CurrentUser } from '../auth/current-user';
 import type { JwtPayload } from '../auth/jwt-payload';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -24,6 +25,8 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { Idempotente } from '../sync/idempotencia.interceptor';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { TenantContext } from '../tenancy/tenant-context';
 import { CatalogoService } from './catalogo.service';
 import { ImagenService } from './imagen.service';
 import { ActualizarProductoDto, CrearProductoDto } from './dto/producto.dto';
@@ -36,6 +39,8 @@ export class CatalogoController {
     private readonly catalogo: CatalogoService,
     private readonly imagenes: ImagenService,
     private readonly prisma: PrismaService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
 
   @Get('productos')
@@ -120,9 +125,13 @@ export class CatalogoController {
 
   @Get('categorias')
   async categorias() {
-    const categorias = await this.prisma.categoria.findMany({ where: { activa: true }, orderBy: { nombre: 'asc' } });
+    // Piloto de solo lectura. La tienda se resuelve mediante el middleware, nunca desde un nombre de esquema HTTP.
+    const prisma = this.config.get<string>('TENANT_SCHEMAS_CATEGORIAS') === 'true'
+      ? this.esquemas.clienteTienda(TenantContext.tiendaIdOrThrow())
+      : this.prisma;
+    const categorias = await prisma.categoria.findMany({ where: { activa: true }, orderBy: { nombre: 'asc' } });
     if (categorias.length) return categorias;
-    const legacy = await this.prisma.producto.findMany({ distinct: ['categoria'], select: { categoria: true }, orderBy: { categoria: 'asc' } });
+    const legacy = await prisma.producto.findMany({ distinct: ['categoria'], select: { categoria: true }, orderBy: { categoria: 'asc' } });
     return legacy.map(item => ({ id: item.categoria, nombre: item.categoria, activa: true, origen: 'compatibilidad' }));
   }
 
@@ -227,13 +236,15 @@ export class CatalogoController {
     @Body() dto: UpsertStockDto,
   ) {
     if (user.rol === Rol.ENCARGADO) {
-      const u = await this.prisma.usuario.findUniqueOrThrow({
+      const prisma = this.config.get<string>('TENANT_SCHEMAS_CATALOGO_ESCRITURA') === 'true'
+        ? this.esquemas.clienteTienda(TenantContext.tiendaIdOrThrow()) : this.prisma;
+      const u = await prisma.usuario.findUniqueOrThrow({
         where: { id: user.sub },
       });
       if (!u.sucursalId) {
         throw new ForbiddenException({ codigo: 'ENCARGADO_SIN_SUCURSAL' });
       }
-      const a = await this.prisma.almacen.findUnique({
+      const a = await prisma.almacen.findUnique({
         where: { id: dto.almacenId },
       });
       if (!a || a.sucursalId !== u.sucursalId) {

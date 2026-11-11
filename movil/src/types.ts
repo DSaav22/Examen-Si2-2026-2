@@ -3,8 +3,29 @@ export type User = {
   email: string
   nombre: string
   rol: string
+  cuentaId?: string
   sucursalId?: string | null
   mayorista?: boolean
+}
+
+export type TiendaInfo = {
+  id: string
+  slug: string
+  nombre: string
+  logo?: string | null
+  pais?: string
+  moneda?: string
+  plan?: string | null
+}
+
+export type TiendaAutorizada = {
+  tiendaId: string
+  slug: string
+  nombre: string
+  rol: string
+  vigente: boolean
+  plan?: string | null
+  esDueno?: boolean
 }
 
 export type Variante = {

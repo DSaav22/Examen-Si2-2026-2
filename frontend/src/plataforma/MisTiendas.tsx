@@ -47,6 +47,8 @@ function Suscripcion({ tienda, onCambio }: { tienda: TiendaDeCuenta; onCambio: (
   const [periodo, setPeriodo] = useState<Periodo>('MENSUAL')
   const [tarjeta, setTarjeta] = useState<Tarjeta>({ titular: '', numero: '', vence: '', cvc: '' })
   const [metodoPago, setMetodoPago] = useState('')
+  const [pagando, setPagando] = useState(false)
+  const [resultadoSimulado, setResultadoSimulado] = useState<'aprobado' | 'rechazado'>('aprobado')
   const [clave, setClave] = useState(() => crypto.randomUUID())
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
@@ -61,12 +63,14 @@ function Suscripcion({ tienda, onCambio }: { tienda: TiendaDeCuenta; onCambio: (
 
   async function renovar(e: FormEvent) {
     e.preventDefault()
+    if (pagando || !metodoPago) return
+    setPagando(true)
     setError('')
     setOk('')
     try {
       const d = await apiCuenta<Detalle>(`/plataforma/tiendas/${tienda.tiendaId}/renovar`, {
         method: 'POST',
-        body: JSON.stringify({ planId, periodo, metodoPago, pago: metodoPago === 'tarjeta' ? tarjeta : TARJETA_SIMULADA, idempotencyKey: clave }),
+        body: JSON.stringify({ planId, periodo, metodoPago, pago: metodoPago === 'tarjeta' ? tarjeta : { ...TARJETA_SIMULADA, numero: resultadoSimulado === 'aprobado' ? TARJETA_SIMULADA.numero : '4000000000000002' }, idempotencyKey: clave }),
       })
       setDetalle(d)
       setAbierto(false)
@@ -75,8 +79,8 @@ function Suscripcion({ tienda, onCambio }: { tienda: TiendaDeCuenta; onCambio: (
       onCambio()
     } catch (err) {
       setError((err as Error).message)
-      setClave(crypto.randomUUID())
-    }
+      if ((err as { status?: number }).status === 402 || (err as { status?: number }).status === 409) setClave(crypto.randomUUID())
+    } finally { setPagando(false) }
   }
 
   if (!detalle) return <p className="pf-muted">{error || 'Cargando suscripción…'}</p>
@@ -127,10 +131,11 @@ function Suscripcion({ tienda, onCambio }: { tienda: TiendaDeCuenta; onCambio: (
           </p>
           <SelectorPagoPais pais={detalle.pais} metodo={metodoPago} onChange={setMetodoPago} />
           {metodoPago === 'tarjeta' ? <FormTarjeta tarjeta={tarjeta} onChange={setTarjeta} /> : null}
+          {metodoPago && metodoPago !== 'tarjeta' ? <label>Resultado de la simulacion<select value={resultadoSimulado} onChange={e => setResultadoSimulado(e.target.value as 'aprobado' | 'rechazado')}><option value="aprobado">Aprobado</option><option value="rechazado">Rechazado</option></select></label> : null}
           {error ? <p className="pf-error" role="alert">{error}</p> : null}
           <div className="pf-actions">
             <button type="button" className="pf-btn pf-btn--ghost" onClick={() => setAbierto(false)}>Cancelar</button>
-            <button className="pf-btn" disabled={!metodoPago}>Simular pago {elegido ? usd(elegido.precios[periodo]) : ''}</button>
+            <button className="pf-btn" disabled={pagando || !metodoPago}>Simular pago {elegido ? usd(elegido.precios[periodo]) : ''}</button>
           </div>
         </form>
       )}
@@ -175,8 +180,8 @@ export function MisTiendas() {
   }
 
   return (
-    <section>
-      <div className="pf-section-head">
+    <section className="pf-my-stores">
+      <div className="pf-section-head pf-my-stores-head">
         <div>
           <p className="pf-eyebrow">Hola, {sesion.cuenta.nombre || sesion.cuenta.email}</p>
           <h1>Mis tiendas</h1>
@@ -188,7 +193,7 @@ export function MisTiendas() {
       {sesion.tiendas.length === 0 ? (
         <div className="pf-card pf-empty">
           <h2>Todavía no tenés tiendas</h2>
-          <p>Elegí un plan y en dos minutos tenés tu tienda funcionando.</p>
+          <p>Elegí un plan y comenzá a crear tu tienda.</p>
           <Link className="pf-btn" to="/plataforma/nueva">Crear mi primera tienda</Link>
         </div>
       ) : (

@@ -9,20 +9,25 @@ export type TiendaPublica = {
   id: string
   slug: string
   nombre: string
+  logo?: string | null
   pais: string
   moneda: string
   plan: { codigo: string; nombre: string; modulos: string[] } | null
 }
 
-let cache: Promise<TiendaPublica | null> | null = null
+const cache = new Map<string, Promise<TiendaPublica | null>>()
 
 /** Nombre y datos de la tienda cuya vitrina se está mostrando. */
 export function useTiendaPublica() {
   const [tienda, setTienda] = useState<TiendaPublica | null>(null)
+  const slug = tiendaActiva()
   useEffect(() => {
-    cache ??= api<TiendaPublica>('/tienda').catch(() => null)
-    void cache.then(setTienda)
-  }, [])
+    let vigente = true
+    setTienda(null)
+    if (!cache.has(slug)) cache.set(slug, api<TiendaPublica>('/tienda').catch(() => { cache.delete(slug); return null }))
+    void cache.get(slug)!.then(t => { if (vigente) setTienda(t) })
+    return () => { vigente = false }
+  }, [slug])
   return tienda
 }
 

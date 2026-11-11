@@ -673,6 +673,21 @@
   gap: 0.85rem;
 }
 
+.analytics-notice { padding: 1rem; margin-bottom: 1rem; border: 1px solid #ccae82; border-radius: 10px; background: #fff7e8; color: #634b25; line-height: 1.5; }
+.analytics-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+.analytics-kpis > div { display: grid; gap: .35rem; padding: 1rem; border: 1px solid var(--ops-line, #ded5cb); border-radius: 10px; background: var(--ops-card, #fff); }
+.analytics-kpis span { font-size: .78rem; opacity: .75; }
+.analytics-kpis strong { font-size: 1.6rem; }
+.analytics-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: 1rem; align-items: start; }
+.analytics-metrics { font-size: .82rem; }
+.analytics-groups { list-style: none; padding: 0; display: grid; gap: 1rem; }
+.analytics-groups li > div:first-child { display: flex; justify-content: space-between; gap: .5rem; font-size: .85rem; }
+.analytics-groups small { display: block; margin-top: .3rem; opacity: .7; line-height: 1.4; }
+.analytics-track { height: 8px; overflow: hidden; border-radius: 8px; background: #eadfe1; margin-top: .4rem; }
+.analytics-track span { display: block; height: 100%; background: #77283f; border-radius: inherit; }
+.analytics-footnote { font-size: .8rem; line-height: 1.5; }
+@media (max-width: 850px) { .analytics-grid { grid-template-columns: 1fr; } .analytics-kpis { grid-template-columns: 1fr; } }
+
 /* Moderación / opiniones */
 .ops-moderation-help {
   margin: 0 0 0.85rem;

@@ -1,3 +1,5 @@
+import { metodosSimuladosPorPais, validarPagoVenta } from './metodos-pais';
+import { TenantContext } from '../tenancy/tenant-context';
 import {
   Body,
   ConflictException,
@@ -6,6 +8,7 @@ import {
   Get,
   Logger,
   NotFoundException,
+  Optional,
   Param,
   Post,
   UseGuards,
@@ -21,6 +24,8 @@ import { Idempotente } from '../sync/idempotencia.interceptor';
 import { InventarioService } from '../inventario/inventario.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
 import { VentasService } from '../ventas/ventas.service';
 
 class SimularDto {
@@ -38,12 +43,31 @@ export class PagosController {
     private readonly inventario: InventarioService,
     private readonly ventas: VentasService,
     private readonly notificaciones: NotificacionesService,
+    @Optional() private readonly esquemas?: PrismaEsquemasService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
+
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && (this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas) {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
+
+  @Get('metodos')
+  @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
+  async metodos() {
+    const tienda = await ((this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas
+      ? this.esquemas.clientePlataforma()
+      : this.prisma).tienda.findUniqueOrThrow({ where: { id: TenantContext.tiendaIdOrThrow() }, select: { pais: true } });
+    return { pais: tienda.pais, metodos: metodosSimuladosPorPais(tienda.pais) };
+  }
 
   @Get(':id')
   @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
   async uno(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    const pago = await this.prisma.pagoSimulado.findUnique({
+    const pago = await this.db().pagoSimulado.findUnique({
       where: { id },
       include: { venta: { include: { lineas: true } } },
     });
@@ -65,7 +89,7 @@ export class PagosController {
     @Param('id') id: string,
     @Body() dto: SimularDto,
   ) {
-    const pago = await this.prisma.pagoSimulado.findUnique({
+    const pago = await this.db().pagoSimulado.findUnique({
       where: { id },
       include: { venta: { include: { lineas: true } } },
     });
@@ -77,7 +101,19 @@ export class PagosController {
       throw new ForbiddenException({ codigo: 'NO_ES_TU_PAGO' });
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const tienda = await ((this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas
+      ? this.esquemas.clientePlataforma()
+      : this.prisma).tienda.findUniqueOrThrow({ where: { id: TenantContext.tiendaIdOrThrow() }, select: { pais: true } });
+    const metodo = pago.referencia?.startsWith('SIM:') ? pago.referencia.split(':')[1] : undefined;
+    validarPagoVenta(tienda.pais, pago.venta.medioPago, metodo);
+
+    // Una respuesta perdida puede reenviarse sin cobrar ni notificar otra vez.
+    if (pago.estado !== 'pendiente') {
+      if (pago.estado === dto.resultado) return pago;
+      throw new ConflictException({ codigo: 'PAGO_YA_RESUELTO' });
+    }
+
+    return this.db().$transaction(async (tx) => {
       const claim = await tx.pagoSimulado.updateMany({
         where: { id, estado: 'pendiente' },
         data: {

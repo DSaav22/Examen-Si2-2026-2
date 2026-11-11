@@ -117,9 +117,9 @@ La matriz une cada caso con sus requisitos, la ruta que lo atiende, la clase y l
 | UC49 Ajustar y exportar reporte | R2, R3 | `POST /reportes/inteligente/exportar` | ReportesInteligentesService.exportar | verificar:reportes (Excel válido y PDF paginado). |
 | UC50 Vender al crédito | R2, O8 | `POST /ventas` | VentasService.cobrar | verificar:reportes (venta al crédito y caja sin cambios). |
 | UC51 Registrar abono de crédito | R2, O6 | `POST /creditos/:id/abonos` | CreditosController.abonar | verificar:reportes (abonos idempotentes y concurrentes). |
-| UC52 Ver dashboard predictivo | A1, A2, A3 | `GET /analitica/prediccion` | AnaliticaService.prediccion | A definir con la parte de analítica. |
-| UC53 Ver segmentación de clientas | A1, A2, A3 | `GET /analitica/segmentos` | AnaliticaService.segmentos | A definir con la parte de analítica. |
-| UC54 Pagar con pasarela internacional | P1, P2, P3, P4 | `POST /pagos/pasarela` | PagosService.cobrarPasarela | A definir con la parte de pagos. |
+| UC52 Ver dashboard predictivo | A1, A2, A3 | `GET /analitica/panel` | AnaliticaService.panel | verificar-analitica-http.ts: 401 sin sesión, 403 por rol o plan, 200 con plan Cadena y aislamiento por tienda. |
+| UC53 Ver segmentación de clientas | A1, A2, A3 | `GET /analitica/panel` | AnaliticaService.panel | analitica.service.spec.ts y verificar-analitica-http.ts: grupos, silueta sintética y tienda sin ventas. |
+| UC54 Pagar con pasarela internacional | P1, P2, P3, P4 | `POST /pagos/:id/simular` | PagosController.simular | pagos-pais.spec.ts: métodos por país; reintento con la misma clave devuelve el mismo pago. |
 
 ## 9.4.6 Revisión de código y sincronización del modelo
 

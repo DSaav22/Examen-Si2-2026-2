@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { api, type ApiError } from '../api'
-import { alCambiarCola, guardarOp, listarOps, migrarColaVieja, quitarOp, type OperacionOffline } from './cola'
+import { alCambiarCola, confirmarOp, guardarOp, listarOps, migrarColaVieja, type OperacionOffline } from './cola'
 import { dispositivoId, esFalloRed } from './red'
 
 export type ResultadoServidor = {
@@ -58,19 +58,18 @@ export async function refrescarConteo() {
       conflictos: ops.filter(o => o.estado !== 'pendiente').length,
     })
   } catch {
-    /* IndexedDB no disponible */
+    fijar({ ultimoError: 'No se puede leer la cola local. Revisá el almacenamiento del navegador.' })
   }
 }
 
 async function aplicar(op: OperacionOffline, r: ResultadoServidor, cola: OperacionOffline[]) {
   if (r.estado === 'aplicada' || r.estado === 'repetida' || r.estado === 'fusionada') {
-    await quitarOp(op.id)
+    await confirmarOp(op, r.recursoId)
     // Cliente fusionado con uno existente: las ventas pendientes pasan a apuntar al id del servidor.
     if (op.tipo === 'cliente' && r.recursoId && r.recursoId !== op.datos.id) {
       for (const otra of cola) {
-        if (otra.tipo === 'venta' && otra.datos.clientaId === op.datos.id) {
+        if (otra.tipo === 'venta' && otra.estado === 'pendiente' && otra.datos.clientaId === op.datos.id) {
           otra.datos = { ...otra.datos, clientaId: r.recursoId }
-          await guardarOp(otra)
         }
       }
     }
@@ -111,7 +110,8 @@ async function correr(): Promise<ResultadoServidor[]> {
     }
     fijar({ online: true, ultimaSync: new Date().toISOString() })
   } catch (err) {
-    if (esFalloRed(err)) fijar({ online: false })
+    if ((err as ApiError).codigo === 'SYNC_ESQUEMAS_NO_DISPONIBLE') fijar({ ultimoError: 'La sincronización por esquemas todavía no está disponible. Tus operaciones siguen guardadas en este dispositivo.' })
+    else if (esFalloRed(err)) fijar({ online: false })
     else if ((err as ApiError).status === 401) fijar({ ultimoError: 'Tu sesión venció: volvé a entrar para sincronizar.' })
     else fijar({ ultimoError: err instanceof Error ? err.message : 'No se pudo sincronizar' })
   } finally {
@@ -148,6 +148,6 @@ export function iniciarAutoSync() {
     if (navigator.onLine && estado.pendientes > 0) void sincronizar()
   }, INTERVALO_MS)
   void migrarColaVieja()
-    .catch(() => undefined)
     .then(() => sincronizar())
+    .catch(() => fijar({ ultimoError: 'No se pudo recuperar o leer la cola; revisá el almacenamiento del dispositivo.' }))
 }

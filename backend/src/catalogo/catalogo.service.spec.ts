@@ -1,3 +1,4 @@
+jest.mock('@nestjs/config', () => ({ ConfigService: class ConfigService {} }));
 import { CatalogoService } from './catalogo.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { PlanLimitesService } from '../tenancy/plan-limites.service';
@@ -18,7 +19,7 @@ describe('CatalogoService.listarProductos', () => {
       },
       $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     };
-    service = new CatalogoService(prisma as unknown as PrismaService, {} as PlanLimitesService);
+    service = new CatalogoService(prisma as unknown as PrismaService, {} as PlanLimitesService, {} as never, { get: () => undefined } as never);
   });
 
   it('combina búsqueda, filtros y devuelve metadatos de paginación', async () => {

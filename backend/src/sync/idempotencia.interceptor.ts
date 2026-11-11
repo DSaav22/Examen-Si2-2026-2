@@ -18,6 +18,9 @@ import { from, mergeMap, Observable, of, throwError, catchError } from 'rxjs';
 import type { JwtPayload } from '../auth/jwt-payload';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContext } from '../tenancy/tenant-context';
+import { ConfigService } from '@nestjs/config';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { crearPrismaTenant } from '../tenancy/prisma-tenant.extension';
 
 const IDEMPOTENTE = 'idempotente';
 
@@ -50,6 +53,8 @@ export class IdempotenciaInterceptor implements NestInterceptor {
   constructor(
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
 
   async intercept(ctx: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
@@ -59,6 +64,10 @@ export class IdempotenciaInterceptor implements NestInterceptor {
     const clave = req.header('idempotency-key')?.trim();
     const tiendaId = TenantContext.tiendaId();
     if (!clave || !tiendaId) return next.handle();
+    const usarEsquema = this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true';
+    const prisma = usarEsquema
+      ? this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService
+      : this.prisma;
     if (clave.length > 200) throw new BadRequestException({ codigo: 'IDEMPOTENCY_KEY_INVALIDA' });
 
     const usuarioId = req.user?.sub ?? null;
@@ -70,7 +79,7 @@ export class IdempotenciaInterceptor implements NestInterceptor {
       body: req.body as unknown,
     });
 
-    const previa = await this.reservar(operationId, hash, usuarioId, req);
+    const previa = await this.reservar(tiendaId, operationId, hash, usuarioId, req, prisma);
     if (previa) {
       res.setHeader('Idempotent-Replayed', 'true');
       if (previa.status >= 400) throw new HttpException(previa.body as object, previa.status);
@@ -86,7 +95,7 @@ export class IdempotenciaInterceptor implements NestInterceptor {
       mergeMap((body) =>
         from(
           enTienda(() =>
-            this.prisma.operacionSync.update({
+            prisma.operacionSync.update({
               where: { tiendaId_operationId: { tiendaId, operationId } },
               data: { estado: 'aplicada', resultado: aJson({ status, body }) },
             }),
@@ -99,7 +108,7 @@ export class IdempotenciaInterceptor implements NestInterceptor {
         // Un 4xx es una respuesta definitiva (se repite igual); un 5xx o fallo se puede reintentar.
         const registro = cliente
           ? enTienda(() =>
-              this.prisma.operacionSync.update({
+              prisma.operacionSync.update({
                 where: { tiendaId_operationId: { tiendaId, operationId } },
                 data: {
                   estado: 'rechazada',
@@ -107,7 +116,7 @@ export class IdempotenciaInterceptor implements NestInterceptor {
                 },
               }),
             )
-          : enTienda(() => this.prisma.operacionSync.deleteMany({ where: { operationId } }));
+          : enTienda(() => prisma.operacionSync.deleteMany({ where: { operationId } }));
         return from(registro.catch(() => null)).pipe(mergeMap(() => throwError(() => err)));
       }),
     );
@@ -115,15 +124,18 @@ export class IdempotenciaInterceptor implements NestInterceptor {
 
   /** Reserva la clave. Si ya existía, espera a que termine y devuelve la respuesta guardada. */
   private async reservar(
+    tiendaId: string,
     operationId: string,
     hash: string,
     usuarioId: string | null,
     req: Request,
+    prisma: PrismaService,
   ): Promise<Guardada | null> {
     for (let intento = 0; intento <= INTENTOS_ESPERA; intento++) {
       try {
-        await this.prisma.operacionSync.create({
+        await prisma.operacionSync.create({
           data: {
+            tiendaId,
             operationId,
             dispositivoId: req.header('x-dispositivo')?.slice(0, 100) || 'http',
             usuarioId,
@@ -136,7 +148,7 @@ export class IdempotenciaInterceptor implements NestInterceptor {
       } catch (error) {
         if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
       }
-      const fila = await this.prisma.operacionSync.findFirst({ where: { operationId } });
+      const fila = await prisma.operacionSync.findFirst({ where: { operationId } });
       if (!fila) continue;
       if (fila.hash !== hash) {
         throw new UnprocessableEntityException({
@@ -146,7 +158,7 @@ export class IdempotenciaInterceptor implements NestInterceptor {
       }
       if (fila.estado !== 'en_curso') return fila.resultado as Guardada;
       if (Date.now() - fila.actualizadoEn.getTime() > HUERFANA_MS) {
-        await this.prisma.operacionSync.deleteMany({ where: { id: fila.id, estado: 'en_curso' } });
+        await prisma.operacionSync.deleteMany({ where: { id: fila.id, estado: 'en_curso' } });
         continue;
       }
       await dormir(ESPERA_MS);

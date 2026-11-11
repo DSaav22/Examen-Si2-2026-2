@@ -1,3 +1,4 @@
+import { medioDeMetodo, useMetodosPago } from './pagos'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -12,6 +13,7 @@ import {
   View,
 } from 'react-native'
 import { api, apiBase, assetUrl, guardarApiBase, guardarTienda, tiendaActiva } from './api'
+import { guardarCache, leerCache } from './offline/almacen'
 import { useSession } from './session'
 import { colors } from './theme'
 import {
@@ -249,9 +251,18 @@ export function HomeScreen() {
       setProducts(items)
       setPopular(pop.slice(0, 4))
       setNovedades((neu.length ? neu : items).slice(0, 4))
+      await guardarCache('home_seleccion', { items, pop, neu }, tiendaActiva())
       s.setError('')
     } catch (e) {
-      s.setError(e instanceof Error ? e.message : 'No pudimos cargar la selección')
+      const guardado = await leerCache<{ items: Producto[]; pop: Producto[]; neu: Producto[] }>('home_seleccion', tiendaActiva())
+      if (guardado) {
+        setProducts(guardado.items)
+        setPopular(guardado.pop.slice(0, 4))
+        setNovedades((guardado.neu.length ? guardado.neu : guardado.items).slice(0, 4))
+        s.setAviso('Catálogo cargado desde la memoria local del dispositivo.')
+      } else {
+        s.setError(e instanceof Error ? e.message : 'No pudimos cargar la selección')
+      }
     }
   }
 
@@ -465,16 +476,27 @@ export function CatalogoScreen() {
   useEffect(() => {
     let vivo = true
     setCargando(true)
+    const cacheKey = `catalogo_${query}`
     void api<CatalogPage>(`/catalogo/productos?${query}`, s.token)
-      .then((res) => {
+      .then(async (res) => {
         if (!vivo) return
         const lista = Array.isArray(res) ? res : res.items
         setItems((prev) => (pagina === 1 ? lista : [...prev, ...lista]))
         setHayMas(Array.isArray(res) ? false : res.hayMas)
         s.setError('')
+        await guardarCache(cacheKey, res, tiendaActiva())
       })
-      .catch((e: unknown) => {
-        if (vivo) s.setError(e instanceof Error ? e.message : 'Catálogo no disponible')
+      .catch(async (e: unknown) => {
+        if (!vivo) return
+        const guardado = await leerCache<CatalogPage | Producto[]>(cacheKey, tiendaActiva())
+        if (guardado) {
+          const lista = Array.isArray(guardado) ? guardado : guardado.items
+          setItems((prev) => (pagina === 1 ? lista : [...prev, ...lista]))
+          setHayMas(false)
+          s.setAviso('Catálogo cargado desde la memoria local (sin red).')
+        } else {
+          s.setError(e instanceof Error ? e.message : 'Catálogo no disponible')
+        }
       })
       .finally(() => {
         if (vivo) setCargando(false)
@@ -770,11 +792,13 @@ export function FavoritosScreen() {
 
 export function BolsaScreen() {
   const s = useSession()
+  const pagos = useMetodosPago(s.token)
   const [cupon, setCupon] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [pagoPendiente, setPagoPendiente] = useState<string | null>(null)
 
-  async function comprar(medio: 'contra_entrega' | 'qr') {
+  async function comprar(medio: 'contra_entrega' | 'qr' | 'tarjeta' | 'transferencia', metodoPasarela?: string) {
+    if (ocupado || pagoPendiente) return
     if (!s.token || !s.almacenId || !s.cart.length) {
       s.setError(s.almacenId ? 'La bolsa está vacía' : 'Elige una sucursal con almacén')
       return
@@ -787,14 +811,15 @@ export function BolsaScreen() {
           uuid: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
           canal: 'online',
           medioPago: medio,
+          metodoPasarela,
           almacenId: s.almacenId,
           cuponCodigo: cupon.trim() || undefined,
           lineas: s.cart.map((l) => ({ varianteId: l.varianteId, cantidad: l.cantidad })),
         }),
       })
-      if (medio === 'qr' && venta.pago?.id) {
+      if (venta.pago?.id) {
         setPagoPendiente(venta.pago.id)
-        s.setAviso(`Pedido ${venta.id.slice(0, 8)} pendiente de pago QR · Bs ${Number(venta.total).toFixed(2)}`)
+        s.setAviso(`Pedido ${venta.id.slice(0, 8)} pendiente de pago simulado · Bs ${Number(venta.total).toFixed(2)}`)
       } else {
         s.setAviso(`Compra ${venta.id.slice(0, 8)} · Bs ${Number(venta.total).toFixed(2)}`)
         s.vaciar()
@@ -808,13 +833,14 @@ export function BolsaScreen() {
   }
 
   async function simular(resultado: 'aprobado' | 'rechazado') {
-    if (!pagoPendiente || !s.token) return
+    if (!pagoPendiente || !s.token || ocupado) return
+    setOcupado(true)
     try {
       await api(`/pagos/${pagoPendiente}/simular`, s.token, {
         method: 'POST',
         body: JSON.stringify({ resultado }),
       })
-      s.setAviso(resultado === 'aprobado' ? 'Pago QR aprobado' : 'Pago QR rechazado')
+      s.setAviso(resultado === 'aprobado' ? 'Pago simulado aprobado' : 'Pago simulado rechazado')
       if (resultado === 'aprobado') s.vaciar()
       setPagoPendiente(null)
     } catch (e) {
@@ -884,17 +910,13 @@ export function BolsaScreen() {
             loading={ocupado}
             disabled={!s.cart.length}
           />
-          <Btn
-            label="PAGAR CON QR"
-            ghost
-            onPress={() => void comprar('qr')}
-            disabled={!s.cart.length || ocupado}
-          />
+          {pagos.error ? <Text accessibilityRole="alert">{pagos.error}</Text> : null}
+          {pagos.metodos.map(m => <Btn key={m.codigo} label={`${m.nombre} - SIMULADO`} ghost onPress={() => void comprar(medioDeMetodo(m.codigo), m.codigo)} disabled={ocupado || !!pagoPendiente || !s.cart.length} />)}
           {pagoPendiente ? (
             <View style={styles.qrBox}>
-              <Text style={styles.lead}>Pago QR pendiente</Text>
+              <Text style={styles.lead}>Pago simulado pendiente</Text>
               <Text style={styles.hint}>Confirmá el pago para cerrar el pedido (demo).</Text>
-              <Btn label="CONFIRMAR PAGO QR" onPress={() => void simular('aprobado')} />
+              <Btn label="APROBAR PAGO SIMULADO" onPress={() => void simular('aprobado')} />
               <Btn label="CANCELAR PAGO" ghost onPress={() => void simular('rechazado')} />
             </View>
           ) : null}
@@ -1153,6 +1175,40 @@ export function CuentaScreen() {
             </Text>
           ) : null}
         </View>
+      </View>
+
+      <View style={styles.block}>
+        <Text style={styles.eyebrow}>TIENDA Y SUSCRIPCIÓN</Text>
+        <Text style={styles.lookName}>{s.tiendaActual?.nombre ?? tiendaActiva().toUpperCase()}</Text>
+        <Text style={styles.hint}>
+          Tienda: {s.tiendaActual?.slug ?? tiendaActiva()} · {s.tiendaActual?.plan ? `Plan ${s.tiendaActual.plan}` : 'Plan activo'}
+        </Text>
+        {s.tiendasAutorizadas.length > 1 ? (
+          <View style={{ marginTop: 8, gap: 8 }}>
+            <Text style={styles.label}>Cambiar a otra tienda autorizada:</Text>
+            {s.tiendasAutorizadas.map(t => {
+              const esActiva = t.slug === (s.tiendaActual?.slug ?? tiendaActiva())
+              return (
+                <View key={t.tiendaId} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: 1, borderTopColor: colors.line }}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={[styles.lookName, { fontSize: 13 }]}>{t.nombre}</Text>
+                    <Text style={styles.hint}>{t.slug} · Rol: {t.rol.toLowerCase()}{t.vigente ? '' : ' (vencida)'}</Text>
+                  </View>
+                  {esActiva ? (
+                    <Text style={[styles.hint, { color: colors.wine, fontWeight: '700' }]}>ACTIVA</Text>
+                  ) : (
+                    <Btn
+                      label="CAMBIAR"
+                      ghost
+                      disabled={!t.vigente}
+                      onPress={() => void s.cambiarTienda(t.tiendaId)}
+                    />
+                  )}
+                </View>
+              )
+            })}
+          </View>
+        ) : null}
       </View>
 
       <Pressable style={styles.accountCard} onPress={() => s.push({ name: 'historial' })}>

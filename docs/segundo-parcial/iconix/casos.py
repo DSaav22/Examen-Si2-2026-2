@@ -101,9 +101,9 @@ ENTIDADES = {
     "OperacionSync": "Operación offline recibida con su estado (aplicada, duplicada, conflicto...).",
     "PushSuscripcion": "Suscripción Web Push (endpoint y claves) de un usuario.",
     "EventoAnalitica": "Evento de comportamiento usado para analítica.",
-    "ModeloPredictivo": "Modelo supervisado entrenado y sus métricas (lote 4, a confirmar con el código de analítica).",
-    "SegmentoCliente": "Grupo de clientas obtenido por clustering (lote 4, a confirmar con el código de analítica).",
-    "TransaccionPasarela": "Transacción en la pasarela externa en modo sandbox (lote 5, a confirmar con el código de pagos).",
+    "ModeloPredictivo": "Modelo supervisado de demanda (regresión lineal) con sus métricas de evaluación sobre datos sintéticos.",
+    "SegmentoCliente": "Grupo de clientas obtenido con k-medias a partir de recencia, frecuencia y monto.",
+    "TransaccionPasarela": "Cobro con un método habilitado para el país de la tienda, procesado por la pasarela simulada con clave de idempotencia.",
 }
 
 
@@ -680,36 +680,39 @@ CASOS = [
       ruta="POST /creditos/:id/abonos", clases=("CreditosController", None), metodo="abonar",
       req=["R2", "O6"], prueba="verificar:reportes (abonos idempotentes y concurrentes)."),
 
-    # ------------------------------------------------------------------ Lote 4: analítica (a confirmar)
+    # ------------------------------------------------------------------ Lote 4: analítica
     U("UC52", "Ver dashboard predictivo", 4, "Analítica", ["Administrador"], ["Dashboard de analítica"],
       ["El Administrador abre el Dashboard de analítica.",
-       "El sistema consulta el ModeloPredictivo entrenado con datos sintéticos de la tienda.",
-       "El sistema muestra la predicción (por ejemplo, demanda o ventas por período) con sus métricas de error."],
-      [("2a", "No hay modelo entrenado: el sistema ofrece entrenarlo con los datos disponibles.")],
+       "El sistema aplica el ModeloPredictivo, entrenado con datos sintéticos, a las ventas de 7 y 28 días de cada variante.",
+       "El sistema muestra la demanda estimada de los próximos 7 días junto al stock disponible y el error del modelo."],
+      [("2a", "La tienda no tiene ventas en el período: el sistema muestra un estado vacío explicativo.")],
       [("Obtener predicción", ["ModeloPredictivo", "Venta"]), ("Calcular métricas", ["ModeloPredictivo"])],
-      ruta="GET /analitica/prediccion", clases=("AnaliticaController", "AnaliticaService"), metodo="prediccion",
-      req=["A1", "A2", "A3"], prueba="A definir con la parte de analítica."),
+      ruta="GET /analitica/panel", clases=("AnaliticaController", "AnaliticaService"), metodo="panel",
+      req=["A1", "A2", "A3"],
+      prueba="verificar-analitica-http.ts: 401 sin sesión, 403 por rol o plan, 200 con plan Cadena y aislamiento por tienda."),
 
     U("UC53", "Ver segmentación de clientas", 4, "Analítica", ["Administrador"], ["Dashboard de analítica"],
       ["El Administrador abre la segmentación en el Dashboard de analítica.",
-       "El sistema agrupa a las clientas con un modelo no supervisado a partir de compras y comportamiento.",
-       "El sistema muestra cada SegmentoCliente con su tamaño y sus rasgos."],
-      [("2a", "Pocos datos: el sistema avisa que la segmentación no es confiable.")],
+       "El sistema asigna cada clienta con compras en los últimos 90 días a un grupo de k-medias según recencia, frecuencia y monto.",
+       "El sistema muestra cada SegmentoCliente con su tamaño y su centro, sin exponer identidades."],
+      [("2a", "No hay clientas con compras identificadas: el sistema muestra los grupos vacíos.")],
       [("Agrupar clientas", ["SegmentoCliente", "Venta", "EventoAnalitica"])],
-      ruta="GET /analitica/segmentos", clases=("AnaliticaController", "AnaliticaService"), metodo="segmentos",
-      req=["A1", "A2", "A3"], prueba="A definir con la parte de analítica."),
+      ruta="GET /analitica/panel", clases=("AnaliticaController", "AnaliticaService"), metodo="panel",
+      req=["A1", "A2", "A3"],
+      prueba="analitica.service.spec.ts y verificar-analitica-http.ts: grupos, silueta sintética y tienda sin ventas."),
 
-    # ------------------------------------------------------------------ Lote 5: pagos (a confirmar)
+    # ------------------------------------------------------------------ Lote 5: pagos
     U("UC54", "Pagar con pasarela internacional", 5, "Pagos", ["Clienta", "Pasarela de pago"], ["Pantalla Pago", "Interfaz pasarela"],
-      ["La Clienta elige pagar con tarjeta o billetera en la Pantalla Pago.",
-       "El sistema crea la TransaccionPasarela en modo sandbox con una clave de idempotencia.",
-       "La Pasarela de pago autoriza el cobro y notifica el resultado.",
+      ["La Clienta elige en la Pantalla Pago un método habilitado para el país de la tienda.",
+       "El sistema valida el método contra el catálogo del país y registra la TransaccionPasarela pendiente con una clave de idempotencia.",
+       "La Pasarela de pago, simulada, aprueba o rechaza el cobro.",
        "Con el pago aprobado, la Venta continúa su cobro (UC05)."],
-      [("3a", "La pasarela rechaza el cobro: la venta no se confirma."),
-       ("3b", "La notificación llega dos veces: el sistema la procesa una sola vez.")],
+      [("3a", "La pasarela rechaza el cobro: la venta no se confirma y se liberan las unidades reservadas."),
+       ("3b", "La confirmación llega dos veces: el sistema la procesa una sola vez.")],
       [("Crear transacción", ["TransaccionPasarela", "Interfaz pasarela"]), ("Confirmar pago", ["TransaccionPasarela", "Venta"])],
-      ruta="POST /pagos/pasarela", clases=("PagosController", "PagosService"), metodo="cobrarPasarela",
-      req=["P1", "P2", "P3", "P4"], prueba="A definir con la parte de pagos."),
+      ruta="POST /pagos/:id/simular", clases=("PagosController", None), metodo="simular",
+      req=["P1", "P2", "P3", "P4"],
+      prueba="pagos-pais.spec.ts: métodos por país; reintento con la misma clave devuelve el mismo pago."),
 ]
 
 # Método del controlador que atiende la ruta de cada caso (cuando difiere del método del servicio).

@@ -1,3 +1,4 @@
+import { BotonesPago, medioDeMetodo, useMetodosPago } from '../shared/PagosSimulados'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { api } from '../api'
@@ -38,6 +39,7 @@ type VentaPos = {
   uuid: string
   canal: 'pos'
   medioPago: MedioPago
+  metodoPasarela?: string
   almacenId: string
   cajaTurnoId: string
   lineas: { varianteId: string; cantidad: number }[]
@@ -59,6 +61,7 @@ function DevolucionesPanel({
   cant,
   msg,
   err,
+  online = true,
   onRefresh,
   onCantidad,
   onDevolver,
@@ -67,6 +70,7 @@ function DevolucionesPanel({
   cant: Record<string, Record<string, number>>
   msg: string
   err: string
+  online?: boolean
   onRefresh: () => void
   onCantidad: (ventaId: string, lineaId: string, value: number, max: number) => void
   onDevolver: (venta: VentaSucursal) => void
@@ -76,11 +80,16 @@ function DevolucionesPanel({
       title="Devoluciones"
       eyebrow={`${ventas.length} ventas cobradas`}
       actions={
-        <OpsBtn type="button" variant="secondary" onClick={onRefresh}>
+        <OpsBtn type="button" variant="secondary" disabled={!online} onClick={onRefresh}>
           Actualizar
         </OpsBtn>
       }
     >
+      {!online ? (
+        <p className="muted" role="status">
+          Las devoluciones solo están permitidas en línea. Se rehabilitan automáticamente al volver la conexión.
+        </p>
+      ) : null}
       {msg ? <p className="ok" role="status">{msg}</p> : null}
       {err ? <p className="error">{err}</p> : null}
 
@@ -159,6 +168,8 @@ export function Pos() {
   const ventaEnCola = useRef<string | null>(null)
   const [comprobante, setComprobante] = useState<TicketDatos | null>(null)
   const [medio, setMedio] = useState<MedioPago>('efectivo')
+  const pagos = useMetodosPago()
+  const [metodo, setMetodo] = useState('')
   const [declarado, setDeclarado] = useState('')
   const [arqueo, setArqueo] = useState<Arqueo | null>(null)
   const [busqueda, setBusqueda] = useState('')
@@ -179,6 +190,13 @@ export function Pos() {
   const [recarga, setRecarga] = useState(0)
   const [altaClienta, setAltaClienta] = useState<{ nombre: string; email: string } | null>(null)
   const sync = useEstadoSync()
+
+  useEffect(() => {
+    if (!sync.online && medio !== 'efectivo') {
+      setMedio('efectivo')
+      setMetodo('')
+    }
+  }, [sync.online, medio])
 
   const [clientas, setClientas] = useState<Clienta[]>([
     { id: '88888888-8888-8888-8888-888888888888', nombre: 'Ana Cliente', email: 'clienta@ensayar.bo' },
@@ -414,18 +432,22 @@ export function Pos() {
   }
 
   async function resolverPago(resultado: 'aprobado' | 'rechazado') {
-    if (!pagoId) return
-    await api(`/pagos/${pagoId}/simular`, { method: 'POST', body: JSON.stringify({ resultado }) })
-    setPagoId('')
-    setTarjeta('')
-    setLineas([])
-    setTicket(
-      resultado === 'aprobado'
-        ? 'Pago de prueba aprobado. La venta quedó cobrada.'
-        : 'Pago de prueba rechazado. El stock reservado volvió al almacén.',
-    )
-    await cargarTurno({ soft: true })
-    void cargarVentasDevolucion()
+    if (!pagoId || cobrando) return
+    setCobrando(true)
+    try {
+      await api(`/pagos/${pagoId}/simular`, { method: 'POST', body: JSON.stringify({ resultado }) })
+      setPagoId('')
+      setTarjeta('')
+      setLineas([])
+      setTicket(
+        resultado === 'aprobado'
+          ? 'Pago de prueba aprobado. La venta quedó cobrada.'
+          : 'Pago de prueba rechazado. El stock reservado volvió al almacén.',
+      )
+      await cargarTurno({ soft: true })
+      void cargarVentasDevolucion()
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'No se pudo resolver el pago') }
+    finally { setCobrando(false) }
   }
 
   if (!user || !['CAJERO', 'ADMIN', 'SUPERADMIN'].includes(user.rol)) {
@@ -447,12 +469,14 @@ export function Pos() {
       setMsg('Los cupones se validan en línea. Quitá el cupón para vender sin conexión.')
       return
     }
+    if (['qr', 'tarjeta', 'transferencia'].includes(medio) && !pagos.metodos.some(m => m.codigo === metodo)) { setMsg('Elegí un método disponible para la tienda.'); return }
     setCobrando(true)
     setMsg('')
     const payload: VentaPos = {
       uuid: uuid(),
       canal: 'pos',
       medioPago: medio,
+      ...(['qr', 'tarjeta', 'transferencia'].includes(medio) ? { metodoPasarela: metodo } : {}),
       almacenId,
       cajaTurnoId: turno.id,
       lineas: lineas.map(l => ({
@@ -651,6 +675,7 @@ export function Pos() {
             cant={devCant}
             msg={devMsg}
             err={devErr}
+            online={sync.online}
             onRefresh={() => void cargarVentasDevolucion()}
             onCantidad={setDevCantidad}
             onDevolver={v => void devolverVenta(v)}
@@ -775,17 +800,24 @@ export function Pos() {
                       <input value={cuponCodigo} onChange={e => setCuponCodigo(e.target.value)} placeholder="VESTA10" />
                     </OpsField>
                     <OpsField label="Medio de pago">
-                      <select value={medio} onChange={e => setMedio(e.target.value as typeof medio)}>
+                      <select disabled={cobrando || !!pagoId} value={medio} onChange={e => { setMedio(e.target.value as typeof medio); setMetodo('') }}>
+                        {['qr', 'tarjeta', 'transferencia'].includes(medio) ? <option value={medio}>Método seleccionado abajo</option> : null}
                         <option value="efectivo">Efectivo</option>
-                        <option value="qr">QR simulado</option>
-                        <option value="tarjeta">Tarjeta simulada</option>
-                        <option value="transferencia">Transferencia</option>
-                        <option value="mixto">Mixto</option>
-                        <option value="credito">Crédito (30 días)</option>
+                        {pagos.metodos.some(m => m.codigo === 'tarjeta') && pagos.metodos.some(m => m.codigo === 'transferencia') ? (
+                          <option value="mixto" disabled={!sync.online}>Mixto {!sync.online ? '(solo en línea)' : ''}</option>
+                        ) : null}
+                        <option value="credito" disabled={!sync.online}>Crédito (30 días) {!sync.online ? '(solo en línea)' : ''}</option>
                       </select>
+                      {!sync.online ? (
+                        <small className="muted">
+                          Sin red: solo se permite cobrar en efectivo (las operaciones se guardan en el dispositivo y sincronizan al reconectar).
+                        </small>
+                      ) : null}
                     </OpsField>
                   </div>
 
+                  <BotonesPago disabled={cobrando || !!pagoId} pais={pagos.pais} metodos={sync.online ? pagos.metodos : []} valor={['qr', 'tarjeta', 'transferencia'].includes(medio) ? metodo : ''} onChange={codigo => { setMetodo(codigo); setMedio(medioDeMetodo(codigo)) }} />
+                  {pagos.error ? <p role="alert">{pagos.error}</p> : null}
                   {altaClienta ? (
                     <form className="pos-alta-clienta" onSubmit={e => void registrarClienta(e)}>
                       <p className="eyebrow">Nueva clienta {sync.online ? '' : '(sin conexión)'}</p>
@@ -911,6 +943,7 @@ export function Pos() {
           cant={devCant}
           msg={devMsg}
           err={devErr}
+          online={sync.online}
           onRefresh={() => void cargarVentasDevolucion()}
           onCantidad={setDevCantidad}
           onDevolver={v => void devolverVenta(v)}
