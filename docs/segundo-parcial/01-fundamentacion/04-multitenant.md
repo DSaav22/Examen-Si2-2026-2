@@ -61,7 +61,7 @@ Azure usa nombres equivalentes: despliegues automatizados de un solo inquilino, 
 | Cumplimiento y residencia de datos | Más sencillo de demostrar | Intermedio | Requiere controles y auditoría adicionales |
 | Reportes globales del proveedor | Consultas a muchas bases | Consultas a muchos esquemas | Una consulta |
 
-> Figura 4.1: diagrama de tres columnas con los modelos silo, bridge y pool, mostrando una aplicación compartida en la parte superior y, abajo, varias bases, varios esquemas en una base, y una sola tabla con la columna tienda_id, respectivamente.
+![Figura 4.1: Modelos de aislamiento silo, bridge y pool. Diagrama de despliegue UML 2.5: los tres comparten la aplicación; cambia la base, el esquema o la tabla que guarda los datos de cada tienda.](../imagenes/ea/fun-modelos-aislamiento.png)
 
 ## 4.4 Resolución del inquilino en cada petición
 
@@ -127,7 +127,7 @@ La documentación advierte detalles que deben tenerse en cuenta. Los superusuari
 
 El punto delicado con un ORM es el pool de conexiones: cada consulta puede usar una conexión distinta. El ejemplo oficial de Prisma para RLS resuelve esto fijando la variable con set_config en modo local y ejecutando la consulta en la misma transacción por lotes, de modo que comparten conexión y la variable desaparece al terminar. El propio ejemplo aclara que no está pensado para producción y que las transacciones explícitas pueden no comportarse como se espera. Azure, por su parte, señala que muchas soluciones multi-inquilino no usan RLS por la complejidad de diseñarla, probarla y mantenerla. RLS es la defensa más fuerte del modelo pool, pero su costo de adopción es real.
 
-> Figura 4.2: diagrama de capas concéntricas: en el centro, los datos; alrededor, RLS y valores por defecto en PostgreSQL; luego, la extensión de Prisma; luego, el guard y el middleware de NestJS; y en el borde, el token firmado.
+![Figura 4.2: Capas de aislamiento entre inquilinos en EnsayAR. Diagrama de componentes UML 2.5: cada capa repite la restricción por tienda, de modo que la falla de una no expone datos de otra tienda.](../imagenes/ea/fun-capas-aislamiento.png)
 
 ## 4.7 Resolución paso a paso en NestJS con Prisma
 
@@ -172,7 +172,7 @@ else if (operation === 'create') a.data = conCreate(model, a.data, tiendaId);
 
 Con estos cinco pasos, los servicios de negocio escriben consultas como si la aplicación tuviera una sola tienda; la tienda se resuelve una vez en el borde y se aplica de forma transversal.
 
-> Figura 4.3: diagrama de secuencia de una petición GET /catalogo/productos con token: middleware, contexto, guard, controlador, servicio, extensión de Prisma y PostgreSQL, mostrando dónde se fija y dónde se aplica tienda_id.
+![Figura 4.3: Resolución de la tienda en una petición GET /catalogo/productos. Diagrama de secuencia UML 2.5: el guard fija la tienda en el contexto y la extensión de Prisma la aplica en la consulta.](../imagenes/ea/fun-seq-tenant.png)
 
 ## 4.8 SQL crudo con set_config
 
@@ -240,14 +240,16 @@ En los clientes, la web guarda el slug de la tienda activa (frontend/src/tienda.
 | Alternativa | Motivo para no adoptarla hoy |
 |-------------|------------------------------|
 | Base por tienda | El alta debe ser instantánea tras el pago; crear y migrar una base por cada suscripción contradice el autoservicio y multiplica el costo en Azure para tiendas pequeñas |
-| Esquema por tienda | Prisma trabaja con un esquema por conexión y un historial de migraciones; repetir migraciones por esquema y cambiar search_path por petición agrega complejidad sin ganancia proporcional |
+| Esquema por tienda como modo único | Prisma trabaja con un esquema por conexión y un historial de migraciones; exige versionar migraciones por esquema y mantener un cliente por tienda. Se implementó como modalidad piloto (sección 4.12), sin reemplazar todavía al pool en producción |
 | Pool sin capas adicionales | Un olvido de filtro sería una fuga; por eso el filtro se centraliza y la base aporta su propia barrera |
 
 El perfil del cliente refuerza la decisión: tiendas pequeñas y medianas, con volúmenes modestos y sensibles al precio, para quienes la eficiencia del modelo pool se traduce en planes baratos. El costo de una base por tienda se trasladaría al precio y dejaría a EnsayAR en desventaja frente a competidores. La extensión de Prisma convierte el riesgo principal del pool en una regla automática, y el diseño deja abierta la evolución hacia RLS completa, inquilinos dedicados y sharding sin reescribir los servicios, porque todos los datos ya están marcados con su tienda.
 
-### 4.11.4 Respuesta para la defensa
+### 4.11.4 Síntesis de la solución en NestJS
 
-Ante la pregunta "explícame el multi-tenant y cómo lo solucionas en una aplicación con Nest", la respuesta sintética es la siguiente. Multi-tenant significa que una sola instancia de la aplicación atiende a muchos clientes, llamados inquilinos, manteniendo separados sus datos. Hay tres modelos de datos: base por inquilino, esquema por inquilino y base compartida con un identificador; en EnsayAR se usa la base compartida con tienda_id porque el alta debe ser automática e instantánea y el costo por tienda debe ser bajo. En Nest se resuelve en el borde y se aplica de forma transversal: un middleware global abre un contexto con AsyncLocalStorage y resuelve la tienda desde el token o la cabecera X-Tienda; el guard JWT confirma la tienda del token; una extensión de Prisma agrega tienda_id a todas las lecturas y escrituras y falla si no hay tienda; la base pone tienda_id por defecto desde la variable de sesión, y el SQL crudo fija esa variable con set_config dentro de una transacción. Todo se prueba con scripts que crean tiendas y verifican que ninguna ve los datos de otra.
+Una arquitectura multi-tenant permite que una sola instancia de la aplicación atienda a varios clientes, denominados inquilinos, con sus datos separados. Los tres modelos de datos habituales son la base por inquilino, el esquema por inquilino y la base compartida con identificador. EnsayAR adopta el tercero porque el alta de una tienda debe ser automática e inmediata y el costo por tienda debe mantenerse bajo.
+
+En NestJS la tienda se resuelve en el borde de la petición y se aplica de forma transversal. Un middleware global abre un contexto con AsyncLocalStorage y obtiene la tienda desde el token o la cabecera X-Tienda; el guard JWT comprueba que coincida con la del token; una extensión de Prisma agrega tienda_id a todas las lecturas y escrituras y rechaza la operación si no hay tienda; la base de datos asigna tienda_id por defecto desde la variable de sesión, y el SQL directo fija esa variable con set_config dentro de una transacción. El aislamiento se comprueba con scripts que crean tiendas reales y verifican que ninguna accede a los datos de otra.
 
 ### 4.11.5 Limitaciones reconocidas
 
@@ -257,16 +259,33 @@ Ante la pregunta "explícame el multi-tenant y cómo lo solucionas en una aplica
 - La resolución por subdominio no está implementada; la tienda se elige por token, cabecera o ruta del frontend.
 - La caché de tiendas de 30 segundos es local a cada instancia de la API; con varias réplicas, una suspensión puede tardar hasta ese plazo en aplicarse en todas.
 
-## Referencias del capítulo
+## 4.12 Evolución implementada: un esquema PostgreSQL por tienda
 
-- Microsoft. Tenancy models for a multitenant solution. Azure Architecture Center. https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenancy-models
-- Microsoft. Architectural approaches for storage and data in multitenant solutions. Azure Architecture Center. https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/storage-data
-- Microsoft. Map requests to tenants in a multitenant solution. Azure Architecture Center. https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/map-requests
-- Amazon Web Services. SaaS Lens, AWS Well-Architected Framework: Silo isolation, Pool isolation y The bridge model. https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/silo-isolation.html, https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/pool-isolation.html, https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/bridge-model.html
-- Amazon Web Services. SaaS Tenant Isolation Strategies: Hiding the details of pooled isolation. AWS Whitepaper. https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/hiding-the-details-of-pooled-isolation.html
-- PostgreSQL Global Development Group. Row Security Policies. PostgreSQL Documentation, sección 5.9. https://www.postgresql.org/docs/current/ddl-rowsecurity.html
-- PostgreSQL Global Development Group. System Administration Functions: Configuration Settings Functions (set_config y current_setting). PostgreSQL Documentation. https://www.postgresql.org/docs/current/functions-admin.html
-- OpenJS Foundation. Asynchronous context tracking: class AsyncLocalStorage. Node.js Documentation. https://nodejs.org/api/async_context.html
-- NestJS. Middleware. NestJS Documentation. https://docs.nestjs.com/middleware
-- Prisma. Prisma Client extensions: query component. Prisma Documentation. https://www.prisma.io/docs/orm/prisma-client/client-extensions/query
-- Prisma. Prisma Client Extension: Row Level Security (ejemplo oficial). https://github.com/prisma/prisma-client-extensions/tree/main/row-level-security
+### 4.12.1 Motivación
+
+El modelo pool concentra el aislamiento en la aplicación. Para reforzarlo físicamente y permitir el respaldo y la restauración de cada tienda por separado, se implementó una segunda modalidad de aislamiento basada en el modelo bridge de la sección 4.3: una sola base PostgreSQL, con los datos de plataforma en el esquema `public` y los datos operativos de cada tienda en un esquema propio. La modalidad se activa mediante variables de configuración y convive con el modelo pool, que sigue siendo el modo de operación en producción.
+
+### 4.12.2 Clasificación de los datos
+
+El contrato de `backend/src/tenancy/dominio-ambitos.ts` clasifica los 45 modelos de Prisma en dos ámbitos, y sus pruebas lo contrastan con el esquema generado. Seis modelos son de plataforma y permanecen en `public`: `Cuenta`, `Tienda`, `Plan`, `Suscripcion`, `PagoSuscripcion` y `TokenRevocado`. Los 39 restantes pertenecen a una sola tienda y se ubican en su esquema, desde perfiles, catálogo e inventario hasta ventas, créditos, reportes y sincronización. La relación entre ámbitos se limita a la referencia del perfil local `Usuario` hacia la `Cuenta` global; las demás claves foráneas de negocio apuntan siempre a tablas del mismo esquema.
+
+### 4.12.3 Componentes
+
+| Componente | Responsabilidad |
+|---|---|
+| Nombre del esquema | Se deriva del UUID de la tienda con el formato `tienda_<uuid>`, nunca de un texto enviado por el cliente; se rechazan identificadores no válidos |
+| `PrismaEsquemasService` | Mantiene un cliente de Prisma por esquema con un límite de clientes y desalojo del menos usado; nunca desaloja un cliente con operaciones en curso |
+| `AprovisionadorEsquemaService` | Durante el alta crea, en la misma transacción que la tienda, la suscripción y el pago simulado, el esquema con sus 39 tablas, enums, claves, vistas y datos iniciales; ante un error se revierte todo |
+| `TransaccionesMixtasService` | Ejecuta en una sola transacción operaciones de plataforma y de tienda, como un pago global junto con un registro local |
+| Registro de versiones | La tabla `_ensayar_migraciones_tienda` registra qué migraciones se aplicaron a cada esquema |
+| Scripts de migración y auditoría | `migrar-tiendas-aisladas.ts` copia los datos de cada tienda a su esquema sin borrar el origen y `auditar-migracion-esquemas.ts` compara el contenido fila por fila |
+
+Los módulos de catálogo, inventario, ventas, caja, pagos simulados, sincronización offline, reservas, pedidos, devoluciones, reportes, créditos, usuarios y analítica se enrutan al esquema de la tienda autenticada cuando la modalidad está activa. La tienda se sigue resolviendo en el middleware y el guard descritos en la sección 4.7; lo único que cambia es el cliente de base de datos que recibe cada servicio.
+
+### 4.12.4 Verificación
+
+La modalidad se validó en una base de laboratorio independiente de la de producción. Se respaldó la base con `pg_dump` y se restauró en una base aislada, con 28 esquemas de tienda íntegros. Las pruebas de punta a punta comprobaron que las escrituras operativas no tocan las tablas compartidas de `public` y que una tienda no puede leer productos ni variantes de otra. Con dos ventas simultáneas de la última unidad de stock, una se aprobó (201) y la otra se rechazó con 409 `STOCK_INSUFICIENTE`, con el stock final exacto.
+
+### 4.12.5 Alcance y límites
+
+La modalidad permanece desactivada por defecto. Antes de adoptarla en producción falta ejecutar la migración sobre la base desplegada, conectar la aplicación con un rol sin privilegios de administración y aplicar las migraciones versionadas a todos los esquemas existentes en cada despliegue. Con muchos miles de tiendas, la cantidad de esquemas y de clientes de conexión también exige medir el consumo de memoria del servidor. Por eso EnsayAR mantiene el modelo pool como modo principal y conserva el esquema por tienda como la evolución preparada para las tiendas que requieran aislamiento físico.

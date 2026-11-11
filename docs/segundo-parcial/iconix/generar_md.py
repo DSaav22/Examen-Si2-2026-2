@@ -234,8 +234,6 @@ def requisitos():
           "primer ciclo reescritas con estas reglas.\n"]
     for lote in LOTES:
         o.append(f"### {LOTES[lote][0]}: {LOTES[lote][1]}\n")
-        if lote in (4, 5):
-            o.append("> Alcance acordado con el integrante a cargo; el texto se ajusta a su implementación.\n")
         for c in [x for x in CASOS if x["lote"] == lote]:
             o.append(f"#### {c['id']} {c['nombre']}\n")
             o.append(f"**Actores:** {lista(c['actores'])}. **Paquete:** {c['paquete']}. "

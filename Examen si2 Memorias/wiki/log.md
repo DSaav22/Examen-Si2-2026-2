@@ -338,3 +338,17 @@ Se finalizaron y probaron de extremo a extremo las capacidades offline de la web
 ## [2026-11-11] update | Perfiles y reportes inteligentes por esquema
 
 Se migró sin borrar la fuente la tienda que carecía de esquema en `ensayar_copia`, tras un respaldo. El descubrimiento de perfiles ya no usa usuarios de `public` como alternativa y falla si falta un esquema. Los reportes inteligentes consultan y registran sus ejecuciones en el esquema activo. Se verificaron dos tiendas y exportaciones en una copia aislada; la migración del resto de módulos continúa pendiente. La batería general conserva una prueba SaaS fallida por un mock incompleto de `updateMany`.
+
+## [2026-11-11] update | Informe completo en formato APA 7 con carátula oficial
+
+- **Contenido.** Capítulo 5 (pagos: métodos por país, costos con fuentes, Bolivia/PayPal, PCI DSS, saga con reembolso) y capítulo 8 (analítica: pronóstico de demanda con Random Forest y segmentación RFM con k-means sobre datos sintéticos) completos. Sección 1.10 con la evaluación de la arquitectura heredada y los tres caminos (se eligió modificar capas). Anexo 14.2 con URL de Azure y código QR (URL antigua; pendiente la nueva).
+- **Figuras.** Las 12 figuras conceptuales de los capítulos 3, 4, 6 y 7 se dibujan con `imagenes/fundamentacion/_figuras.py`.
+- **Formato.** `_build_docx.py` aplica APA 7: Times New Roman 12, interlineado doble, márgenes de 2,54 cm, sangría de 1,27 cm, niveles de título APA, tablas con solo bordes horizontales, figuras con número y título arriba y nota abajo, número de página arriba a la derecha y referencias en una sola lista con sangría francesa (capítulo 13).
+- **Carátula.** La oficial está en `portada-oficial.docx` y Word la inserta sin cambios al exportar.
+- **Tono.** Se quitaron las referencias por capítulo y las frases de borrador. PDF de 383 páginas.
+
+## [2026-11-11] update | Figuras de fundamentación en Enterprise Architect
+
+- **Figuras.** Las figuras conceptuales de los capítulos 3, 4, 6 y 7 pasan a ser diagramas UML 2.5 del modelo `EnsayAR-ICONIX.eapx`, paquete "9 Fundamentacion", generados con `iconix/fundamentacion.py` y exportados como `imagenes/ea/fun-*.png`: componentes (planos, capas de aislamiento), actividad con particiones (ciclo de suscripción, tubería del reporte), despliegue (silo, bridge y pool), secuencia (resolución de la tienda, conflicto de stock, saga con fragmento alt) y máquinas de estados (service worker, operación offline). Se retiraron las figuras de matplotlib.
+- **Ajustes.** La antigua figura 3.1 se quitó porque repetía la tabla de modelos de entrega; la de PACELC (6.1) quedó como tabla. En las secuencias, los mensajes normales llevan `PDATA4='0'` para que EA no dibuje como retorno las llamadas hacia la izquierda.
+- **Formato.** El número de página va en el pie, abajo a la derecha. PDF de 386 páginas.

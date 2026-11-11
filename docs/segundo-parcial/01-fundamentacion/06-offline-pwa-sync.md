@@ -30,7 +30,12 @@ Abadi (2012) observó que CAP describe solo el comportamiento durante una partic
 
 En EnsayAR, durante la partición el POS elige disponibilidad para el efectivo (PA). Sin partición, la venta espera la confirmación de la transacción antes de emitir el ticket, aceptando latencia a cambio de consistencia (EC); en cambio, para leer el catálogo el service worker espera la red como máximo cuatro segundos y luego sirve la última copia, sacrificando consistencia de lectura por latencia acotada (EL).
 
-> Figura 6.1: diagrama de dos ejes que ubique las operaciones de EnsayAR según PACELC; en el eje de partición, venta en efectivo y alta de clientas del lado A, y pagos QR, créditos y cierre de caja del lado C; en el eje sin partición, lectura de catálogo del lado L y confirmación de venta del lado C.
+| Situación | Operación | Prioriza |
+|-----------|-----------|----------|
+| Con partición (P) | Venta en efectivo, alta de clientas y productos | Disponibilidad (A) |
+| Con partición (P) | Pago QR, créditos, devoluciones y cierre de caja | Consistencia (C) |
+| Sin partición (E) | Lectura del catálogo | Latencia (L) |
+| Sin partición (E) | Confirmación de la venta | Consistencia (C) |
 
 ## 6.2 Criterios para decidir qué opera sin conexión
 
@@ -113,7 +118,7 @@ Un **service worker** es un script que el navegador ejecuta en segundo plano, se
 
 El `sw.js` de EnsayAR declara `VERSION = 'v2'` y deriva tres cachés: `ensayar-shell-v2`, `ensayar-estaticos-v2` y `ensayar-api-v2`. En `install` precarga la raíz `/`, el manifiesto y el favicon y llama a `skipWaiting()`; en `activate` elimina toda caché ajena a la lista vigente y ejecuta `clients.claim()`. Cambiar la versión basta para invalidar ordenadamente lo guardado por la anterior.
 
-> Figura 6.2: diagrama de estados del service worker (registrado, instalando, en espera, activando, activo, redundante), señalando dónde actúan skipWaiting y clients.claim en el sw.js de EnsayAR.
+![Figura 6.1: Ciclo de vida del service worker de EnsayAR. Máquina de estados UML 2.5: la llamada a skipWaiting() omite el estado en espera y clients.claim() toma el control de las páginas abiertas.](../imagenes/ea/fun-estados-service-worker.png)
 
 ### 6.4.4 Estrategias de caché
 
@@ -176,7 +181,7 @@ Sin estados explícitos, una operación fallida desaparece en silencio o se rein
 
 El estado teórico "duplicada" se llama `repetida` en el código. Un conflicto es una operación correcta que choca con el estado del mundo y admite resolución de negocio; un rechazo es una operación que nunca debió emitirse.
 
-> Figura 6.3: diagrama de estados de una operación offline, desde pendiente hacia aplicada, repetida, fusionada, conflicto, vencida o rechazada, con la transición de reintento (conflicto a pendiente con un id nuevo) y la de resolución administrativa (conflicto a descartada).
+![Figura 6.2: Estados de una operación offline. Máquina de estados UML 2.5: un conflicto puede reintentarse con un UUID nuevo o darse por descartado mediante una resolución administrativa.](../imagenes/ea/fun-estados-operacion.png)
 
 ### 6.5.4 Sincronización por lotes
 
@@ -215,7 +220,7 @@ La sincronización offline es intrínsecamente optimista: el dispositivo actuó 
 
 ### 6.7.3 El caso de la última unidad paso a paso
 
-El escenario que se forzará en la defensa es este: queda una unidad de un vestido, dos vendedores sin red la venden y, al reconectarse, uno debe enterarse de que su venta no puede aplicarse. La pieza central está en `backend/src/ventas/ventas.service.ts`, dentro de la transacción de cobro:
+El escenario de referencia para validar el diseño es el siguiente: queda una unidad de un vestido, dos vendedores sin red la venden y, al reconectarse, uno debe enterarse de que su venta no puede aplicarse. La pieza central está en `backend/src/ventas/ventas.service.ts`, dentro de la transacción de cobro:
 
 ```sql
 UPDATE stock_almacen
@@ -228,7 +233,7 @@ WHERE tienda_id = :tienda
 
 La columna `reservado` contiene las unidades retenidas por pagos QR o con tarjeta aún no confirmados, de modo que el disponible real es `cantidad - reservado`. La sentencia descuenta solo si el disponible alcanza; si no, no modifica ninguna fila. El servicio inspecciona las filas afectadas y, si son cero, lanza `StockInsuficienteError` con el disponible y la cantidad pedida, lo que aborta toda la transacción.
 
-Que dos ejecuciones simultáneas no puedan ambas descontar la última unidad lo garantiza PostgreSQL: en Read Committed, su nivel predeterminado, cuando un `UPDATE` encuentra una fila que otra transacción concurrente modificó, espera a que esta confirme o deshaga; si confirma, reevalúa la condición `WHERE` sobre la versión actualizada y solo procede si se sigue cumpliendo (PostgreSQL Global Development Group, s.f.). El recorrido es el siguiente:
+Que dos ejecuciones simultáneas no puedan ambas descontar la última unidad lo garantiza PostgreSQL: en Read Committed, su nivel predeterminado, cuando un `UPDATE` encuentra una fila que otra transacción concurrente modificó, espera a que esta confirme o deshaga; si confirma, reevalúa la condición `WHERE` sobre la versión actualizada y solo procede si se sigue cumpliendo (PostgreSQL Global Development Group, s.f.-c). El recorrido es el siguiente:
 
 1. Estado inicial: `cantidad = 1`, `reservado = 0`. Ambos dispositivos tienen esa copia.
 2. Se corta la red. El vendedor A vende la unidad en efectivo; el POS guarda la operación con su UUID, descuenta su copia local y muestra la venta como **Pendiente**.
@@ -243,7 +248,7 @@ Que dos ejecuciones simultáneas no puedan ambas descontar la última unidad lo 
 
 El stock nunca queda negativo y la resolución corresponde al negocio. **Vender lo disponible** limita cada línea al disponible informado y reencola la operación con un UUID nuevo conservando la fecha original (no se ofrece si el disponible es cero). **Descartar** la elimina de la cola local, lo que implica anular la venta y devolver el dinero o buscar la prenda en otra sucursal. En el servidor, la operación original sigue como conflicto hasta que un encargado la marca resuelta, lo que la deja `descartada` con la auditoría `sync_conflicto_descartado`. En ventas de varias líneas, los `UPDATE` se ejecutan en **orden fijo de identificador de variante** para que dos ventas cruzadas adquieran los bloqueos en la misma secuencia y no se interbloqueen.
 
-> Figura 6.4: diagrama de secuencia con dos dispositivos, el endpoint /sync/lote y PostgreSQL; muestra los dos UPDATE concurrentes, la espera de B sobre el bloqueo de fila, la reevaluación del WHERE y las respuestas "aplicada" y "conflicto".
+![Figura 6.3: Conflicto de stock entre dos dispositivos que vendieron la última unidad sin conexión. Diagrama de secuencia UML 2.5: PostgreSQL bloquea la fila, reevalúa la condición después del COMMIT de A y la transacción de B termina en conflicto.](../imagenes/ea/fun-seq-conflicto.png)
 
 ## 6.8 Idempotencia
 
@@ -259,13 +264,13 @@ En HTTP un método es idempotente si el efecto previsto de varias peticiones id�
 
 ### 6.8.3 La cabecera Idempotency-Key
 
-La práctica más difundida es que el cliente genere una clave única por operación lógica y la envíe en cada intento. Stripe la popularizó: el cliente agrega `Idempotency-Key` con un valor de suficiente entropía (sugiere UUID v4) y puede repetir la petición tras un error de conexión sin crear un segundo objeto; el servidor guarda el código de estado y el cuerpo de la primera ejecución, los devuelve en los reintentos y responde con error si los parámetros no coinciden con los originales (Stripe, s.f.).
+La práctica más difundida es que el cliente genere una clave única por operación lógica y la envíe en cada intento. Stripe la popularizó: el cliente agrega `Idempotency-Key` con un valor de suficiente entropía (sugiere UUID v4) y puede repetir la petición tras un error de conexión sin crear un segundo objeto; el servidor guarda el código de estado y el cuerpo de la primera ejecución, los devuelve en los reintentos y responde con error si los parámetros no coinciden con los originales (Stripe, s.f.-a).
 
 El grupo HTTPAPI de la IETF estandariza esta práctica en el borrador "The Idempotency-Key HTTP Header Field", cuya versión 08 se publicó en octubre de 2026 (Jena et al., 2026). Entre otras cosas establece que la clave la genera el cliente y que el recurso puede combinarla con una **huella** del contenido; que reutilizar una clave con otro contenido debería responderse con `422 Unprocessable Content`; que un reintento mientras la original sigue en proceso debería recibir `409 Conflict`; que si el endpoint exige la cabecera y falta corresponde `400 Bad Request`; y que el recurso debe publicar su política de expiración de claves.
 
 ### 6.8.4 Qué se almacena y por cuánto tiempo
 
-Un registro de idempotencia guarda, como mínimo, la clave, una huella del contenido (para distinguir un reintento de una clave reutilizada por error), el estado de procesamiento (para detectar reintentos concurrentes) y la respuesta. En cuanto a la duración, Stripe permite purgar las claves con al menos 24 horas de antigüedad y trata como nueva una clave reutilizada tras la purga (Stripe, s.f.); el borrador IETF deja la política a cada recurso pero exige documentarla (Jena et al., 2026). La regla práctica es que la retención supere el tiempo máximo de reintento, que en un sistema offline no son minutos sino la ventana offline completa.
+Un registro de idempotencia guarda, como mínimo, la clave, una huella del contenido (para distinguir un reintento de una clave reutilizada por error), el estado de procesamiento (para detectar reintentos concurrentes) y la respuesta. En cuanto a la duración, Stripe permite purgar las claves con al menos 24 horas de antigüedad y trata como nueva una clave reutilizada tras la purga (Stripe, s.f.-a); el borrador IETF deja la política a cada recurso pero exige documentarla (Jena et al., 2026). La regla práctica es que la retención supere el tiempo máximo de reintento, que en un sistema offline no son minutos sino la ventana offline completa.
 
 EnsayAR usa una sola tabla, `operaciones_sync`, para los dos caminos de idempotencia: las operaciones del lote y las peticiones HTTP con `Idempotency-Key`. Sus columnas relevantes son `operation_id`, `hash` (SHA-256 del contenido), `estado` (que nace `en_curso`), `resultado` (JSON con la respuesta), `tipo`, `dispositivo_id`, `usuario_id` y `hecha_en`, con índice único sobre `(tienda_id, operation_id)`. Las claves no se purgan: se conservan indefinidamente, lo que cubre con holgura la ventana máxima de 30 días y deja un historial auditable. El costo es el crecimiento de la tabla, asumible para una tienda; una depuración periódica de registros definitivos más antiguos que la ventana sería la evolución natural.
 
@@ -291,7 +296,7 @@ Una **transacción** agrupa lecturas y escrituras en una unidad que se confirma 
 
 ### 6.9.2 Niveles de aislamiento
 
-El estándar SQL define cuatro niveles según las anomalías que permiten: Read Uncommitted, Read Committed, Repeatable Read y Serializable. PostgreSQL implementa Read Uncommitted como Read Committed, que es su nivel por defecto (PostgreSQL Global Development Group, s.f.). En Read Committed cada sentencia ve los datos confirmados al comenzar, de modo que dos lecturas en la misma transacción pueden diferir; Repeatable Read fija una instantánea para toda la transacción; Serializable garantiza equivalencia con alguna ejecución en serie a costa de abortar transacciones que deben reintentarse.
+El estándar SQL define cuatro niveles según las anomalías que permiten: Read Uncommitted, Read Committed, Repeatable Read y Serializable. PostgreSQL implementa Read Uncommitted como Read Committed, que es su nivel por defecto (PostgreSQL Global Development Group, s.f.-c). En Read Committed cada sentencia ve los datos confirmados al comenzar, de modo que dos lecturas en la misma transacción pueden diferir; Repeatable Read fija una instantánea para toda la transacción; Serializable garantiza equivalencia con alguna ejecución en serie a costa de abortar transacciones que deben reintentarse.
 
 Las transacciones de EnsayAR no fijan un nivel explícito, por lo que rige Read Committed. Es suficiente porque las invariantes críticas no dependen de lecturas previas sino que se verifican en la propia sentencia de escritura, y la reevaluación del `WHERE` propia de ese nivel es justamente lo que vuelve correcta la actualización condicional.
 
@@ -345,7 +350,7 @@ Supóngase EnsayAR dividido en cuatro servicios con base propia: Ventas, Inventa
 
 Si el paso 2 falla por stock insuficiente, se compensa el paso 1 y la operación offline se informa como conflicto, igual que hoy. Si el paso 3 falla porque el turno se cerró, se compensa el 2 (reingreso) y luego el 1. El estado PENDIENTE actúa como contramedida de aislamiento: reportes y arqueo deben ignorar ventas pendientes. La notificación va después del último paso compensable porque un aviso enviado no puede retirarse. En la variante coreografiada, los mismos pasos se encadenarían con eventos como `VentaCreada`, `StockDescontado` o `TurnoInvalido`, y cada servicio debería ser idempotente frente a eventos repetidos.
 
-> Figura 6.5: diagrama de secuencia de la saga orquestada de venta, con el flujo exitoso arriba y, abajo, el fallo en Caja con las compensaciones de Inventario y Ventas en orden inverso.
+![Figura 6.4: Saga orquestada de una venta. Diagrama de secuencia UML 2.5 con fragmento alt: arriba, el flujo exitoso; abajo, el fallo en Caja con las compensaciones de Inventario y Ventas en orden inverso.](../imagenes/ea/fun-seq-saga.png)
 
 ### 6.10.5 Patrón Transactional Outbox
 
@@ -383,47 +388,17 @@ El script `backend/scripts/verificar-offline.ts` (`npm run verificar:offline`) c
 
 El JWT dura 12 horas y la ventana 7 días: si la sesión vence sin red, la cola se conserva y la aplicación pide iniciar sesión antes de enviarla. La cadencia de reintento es fija, sin backoff exponencial; no se usa Background Sync; las claves de idempotencia no se depuran; y no se pide almacenamiento persistente. La versión móvil se probó en Expo web, con el respaldo de AsyncStorage, y se verificó que el paquete de Android compila, pero no se ejecutó con SQLite en un dispositivo Android físico.
 
-### 6.12.6 Guion de demostración del conflicto en la defensa
+### 6.12.6 Procedimiento de verificación del conflicto de stock
 
-1. Preparar dos cajas con turno abierto en la misma sucursal (por ejemplo, la PWA en un portátil y la aplicación móvil en un teléfono) y elegir una variante con stock 2.
-2. En la caja A, cortar la red (modo avión o herramientas de desarrollo) y vender las 2 unidades en efectivo. Mostrar la venta **Pendiente** y el contador de operaciones sin sincronizar.
-3. En la caja B, con red, vender 1 unidad de la misma variante; el servidor la aplica y el stock central queda en 1.
-4. Explicar que A cree tener 2 disponibles porque su copia es eventualmente consistente, mientras el servidor mantiene la invariante con consistencia fuerte.
-5. Reactivar la red en A. La venta pasa a **Conflicto** con "había 1 y la venta pedía 2"; mostrar que el stock no quedó negativo y que el administrador recibió el aviso.
-6. Abrir `/sincronizacion` como administrador y señalar el conflicto con su fecha real y el dispositivo de origen.
-7. En A, pulsar **Vender lo disponible**: se reencola con un UUID nuevo y 1 unidad, se aplica y el stock queda en 0. Marcar el conflicto original como resuelto.
-8. Para cerrar, pulsar varias veces "Cobrar" con red inestable y mostrar que se registra una sola venta, explicando `Idempotency-Key` e `Idempotent-Replayed`.
+El siguiente procedimiento reproduce de forma controlada el caso de la última unidad y permite comprobar el comportamiento descrito en este capítulo.
 
-La explicación puede apoyarse en tres frases que condensan el capítulo: el dispositivo registra hechos y el servidor decide si son aplicables; el descuento de stock es una única sentencia condicional que PostgreSQL reevalúa bajo bloqueo; y cada operación lleva un UUID generado en el dispositivo que la vuelve idempotente ante cualquier número de reintentos.
+1. Se preparan dos cajas con turno abierto en la misma sucursal (por ejemplo, la PWA en un portátil y la aplicación móvil en un teléfono) y se elige una variante con stock 2.
+2. En la caja A se corta la red (modo avión o herramientas de desarrollo) y se venden las 2 unidades en efectivo. La venta queda **Pendiente** y el contador de operaciones sin sincronizar aumenta.
+3. En la caja B, con red, se vende 1 unidad de la misma variante; el servidor la aplica y el stock central queda en 1.
+4. En ese momento la caja A considera que tiene 2 unidades disponibles, porque su copia es eventualmente consistente, mientras el servidor mantiene la invariante con consistencia fuerte.
+5. Al restablecer la red en A, la venta pasa a **Conflicto** con el mensaje "había 1 y la venta pedía 2"; el stock no queda negativo y el administrador recibe el aviso.
+6. En `/sincronizacion`, el administrador ve el conflicto con su fecha real y el dispositivo de origen.
+7. En A, la opción **Vender lo disponible** reencola la operación con un UUID nuevo y 1 unidad; el servidor la aplica, el stock queda en 0 y el conflicto original se marca como resuelto.
+8. Por último, varias pulsaciones de "Cobrar" con red inestable producen una sola venta, gracias a las cabeceras `Idempotency-Key` e `Idempotent-Replayed`.
 
-## Referencias del capítulo
-
-Abadi, D. J. (2012). Consistency tradeoffs in modern distributed database system design: CAP is only part of the story. IEEE Computer, 45(2), 37-42. https://doi.org/10.1109/MC.2012.33
-
-Archibald, J. (s.f.-a). The offline cookbook. web.dev, Google. https://web.dev/articles/offline-cookbook
-
-Archibald, J. (s.f.-b). The service worker lifecycle. web.dev, Google. https://web.dev/articles/service-worker-lifecycle
-
-Davis, K., Peabody, B. y Leach, P. (2024). Universally Unique IDentifiers (UUIDs) (RFC 9562). Internet Engineering Task Force. https://www.rfc-editor.org/rfc/rfc9562.html
-
-Eidson, B. y Simmons, J. (2023, 16 de febrero). Web Push for web apps on iOS and iPadOS. WebKit Blog. https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/
-
-Jena, J., Dalal, S. y Tishkin, D. (2026). The Idempotency-Key HTTP Header Field (Internet-Draft draft-ietf-httpapi-idempotency-key-header-08). Internet Engineering Task Force. https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/
-
-Kleppmann, M. (2017). Designing data-intensive applications: The big ideas behind reliable, scalable, and maintainable systems. O'Reilly Media.
-
-MDN Web Docs. (s.f.-a). Push API. Mozilla. https://developer.mozilla.org/en-US/docs/Web/API/Push_API
-
-MDN Web Docs. (s.f.-b). Storage quotas and eviction criteria. Mozilla. https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
-
-PostgreSQL Global Development Group. (s.f.). Transaction isolation. En PostgreSQL documentation, capítulo 13: Concurrency control. https://www.postgresql.org/docs/current/transaction-iso.html
-
-Richardson, C. (s.f.-a). Pattern: Saga. Microservice Architecture. https://microservices.io/patterns/data/saga.html
-
-Richardson, C. (s.f.-b). Pattern: Transactional outbox. Microservice Architecture. https://microservices.io/patterns/data/transactional-outbox.html
-
-Russell, A. (2015, 15 de junio). Progressive web apps: Escaping tabs without losing our soul. Infrequently Noted. https://infrequently.org/2015/06/progressive-apps-escaping-tabs-without-losing-our-soul/
-
-Stripe. (s.f.). Idempotent requests. Stripe API Reference. https://docs.stripe.com/api/idempotent_requests
-
-Thomson, M. y Beverloo, P. (2017). Voluntary Application Server Identification (VAPID) for Web Push (RFC 8292). Internet Engineering Task Force. https://www.rfc-editor.org/info/rfc8292/
+El procedimiento confirma tres propiedades del diseño: el dispositivo registra hechos y el servidor decide si son aplicables; el descuento de stock es una única sentencia condicional que PostgreSQL reevalúa bajo bloqueo; y cada operación lleva un UUID generado en el dispositivo que la vuelve idempotente ante cualquier número de reintentos.

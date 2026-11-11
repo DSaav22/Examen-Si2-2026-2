@@ -35,8 +35,6 @@ Los modelos de despliegue del NIST son nube privada, comunitaria, pública e hí
 | Datos y configuración | Cliente | Cliente | Cliente | Cliente | Cliente |
 | Pago típico | Licencia y mantenimiento | Cuota de alojamiento | Por recurso | Por recurso | Suscripción o uso |
 
-> Figura 3.1: diagrama de pila con cinco columnas (on-premise, ASP, IaaS, PaaS, SaaS) y capas horizontales coloreadas según quién las gestiona, destacando que en SaaS el cliente solo conserva sus datos y su configuración.
-
 ## 3.3 Variantes del modelo SaaS
 
 ### 3.3.1 SaaS horizontal y vertical
@@ -55,7 +53,7 @@ En la variante white-label, el cliente presenta el servicio con su propia identi
 
 La guía SaaS Architecture Fundamentals de AWS divide toda solución SaaS en dos planos. El plano de control reúne los servicios para incorporar, autenticar, administrar, operar y analizar inquilinos: alta, identidad, registro de inquilinos, facturación, métricas y consola del proveedor. El plano de aplicación contiene la funcionalidad de negocio que usan los inquilinos. El documento aclara que los servicios del plano de control no son multi-inquilino: son globales y ven a todos los clientes, mientras que el plano de aplicación sí debe aplicar aislamiento. Esta separación ayuda a razonar qué operaciones pueden cruzar inquilinos y cuáles nunca deben hacerlo.
 
-> Figura 3.2: diagrama de dos planos. A la izquierda, el plano de aplicación de EnsayAR (catálogo, ventas, inventario, reportes) con datos separados por tienda; a la derecha, el plano de control (cuentas, planes, suscripciones, pagos, métricas) que ve a todas las tiendas.
+![Figura 3.1: Plano de aplicación y plano de control en EnsayAR. Diagrama de componentes UML 2.5: el plano de aplicación solo accede a las filas de su tienda; el plano de control es global y lee las métricas de todas las tiendas.](../imagenes/ea/fun-planos.png)
 
 ## 3.4 Modelos de cobro
 
@@ -88,7 +86,7 @@ En un SaaS de autoservicio, cada etapa del ciclo de vida del inquilino debe comp
 
 Entre las etapas 4 y 5 hay un punto técnico delicado. El cobro ocurre en un sistema externo y el aprovisionamiento en la base propia, y no existe una transacción que abarque ambos. Si el cobro se aprueba y la creación del inquilino falla, el cliente pagó por nada. La solución habitual es tratar el proceso como una saga: se cobra, se aprovisiona en una transacción local y, si esta falla, se ejecuta una acción compensatoria que reembolsa el pago.
 
-> Figura 3.3: diagrama de actividad del ciclo de vida con carriles para cliente, plataforma y pasarela, mostrando la rama de compensación (reembolso) si el aprovisionamiento falla después del cobro.
+![Figura 3.2: Ciclo de vida de la suscripción con compensación. Diagrama de actividad UML 2.5 con particiones: si el aprovisionamiento falla después del cobro, la pasarela reembolsa el pago y la plataforma informa el fallo.](../imagenes/ea/fun-ciclo-suscripcion.png)
 
 ## 3.6 Métricas de negocio
 
@@ -248,16 +246,3 @@ El script backend/scripts/verificar-saas.ts (npm run verificar:saas) recorre el 
 - No hay baja voluntaria ni borrado automático tras el vencimiento: la baja ocurre por no renovar y los datos se conservan. El script backend/scripts/lib/borrar-tienda.ts elimina una tienda completa, pero solo se usa en pruebas.
 - El cambio de plan no prorratea los días no consumidos, y no existe una pantalla del operador para suspender tiendas aunque el estado suspendida se respete.
 - Varias pantallas del frontend aún muestran montos con el símbolo Bs fijo, aunque la tienda tenga otra moneda.
-
-## Referencias del capítulo
-
-- Mell, P. y Grance, T. (2011). The NIST Definition of Cloud Computing. NIST Special Publication 800-145. National Institute of Standards and Technology. https://csrc.nist.gov/pubs/sp/800/145/final
-- Chong, F. y Carraro, G. (2006). Architecture Strategies for Catching the Long Tail. Microsoft Corporation, MSDN Library.
-- Amazon Web Services. SaaS Architecture Fundamentals: Control plane vs. application plane. AWS Whitepaper. https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html
-- Amazon Web Services. SaaS Lens, AWS Well-Architected Framework: Software and architecture patterns. https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/software-and-architecture-patterns.html
-- Amazon Web Services. Tenant Onboarding Best Practices in SaaS with the AWS Well-Architected SaaS Lens. AWS Partner Network Blog. https://aws.amazon.com/blogs/apn/tenant-onboarding-best-practices-in-saas-with-the-aws-well-architected-saas-lens/
-- Microsoft. Tenancy models for a multitenant solution. Azure Architecture Center. https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenancy-models
-- Microsoft. Pricing models for a multitenant solution. Azure Architecture Center. https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/pricing-models
-- Microsoft. Architectural approaches for identity in multitenant solutions. Azure Architecture Center. https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/approaches/identity
-- Skok, D. SaaS Metrics 2.0: A Guide to Measuring and Improving What Matters. For Entrepreneurs. https://www.forentrepreneurs.com/saas-metrics-2/
-- Skok, D. SaaS Metrics 2.0: Detailed Definitions. For Entrepreneurs. https://www.forentrepreneurs.com/saas-metrics-2-definitions/

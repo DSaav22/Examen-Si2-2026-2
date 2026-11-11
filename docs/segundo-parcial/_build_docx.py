@@ -16,7 +16,8 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "EnsayAR-Informe-Segundo-Parcial.docx"
 
-PORTADA = ROOT / "00-portada.md"
+# Carátula oficial de la facultad: se inserta tal cual con Word, sin regenerarla.
+PORTADA_DOCX = ROOT / "portada-oficial.docx"
 CAPITULOS = [
     "01-fundamentacion/01-perfil.md",
     "01-fundamentacion/02-marco-teorico.md",
@@ -38,16 +39,23 @@ CAPITULOS = [
     "04-cierre/14-anexos.md",
 ]
 
+# Formato APA 7: Times New Roman 12, interlineado doble, márgenes de 2,54 cm y sangría de 1,27 cm.
+FUENTE = "Times New Roman"
+INTERLINEADO = 2.0
+SANGRIA = Cm(1.27)
+MARGEN = Cm(2.54)
 ANCHO_MAX = Cm(16)
-ALTO_MAX = Cm(21)
+ALTO_MAX = Cm(17)
+ANCHO_QR = Cm(5)
 # Diagramas anchos (despliegue, componentes, máquinas de estado): van en página horizontal para que se lean.
 APAISADAS = ("arq-", "est-")
-ANCHO_H = Cm(24.7)
-ALTO_H = Cm(14.5)
+ANCHO_H = Cm(22.5)
+ALTO_H = Cm(11.5)
 horizontal = False
-AZUL = RGBColor(0x1F, 0x2A, 0x44)
-TEXTO = RGBColor(0x1A, 0x1A, 0x1A)
-GRIS = RGBColor(0x55, 0x55, 0x55)
+AZUL = RGBColor(0, 0, 0)
+TEXTO = RGBColor(0, 0, 0)
+GRIS = RGBColor(0, 0, 0)
+FIGURA = re.compile(r"^(Figura [\d.]+)[:.]\s*(.*)$", re.S)
 
 INLINE = re.compile(r"\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)|(?<![\w*])\*(?!\s)([^*]+?)\*(?![\w*])")
 IMAGEN = re.compile(r"^!\[([^\]]*)\]\(([^)]+)\)\s*$")
@@ -125,7 +133,8 @@ def add_table(doc, rows):
             if i == 0:
                 for r in p.runs:
                     r.bold = True
-                shade(cell._tc, "DCE3EE")
+                borde_celda(cell, "bottom")
+    bordes_apa(table)
     if len(rows) > 1:
         tr_pr = table.rows[0]._tr.get_or_add_trPr()
         header = OxmlElement("w:tblHeader")
@@ -134,10 +143,48 @@ def add_table(doc, rows):
     doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
 
-def add_paragraph(doc, text, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+def bordes_apa(table):
+    """Tabla APA: solo líneas horizontales arriba, bajo el encabezado y al final."""
+    tbl_pr = table._tbl.tblPr
+    bordes = OxmlElement("w:tblBorders")
+    for lado in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        b = OxmlElement(f"w:{lado}")
+        if lado in ("top", "bottom"):
+            b.set(qn("w:val"), "single")
+            b.set(qn("w:sz"), "8")
+            b.set(qn("w:color"), "000000")
+        else:
+            b.set(qn("w:val"), "nil")
+        bordes.append(b)
+    look = tbl_pr.find(qn("w:tblLook"))
+    if look is not None:
+        look.addprevious(bordes)
+    else:
+        tbl_pr.append(bordes)
+
+
+def borde_celda(cell, lado):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    bordes = OxmlElement("w:tcBorders")
+    b = OxmlElement(f"w:{lado}")
+    b.set(qn("w:val"), "single")
+    b.set(qn("w:sz"), "6")
+    b.set(qn("w:color"), "000000")
+    bordes.append(b)
+    tc_pr.append(bordes)
+
+
+def add_paragraph(doc, text, align=WD_ALIGN_PARAGRAPH.LEFT, referencia=False):
     p = doc.add_paragraph()
     p.alignment = align
-    p.paragraph_format.space_after = Pt(8)
+    f = p.paragraph_format
+    f.space_after = Pt(0)
+    f.line_spacing = INTERLINEADO
+    if referencia:
+        f.left_indent = SANGRIA
+        f.first_line_indent = -SANGRIA
+    elif align == WD_ALIGN_PARAGRAPH.LEFT:
+        f.first_line_indent = SANGRIA
     add_runs(p, text, color=TEXTO)
     return p
 
@@ -165,32 +212,60 @@ def add_image(doc, md_path, caption, src):
     with Image.open(path) as im:
         w, h = im.size
     ancho, alto = (ANCHO_H, ALTO_H) if horizontal else (ANCHO_MAX, ALTO_MAX)
+    if path.name.startswith("qr-"):
+        ancho = ANCHO_QR
     if ancho * h / w > alto:
         ancho = int(alto * w / h)
+
+    # APA 7: número de figura en negrita y título en cursiva sobre la imagen; la explicación va como nota.
+    numero, titulo, nota = "", caption, ""
+    m = FIGURA.match(caption or "")
+    if m:
+        numero, resto = m.groups()
+        partes = re.split(r"(?<=\.)\s+(?=[A-ZÁÉÍÓÚÑ¿])", resto, maxsplit=1)
+        titulo = partes[0].rstrip(".")
+        nota = partes[1] if len(partes) > 1 else ""
+
+    def linea(texto, negrita=False, cursiva=False):
+        c = doc.add_paragraph()
+        c.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        c.paragraph_format.keep_with_next = True
+        c.paragraph_format.space_after = Pt(0)
+        c.paragraph_format.line_spacing = INTERLINEADO
+        r = c.add_run(texto)
+        r.bold = negrita or None
+        r.italic = cursiva or None
+
+    if numero:
+        linea(numero, negrita=True)
+    if titulo:
+        linea(titulo, cursiva=True)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.keep_with_next = True
-    p.paragraph_format.space_after = Pt(2)
+    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.keep_with_next = bool(nota)
     p.add_run().add_picture(str(path), width=ancho)
-    if caption:
+    if nota:
         c = doc.add_paragraph()
-        c.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        c.paragraph_format.space_after = Pt(10)
-        add_runs(c, caption, size=10, color=GRIS, italic=True)
+        c.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        c.paragraph_format.space_after = Pt(12)
+        c.paragraph_format.line_spacing = INTERLINEADO
+        c.add_run("Nota. ").italic = True
+        add_runs(c, nota, color=TEXTO)
 
 
-def render_markdown(doc, md_path, text, desplazar=0, centrado=False):
+def render_markdown(doc, md_path, text, desplazar=0, centrado=False, referencias=False):
     lines = text.replace("\r\n", "\n").split("\n")
     i = 0
     buf = []
-    align = WD_ALIGN_PARAGRAPH.CENTER if centrado else WD_ALIGN_PARAGRAPH.JUSTIFY
+    align = WD_ALIGN_PARAGRAPH.CENTER if centrado else WD_ALIGN_PARAGRAPH.LEFT
 
     def flush():
         nonlocal buf
         chunk = " ".join(x.strip() for x in buf).strip()
         buf = []
         if chunk:
-            add_paragraph(doc, chunk, align)
+            add_paragraph(doc, chunk, align, referencia=referencias)
 
     def es_apaisada(k):
         m = IMAGEN.match(lines[k].strip()) if k < len(lines) else None
@@ -264,15 +339,17 @@ def render_markdown(doc, md_path, text, desplazar=0, centrado=False):
                 quote.append(lines[i].strip().lstrip(">").strip())
                 i += 1
             p = doc.add_paragraph()
-            p.paragraph_format.left_indent = Cm(1)
-            p.paragraph_format.space_after = Pt(8)
-            add_runs(p, " ".join(quote), color=GRIS, italic=True)
+            p.paragraph_format.left_indent = SANGRIA
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.line_spacing = INTERLINEADO
+            add_runs(p, " ".join(quote), color=TEXTO)
             continue
 
         if s.startswith("- ") or s.startswith("* "):
             flush()
             p = doc.add_paragraph(style="List Bullet")
-            p.paragraph_format.space_after = Pt(3)
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.line_spacing = INTERLINEADO
             add_runs(p, s[2:], color=TEXTO)
             i += 1
             continue
@@ -283,7 +360,8 @@ def render_markdown(doc, md_path, text, desplazar=0, centrado=False):
             p = doc.add_paragraph()
             p.paragraph_format.left_indent = Cm(0.9)
             p.paragraph_format.first_line_indent = Cm(-0.6)
-            p.paragraph_format.space_after = Pt(3)
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.line_spacing = INTERLINEADO
             add_runs(p, f"{m.group(1)}.\t{m.group(2)}", color=TEXTO)
             p.paragraph_format.tab_stops.add_tab_stop(Cm(0.9))
             i += 1
@@ -316,10 +394,12 @@ def add_field(paragraph, instruccion):
 
 
 def apply_margins(section):
-    section.top_margin = Cm(2.5)
-    section.bottom_margin = Cm(2.5)
-    section.left_margin = Cm(2.5)
-    section.right_margin = Cm(2.5)
+    section.top_margin = MARGEN
+    section.bottom_margin = MARGEN
+    section.left_margin = MARGEN
+    section.right_margin = MARGEN
+    section.header_distance = Cm(1.27)
+    section.footer_distance = Cm(1.27)
 
 
 def orientar(doc, apaisado):
@@ -335,37 +415,50 @@ def orientar(doc, apaisado):
     s.orientation = WD_ORIENT.LANDSCAPE if apaisado else WD_ORIENT.PORTRAIT
 
 
-def footer_with_number(section, start_at):
+def pie_con_numero(section, start_at):
+    """Número de página en el pie, alineado a la derecha."""
     section.footer.is_linked_to_previous = False
     p = section.footer.paragraphs[0]
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    label = p.add_run("EnsayAR — Segundo Parcial SI2  ·  ")
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     add_field(p, "PAGE")
-    for r in p.runs:
-        r.font.size = Pt(9)
-        r.font.color.rgb = GRIS
     pg = OxmlElement("w:pgNumType")
     pg.set(qn("w:start"), str(start_at))
     section._sectPr.append(pg)
 
 
+def fijar_fuente(estilo, nombre):
+    estilo.font.name = nombre
+    rfonts = estilo.element.get_or_add_rPr().get_or_add_rFonts()
+    for atributo in ("w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme", "w:cstheme"):
+        rfonts.attrib.pop(qn(atributo), None)
+    for atributo in ("w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"):
+        rfonts.set(qn(atributo), nombre)
+
+
 def configurar_estilos(doc):
     normal = doc.styles["Normal"]
-    normal.font.name = "Calibri"
-    normal.element.rPr.rFonts.set(qn("w:eastAsia"), "Calibri")
-    normal.font.size = Pt(11.5)
-    normal.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
-    normal.paragraph_format.line_spacing = 1.15
-    for nivel, tam in ((1, 20), (2, 15), (3, 13), (4, 12)):
+    fijar_fuente(normal, FUENTE)
+    normal.font.size = Pt(12)
+    normal.font.color.rgb = TEXTO
+    normal.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+    normal.paragraph_format.space_after = Pt(0)
+    for nombre in ("List Bullet", "Header", "Footer"):
+        fijar_fuente(doc.styles[nombre], FUENTE)
+    # APA 7, niveles 1 a 4: centrado negrita; izquierda negrita; izquierda negrita cursiva; sangría negrita.
+    for nivel in (1, 2, 3, 4):
         st = doc.styles[f"Heading {nivel}"]
-        st.font.name = "Calibri"
-        st.font.size = Pt(tam)
+        fijar_fuente(st, FUENTE)
+        st.font.size = Pt(12)
         st.font.bold = True
-        st.font.italic = False
+        st.font.italic = nivel == 3
         st.font.color.rgb = AZUL
-        st.paragraph_format.space_before = Pt(18 if nivel == 1 else 12)
-        st.paragraph_format.space_after = Pt(6)
-        st.paragraph_format.keep_with_next = True
+        f = st.paragraph_format
+        f.alignment = WD_ALIGN_PARAGRAPH.CENTER if nivel == 1 else WD_ALIGN_PARAGRAPH.LEFT
+        f.left_indent = SANGRIA if nivel == 4 else Cm(0)
+        f.line_spacing = INTERLINEADO
+        f.space_before = Pt(12 if nivel > 1 else 0)
+        f.space_after = Pt(0)
+        f.keep_with_next = True
 
 
 def construir():
@@ -373,22 +466,15 @@ def construir():
     apply_margins(doc.sections[0])
     configurar_estilos(doc)
 
-    portada = PORTADA.read_text(encoding="utf-8").split("\n", 1)[1]
-    for _ in range(4):
-        doc.add_paragraph()
-    render_markdown(doc, PORTADA, portada, centrado=True)
-    doc.add_page_break()
-
     p = doc.add_paragraph()
-    r = p.add_run("Índice")
-    r.bold = True
-    r.font.size = Pt(20)
-    r.font.color.rgb = AZUL
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.line_spacing = INTERLINEADO
+    p.add_run("Índice").bold = True
     add_field(doc.add_paragraph(), 'TOC \\o "1-3" \\h \\z \\u')
 
     body = doc.add_section(WD_SECTION.NEW_PAGE)
     apply_margins(body)
-    footer_with_number(body, 1)
+    pie_con_numero(body, 1)
 
     for k, rel in enumerate(CAPITULOS):
         path = ROOT / rel
@@ -397,7 +483,7 @@ def construir():
         desplazar = 1 if primera.startswith("# ") and SUBSECCION.match(primera[2:]) else 0
         if k and not desplazar:
             doc.add_page_break()
-        render_markdown(doc, path, texto, desplazar)
+        render_markdown(doc, path, texto, desplazar, referencias="bibliografia" in rel)
 
     try:
         doc.save(OUT)
@@ -419,6 +505,8 @@ def exportar_pdf(docx_path):
     word.DisplayAlerts = 0
     try:
         d = word.Documents.Open(str(docx_path))
+        if PORTADA_DOCX.exists():
+            d.Range(0, 0).InsertFile(str(PORTADA_DOCX))
         d.Fields.Update()
         for toc in d.TablesOfContents:
             toc.Update()

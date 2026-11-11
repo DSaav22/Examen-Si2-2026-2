@@ -87,8 +87,8 @@ No cambian respecto del primer ciclo: la clienta recorre el catálogo, usa el pr
 | Reportes | 10 | Tres pedidos de ejemplo, voz, PDF y Excel |
 | Plataforma | 5 | Métricas de suscripción, para el dueño |
 
-## 10.11 Qué decir y qué no decir
+## 10.11 Mensajes clave y alcance comunicado a los usuarios
 
-Se dice que cada tienda ve solo sus datos, que la caja sigue vendiendo en efectivo sin internet y que la sincronización no duplica ventas, que el pago de la suscripción y el de las ventas son de prueba, y que los reportes no ejecutan texto escrito por la IA.
+La capacitación transmite a los usuarios cinco garantías del sistema: cada tienda accede únicamente a sus datos, la caja continúa vendiendo en efectivo sin conexión, la sincronización no duplica ventas, los reportes generados por lenguaje natural nunca ejecutan texto escrito por el modelo de IA y los cobros de suscripción y de ventas operan en modo de prueba.
 
-No se dice que haya cobro bancario real, que el QR o la tarjeta funcionen sin red, ni que la analítica predictiva o la pasarela regional estén en producción mientras el segundo integrante no las integre.
+Con el mismo cuidado se comunica lo que el sistema no hace: no realiza cobros bancarios reales, no acepta QR ni tarjeta sin conexión porque ambos requieren confirmación en línea, y los módulos de analítica predictiva y de pasarela regional se presentan según su estado de implementación descrito en los capítulos 5 y 8.

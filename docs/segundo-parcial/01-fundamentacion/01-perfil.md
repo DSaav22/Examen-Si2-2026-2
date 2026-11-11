@@ -51,11 +51,11 @@ El problema del primer ciclo sigue vigente dentro de cada tienda: si cada canal 
 
 | Punto de la consigna | Qué se construyó | Estado |
 |---|---|---|
-| 1. SaaS multi-tienda | Página de planes, registro con verificación de correo, suscripción con pago idempotente, alta automática de la tienda, selector de tiendas con un solo login, límites por plan y panel de métricas (MRR, ARR, ARPU, churn, proyección a 6 meses). Aislamiento con `tienda_id` en 36 modelos y una extensión de Prisma que falla cerrada. | Hecho y verificado (`verificar:tenancy`, `verificar:saas`) |
+| 1. SaaS multi-tienda | Página de planes, registro con verificación de correo, suscripción con pago idempotente, alta automática de la tienda, selector de tiendas con un solo login, límites por plan y panel de métricas (MRR, ARR, ARPU, churn, proyección a 6 meses). Aislamiento con `tienda_id` en 36 modelos y una extensión de Prisma que falla cerrada; modalidad piloto con un esquema PostgreSQL por tienda (sección 4.12). | Hecho y verificado (`verificar:tenancy`, `verificar:saas`); esquemas validados en laboratorio |
 | 2. Operación sin conexión | PWA con service worker, caché de datos y cola IndexedDB; app móvil con SQLite; UUID en el cliente; sincronización por lotes con estado por operación; idempotencia en 11 rutas; conflicto de la última unidad visible y resoluble; ventana offline de 1 a 30 días; Web Push. | Hecho y verificado (`verificar:offline`) |
 | 3. Reportes generativos | Capa semántica de 6 fuentes, intérprete con Azure OpenAI y respaldo por reglas, especificación JSON validada, SQL parametrizado aislado por tienda, voz en web y móvil, PDF y Excel; ventas al crédito y abonos. | Hecho y verificado (`verificar:reportes`) |
-| 4. Analítica con aprendizaje automático | Modelo supervisado y no supervisado con datos sintéticos y tableros. | A cargo del segundo integrante |
-| 5. Pagos para países hispanohablantes | Estudio de costos y pasarela real en modo de pruebas. | A cargo del segundo integrante |
+| 4. Analítica con aprendizaje automático | Pronóstico de demanda con regresión lineal, segmentación RFM con k-medias, datos sintéticos reproducibles y tablero web `/analitica` (capítulo 8; UC52 y UC53). | Hecho y verificado con datos sintéticos (`verificar-analitica-http.ts`) |
+| 5. Pagos para países hispanohablantes | Estudio de costos por país, catálogo de métodos de 22 países con validación en el servidor, puerto de pasarela con adaptador simulado, idempotencia y compensación por reembolso (capítulo 5). | Implementado en modo simulado; falta el adaptador al entorno de pruebas de una pasarela real |
 
 El alcance funcional del primer ciclo (catálogo, caja, inventario, reservas, probadores, bot, mayorista, transferencias, despacho, devoluciones y reportes) se mantiene completo y ahora opera dentro de cada tienda. Sus casos de uso UC01 a UC35 se revisaron con robustez y secuencia en el capítulo 9.
 
@@ -97,8 +97,38 @@ El alcance funcional del primer ciclo (catálogo, caja, inventario, reservas, pr
 
 | Tema | Criterio |
 |------|----------|
-| Pagos | El pago de la suscripción y de las ventas es de prueba; no hay cobro bancario real. La pasarela en sandbox es parte del punto 5. |
+| Pagos | El pago de la suscripción y de las ventas es de prueba; no hay cobro bancario real. La conexión con el entorno de pruebas de una pasarela real se describe en el capítulo 5. |
 | IA | La clave de Azure OpenAI del entorno de demostración responde 401; mientras no se renueve, el intérprete por reglas atiende los reportes. |
 | Móvil | La operación sin red se probó en Expo web; en Android se verificó que el paquete compila. |
 | Datos de demo | Tiendas Vesta y nueve tiendas `demo-*` de distintos países con historia de suscripciones; 34 clientas y 320 ventas sintéticas de 180 días para reportes. |
 | Fuera de alcance | Cobro bancario real, facturación fiscal real y aislamiento con políticas RLS en la base (documentado como evolución). |
+
+## 1.10 Evaluación de la arquitectura heredada y estrategia de evolución
+
+Un segundo ciclo de desarrollo pone a prueba las decisiones del primero. Los requisitos nuevos (varias tiendas en una sola instalación, operación sin conexión, reportes generados desde lenguaje natural, analítica y pagos regionales) no estaban previstos cuando se diseñó EnsayAR, y la forma en que la arquitectura los absorbe mide su calidad.
+
+### 1.10.1 Alternativas consideradas
+
+Ante un cambio de requisitos de esta magnitud existen tres caminos. El primero es reutilizar la arquitectura sin cambios y agregar los módulos nuevos alrededor; es el más rápido, pero no sirve cuando el requisito nuevo afecta a todas las capas, como ocurre con el aislamiento por tienda. El segundo es modificar las capas afectadas y conservar el resto; exige analizar con cuidado el impacto, pero aprovecha el código probado. El tercero es descartar la versión anterior y reconstruir el sistema con una arquitectura pensada para los requisitos nuevos; resuelve los problemas de fondo a costa de repetir todo el trabajo del primer ciclo y de volver a probar funciones que ya operaban.
+
+### 1.10.2 Evaluación por capa
+
+La tabla siguiente resume cómo respondió cada capa de la arquitectura del primer ciclo a los requisitos nuevos.
+
+| Capa | Arquitectura del primer ciclo | Cambio requerido en el segundo ciclo | Valoración |
+|---|---|---|---|
+| Organización del backend | Monolito modular NestJS con un módulo por área | Se agregaron los módulos de plataforma, tenencia, sincronización, reportes inteligentes y créditos sin modificar los existentes | La modularidad absorbió el crecimiento |
+| Acceso a datos | Prisma sobre PostgreSQL, una sola tienda | Columna `tienda_id` en 36 modelos y una extensión de Prisma que la aplica en todas las consultas | Cambio transversal, pero concentrado en un punto gracias al ORM |
+| Transacciones | Venta con bloqueo de stock y UUID único | Se reutilizaron para la sincronización y se agregaron la idempotencia y la actualización condicional | Base sólida; se extendió sin reescribir |
+| Cliente web | React con una cola de ventas en IndexedDB | Service worker, caché de datos, cola para clientas y productos, Web Push | Se amplió el mecanismo existente |
+| Cliente móvil | React Native con Expo | Base local SQLite y sincronización por lotes | Se agregó una capa de persistencia |
+| Reportes | Reportes predefinidos y consulta por voz simple | Capa semántica, compilador de SQL parametrizado y exportación | Se reemplazó el intérprete; la interfaz se conservó |
+| Infraestructura | App Service y PostgreSQL Flexible en Azure, definidos con Bicep | Sin cambios de topología | Adecuada para la escala actual |
+
+### 1.10.3 Camino elegido
+
+EnsayAR siguió el segundo camino: modificar capas. La arquitectura del primer ciclo resistió el cambio en lo esencial. El monolito modular permitió agregar áreas completas sin tocar las existentes, y las decisiones de integridad del primer ciclo (identificadores únicos generados en el cliente y bloqueo del stock dentro de una transacción) resultaron ser exactamente la base que necesitaba la sincronización sin conexión. El único cambio verdaderamente transversal fue el aislamiento por tienda, que afectó a todos los modelos de datos; aun así, se resolvió en un único punto del acceso a datos y no en cada servicio, lo que confirma el valor de haber centralizado la persistencia en un ORM.
+
+Reconstruir el sistema no estaba justificado: los 35 casos de uso del primer ciclo siguen operando dentro de cada tienda y se verificaron de nuevo con robustez y secuencia en el capítulo 9. El costo de rehacerlos habría consumido el tiempo necesario para los requisitos nuevos sin aportar una mejora proporcional.
+
+La evaluación también identifica los límites de la arquitectura actual. El aislamiento depende de la aplicación y no de la base de datos, por lo que la incorporación de políticas de seguridad por fila de PostgreSQL es la evolución natural (sección 4.10). Para las tiendas que requieran aislamiento físico, el modelo de base compartida ya cuenta con una alternativa implementada y validada en laboratorio: un esquema PostgreSQL por tienda, que se activa por configuración (sección 4.12). Por último, si el módulo de analítica adopta modelos más costosos de entrenar, será el primer candidato a separarse del monolito como un servicio independiente (sección 8.7).
