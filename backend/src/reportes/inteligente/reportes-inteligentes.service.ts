@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ModeloClient } from '../../ia/modelo.client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaEsquemasService } from '../../prisma/prisma-esquemas.service';
+import { nombreSchemaTienda } from '../../tenancy/schema-nombre';
 import { TenantContext } from '../../tenancy/tenant-context';
 import { AGREGACIONES, FUENTES, ZONA_HORARIA, campoDe } from './catalogo';
 import { ColumnaResultado, compilar } from './compilador';
@@ -34,6 +36,7 @@ export class ReportesInteligentesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly modelo: ModeloClient,
+    private readonly esquemas: PrismaEsquemasService,
   ) {}
 
   catalogo() {
@@ -67,12 +70,13 @@ export class ReportesInteligentesService {
     const tiendaId = TenantContext.tiendaIdOrThrow();
     const cache = this.diccionarios.get(tiendaId);
     if (cache && cache.hasta > Date.now()) return cache.dic;
+    const db = this.esquemas.clienteTienda(tiendaId);
     const [sucursales, productos, colores, proveedores, clientas] = await Promise.all([
-      this.prisma.sucursal.findMany({ select: { nombre: true, ciudad: true } }),
-      this.prisma.producto.findMany({ select: { nombre: true, categoria: true, ocasion: true }, take: 500 }),
-      this.prisma.variante.findMany({ select: { color: true }, distinct: ['color'], take: 100 }),
-      this.prisma.proveedor.findMany({ select: { nombre: true }, take: 100 }),
-      this.prisma.usuario.findMany({ where: { rol: 'CLIENTA' }, select: { nombre: true }, take: 800 }),
+      db.sucursal.findMany({ select: { nombre: true, ciudad: true } }),
+      db.producto.findMany({ select: { nombre: true, categoria: true, ocasion: true }, take: 500 }),
+      db.variante.findMany({ select: { color: true }, distinct: ['color'], take: 100 }),
+      db.proveedor.findMany({ select: { nombre: true }, take: 100 }),
+      db.usuario.findMany({ where: { rol: 'CLIENTA' }, select: { nombre: true }, take: 800 }),
     ]);
     const unicos = (xs: (string | null | undefined)[]) => [...new Set(xs.map((x) => x?.trim()).filter((x): x is string => !!x))];
     const dic: Diccionario = {
@@ -147,8 +151,10 @@ export class ReportesInteligentesService {
     const filas = crudas.map((f) => serializar(f, compilado.columnas));
     const totales = calcularTotales(filas, compilado.columnas);
 
-    await this.prisma.reporteEjecucion.create({
+    const tiendaId = TenantContext.tiendaIdOrThrow();
+    await this.esquemas.clienteTienda(tiendaId).reporteEjecucion.create({
       data: {
+        tiendaId,
         pregunta: (meta.pregunta ?? spec.titulo).slice(0, 500),
         sql: compilado.sql,
         filas: filas.length,
@@ -204,11 +210,15 @@ export class ReportesInteligentesService {
   /** SQL de reportes: la tienda se fija en la sesión de Postgres dentro de la misma transacción. */
   private async consultar(sql: string, parametros: unknown[]) {
     const tiendaId = TenantContext.tiendaIdOrThrow();
-    const [, filas] = await this.prisma.$transaction([
-      this.prisma.$queryRaw`SELECT set_config('app.tienda_id', ${tiendaId}, true)`,
-      this.prisma.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...parametros),
-    ]);
-    return filas;
+    const esquemaEsperado = nombreSchemaTienda(tiendaId);
+    return this.esquemas.clienteTienda(tiendaId).$transaction(async (tx) => {
+      const [contexto] = await tx.$queryRaw<{ esquema: string; tienda: string }[]>`
+        SELECT current_schema() AS esquema, set_config('app.tienda_id', ${tiendaId}, true) AS tienda`;
+      if (contexto?.esquema !== esquemaEsperado || contexto.tienda !== tiendaId) {
+        throw new Error('CONTEXTO_TIENDA_INVALIDO');
+      }
+      return tx.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...parametros);
+    });
   }
 
   private comoBadRequest(e: unknown) {

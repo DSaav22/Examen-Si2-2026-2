@@ -93,3 +93,9 @@ Mantener cuentas globales, planes y suscripciones en un esquema de plataforma y 
 - Los datos migrados coinciden y la restauración del respaldo ha sido ensayada.
 
 Referencias: [Prisma: varios esquemas](https://docs.prisma.io/docs/orm/v6/prisma-schema/data-model/multi-schema), [PostgreSQL: CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html).
+# Actualización: perfiles y reportes inteligentes
+
+- El descubrimiento de perfiles de cuenta consulta exclusivamente los esquemas de tienda registrados. Si falta alguno, devuelve `ESQUEMA_TIENDA_INEXISTENTE` y no consulta usuarios de `public`. Las cuentas, tiendas y suscripciones globales permanecen en `public` por diseño.
+- Los reportes inteligentes consultan el diccionario, ejecutan SQL y guardan `ReporteEjecucion` en el esquema derivado de la tienda activa. El SQL verifica `current_schema()` y fija `app.tienda_id` dentro de la misma transacción; la identidad de la tienda para exportación sigue siendo global.
+- En `ensayar_copia` se creó el esquema de la tienda faltante mediante el migrador transaccional existente, conservando y comparando los registros fuente. Antes se generó un respaldo fuera del repositorio.
+- El script `backend/scripts/verificar-reportes-esquemas.ts` solo admite una base de prueba aislada y comprueba dos tiendas, PDF, Excel y rechazo de esquema inexistente. Los demás módulos y las rutas de compatibilidad aún necesitan auditoría; este cambio no completa por sí solo la migración integral.

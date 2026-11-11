@@ -334,3 +334,7 @@ Se finalizaron y probaron de extremo a extremo las capacidades offline de la web
   2. Integridad transaccional y rollback de IndexedDB (`verificar-cola-idb.mjs`).
   3. Flujo completo offline: registro triple (venta, cliente, producto), supervivencia a recarga sin red, aislamiento por tienda, conflicto de stock con reintento, e idempotencia (`verificar-flujo-offline-completo.mjs`).
 - **Verificación backend:** 14 pruebas de `backend/scripts/verificar-offline.ts` superadas sobre la base de datos `ensayar_copia`. Ver [[Modo offline]].
+
+## [2026-11-11] update | Perfiles y reportes inteligentes por esquema
+
+Se migró sin borrar la fuente la tienda que carecía de esquema en `ensayar_copia`, tras un respaldo. El descubrimiento de perfiles ya no usa usuarios de `public` como alternativa y falla si falta un esquema. Los reportes inteligentes consultan y registran sus ejecuciones en el esquema activo. Se verificaron dos tiendas y exportaciones en una copia aislada; la migración del resto de módulos continúa pendiente. La batería general conserva una prueba SaaS fallida por un mock incompleto de `updateMany`.
