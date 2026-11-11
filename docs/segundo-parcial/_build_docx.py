@@ -399,6 +399,7 @@ def apply_margins(section):
     section.left_margin = MARGEN
     section.right_margin = MARGEN
     section.header_distance = Cm(1.27)
+    section.footer_distance = Cm(1.27)
 
 
 def orientar(doc, apaisado):
@@ -414,10 +415,10 @@ def orientar(doc, apaisado):
     s.orientation = WD_ORIENT.LANDSCAPE if apaisado else WD_ORIENT.PORTRAIT
 
 
-def encabezado_con_numero(section, start_at):
-    """APA 7: número de página en el encabezado, alineado a la derecha."""
-    section.header.is_linked_to_previous = False
-    p = section.header.paragraphs[0]
+def pie_con_numero(section, start_at):
+    """Número de página en el pie, alineado a la derecha."""
+    section.footer.is_linked_to_previous = False
+    p = section.footer.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     add_field(p, "PAGE")
     pg = OxmlElement("w:pgNumType")
@@ -473,7 +474,7 @@ def construir():
 
     body = doc.add_section(WD_SECTION.NEW_PAGE)
     apply_margins(body)
-    encabezado_con_numero(body, 1)
+    pie_con_numero(body, 1)
 
     for k, rel in enumerate(CAPITULOS):
         path = ROOT / rel

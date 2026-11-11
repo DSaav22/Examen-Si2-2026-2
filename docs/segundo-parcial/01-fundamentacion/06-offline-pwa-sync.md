@@ -30,7 +30,12 @@ Abadi (2012) observó que CAP describe solo el comportamiento durante una partic
 
 En EnsayAR, durante la partición el POS elige disponibilidad para el efectivo (PA). Sin partición, la venta espera la confirmación de la transacción antes de emitir el ticket, aceptando latencia a cambio de consistencia (EC); en cambio, para leer el catálogo el service worker espera la red como máximo cuatro segundos y luego sirve la última copia, sacrificando consistencia de lectura por latencia acotada (EL).
 
-![Figura 6.1: Operaciones de EnsayAR según PACELC. Con partición, el efectivo y el alta de clientas privilegian la disponibilidad; pagos QR, créditos y cierre de caja exigen consistencia.](../imagenes/fundamentacion/fig-6-1-pacelc.png)
+| Situación | Operación | Prioriza |
+|-----------|-----------|----------|
+| Con partición (P) | Venta en efectivo, alta de clientas y productos | Disponibilidad (A) |
+| Con partición (P) | Pago QR, créditos, devoluciones y cierre de caja | Consistencia (C) |
+| Sin partición (E) | Lectura del catálogo | Latencia (L) |
+| Sin partición (E) | Confirmación de la venta | Consistencia (C) |
 
 ## 6.2 Criterios para decidir qué opera sin conexión
 
@@ -113,7 +118,7 @@ Un **service worker** es un script que el navegador ejecuta en segundo plano, se
 
 El `sw.js` de EnsayAR declara `VERSION = 'v2'` y deriva tres cachés: `ensayar-shell-v2`, `ensayar-estaticos-v2` y `ensayar-api-v2`. En `install` precarga la raíz `/`, el manifiesto y el favicon y llama a `skipWaiting()`; en `activate` elimina toda caché ajena a la lista vigente y ejecuta `clients.claim()`. Cambiar la versión basta para invalidar ordenadamente lo guardado por la anterior.
 
-![Figura 6.2: Ciclo de vida del service worker de EnsayAR. La llamada a skipWaiting() omite el estado en espera y clients.claim() toma el control de las páginas abiertas.](../imagenes/fundamentacion/fig-6-2-ciclo-service-worker.png)
+![Figura 6.1: Ciclo de vida del service worker de EnsayAR. Máquina de estados UML 2.5: la llamada a skipWaiting() omite el estado en espera y clients.claim() toma el control de las páginas abiertas.](../imagenes/ea/fun-estados-service-worker.png)
 
 ### 6.4.4 Estrategias de caché
 
@@ -176,7 +181,7 @@ Sin estados explícitos, una operación fallida desaparece en silencio o se rein
 
 El estado teórico "duplicada" se llama `repetida` en el código. Un conflicto es una operación correcta que choca con el estado del mundo y admite resolución de negocio; un rechazo es una operación que nunca debió emitirse.
 
-![Figura 6.3: Estados de una operación offline. Un conflicto puede reintentarse con un UUID nuevo o darse por descartado mediante una resolución administrativa.](../imagenes/fundamentacion/fig-6-3-estados-operacion.png)
+![Figura 6.2: Estados de una operación offline. Máquina de estados UML 2.5: un conflicto puede reintentarse con un UUID nuevo o darse por descartado mediante una resolución administrativa.](../imagenes/ea/fun-estados-operacion.png)
 
 ### 6.5.4 Sincronización por lotes
 
@@ -243,7 +248,7 @@ Que dos ejecuciones simultáneas no puedan ambas descontar la última unidad lo 
 
 El stock nunca queda negativo y la resolución corresponde al negocio. **Vender lo disponible** limita cada línea al disponible informado y reencola la operación con un UUID nuevo conservando la fecha original (no se ofrece si el disponible es cero). **Descartar** la elimina de la cola local, lo que implica anular la venta y devolver el dinero o buscar la prenda en otra sucursal. En el servidor, la operación original sigue como conflicto hasta que un encargado la marca resuelta, lo que la deja `descartada` con la auditoría `sync_conflicto_descartado`. En ventas de varias líneas, los `UPDATE` se ejecutan en **orden fijo de identificador de variante** para que dos ventas cruzadas adquieran los bloqueos en la misma secuencia y no se interbloqueen.
 
-![Figura 6.4: Conflicto de stock entre dos dispositivos que vendieron la última unidad sin conexión. PostgreSQL bloquea la fila, reevalúa la condición después del COMMIT de A y la transacción de B termina en conflicto.](../imagenes/fundamentacion/fig-6-4-conflicto-stock.png)
+![Figura 6.3: Conflicto de stock entre dos dispositivos que vendieron la última unidad sin conexión. Diagrama de secuencia UML 2.5: PostgreSQL bloquea la fila, reevalúa la condición después del COMMIT de A y la transacción de B termina en conflicto.](../imagenes/ea/fun-seq-conflicto.png)
 
 ## 6.8 Idempotencia
 
@@ -345,7 +350,7 @@ Supóngase EnsayAR dividido en cuatro servicios con base propia: Ventas, Inventa
 
 Si el paso 2 falla por stock insuficiente, se compensa el paso 1 y la operación offline se informa como conflicto, igual que hoy. Si el paso 3 falla porque el turno se cerró, se compensa el 2 (reingreso) y luego el 1. El estado PENDIENTE actúa como contramedida de aislamiento: reportes y arqueo deben ignorar ventas pendientes. La notificación va después del último paso compensable porque un aviso enviado no puede retirarse. En la variante coreografiada, los mismos pasos se encadenarían con eventos como `VentaCreada`, `StockDescontado` o `TurnoInvalido`, y cada servicio debería ser idempotente frente a eventos repetidos.
 
-![Figura 6.5: Saga orquestada de una venta. Arriba, el flujo exitoso; abajo, el fallo en Caja con las compensaciones de Inventario y Ventas en orden inverso.](../imagenes/fundamentacion/fig-6-5-saga-venta.png)
+![Figura 6.4: Saga orquestada de una venta. Diagrama de secuencia UML 2.5 con fragmento alt: arriba, el flujo exitoso; abajo, el fallo en Caja con las compensaciones de Inventario y Ventas en orden inverso.](../imagenes/ea/fun-seq-saga.png)
 
 ### 6.10.5 Patrón Transactional Outbox
 

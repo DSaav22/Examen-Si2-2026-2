@@ -343,3 +343,8 @@ Se finalizaron y probaron de extremo a extremo las capacidades offline de la web
 - **Carátula.** La oficial está en `portada-oficial.docx` y Word la inserta sin cambios al exportar.
 - **Tono.** Se quitaron las referencias por capítulo y las frases de borrador. PDF de 383 páginas.
 
+## [2026-11-11] update | Figuras de fundamentación en Enterprise Architect
+
+- **Figuras.** Las figuras conceptuales de los capítulos 3, 4, 6 y 7 pasan a ser diagramas UML 2.5 del modelo `EnsayAR-ICONIX.eapx`, paquete "9 Fundamentacion", generados con `iconix/fundamentacion.py` y exportados como `imagenes/ea/fun-*.png`: componentes (planos, capas de aislamiento), actividad con particiones (ciclo de suscripción, tubería del reporte), despliegue (silo, bridge y pool), secuencia (resolución de la tienda, conflicto de stock, saga con fragmento alt) y máquinas de estados (service worker, operación offline). Se retiraron las figuras de matplotlib.
+- **Ajustes.** La antigua figura 3.1 se quitó porque repetía la tabla de modelos de entrega; la de PACELC (6.1) quedó como tabla. En las secuencias, los mensajes normales llevan `PDATA4='0'` para que EA no dibuje como retorno las llamadas hacia la izquierda.
+- **Formato.** El número de página va en el pie, abajo a la derecha. PDF de 386 páginas.

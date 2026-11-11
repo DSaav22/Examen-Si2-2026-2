@@ -124,7 +124,7 @@ El costo es la expresividad: no se puede pedir lo que el catálogo no describe. 
 
 El módulo se organiza como una tubería (pipeline) de ocho etapas. Cada una recibe una representación del pedido y entrega otra más precisa: audio, texto, texto normalizado, especificación propuesta, especificación validada, SQL con parámetros, filas, y finalmente presentación y registro de auditoría.
 
-![Figura 7.1: Tubería del reporte inteligente. La capa semántica alimenta la interpretación, la validación y la compilación a SQL.](../imagenes/fundamentacion/fig-7-1-tuberia-reporte.png)
+![Figura 7.1: Tubería del reporte inteligente. Diagrama de actividad UML 2.5: la capa semántica, como almacén de datos, alimenta la interpretación, la validación y la compilación a SQL.](../imagenes/ea/fun-tuberia-reporte.png)
 
 El servicio expone cinco rutas, protegidas por autenticación JWT y por un guardia que solo admite los roles ADMIN, ENCARGADO y SUPERADMIN:
 

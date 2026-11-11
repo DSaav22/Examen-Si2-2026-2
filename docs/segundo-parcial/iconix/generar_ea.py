@@ -219,7 +219,7 @@ class Generador:
         base.Packages.Refresh()
         self.base = self.ea.paquete(base, PAQUETE)
         nombres = ["1 Requisitos", "2 Modelo de dominio", "3 Casos de uso", "4 Robustez",
-                   "5 Secuencias", "6 Diseno detallado", "7 Arquitectura", "8 Estados"]
+                   "5 Secuencias", "6 Diseno detallado", "7 Arquitectura", "8 Estados", "9 Fundamentacion"]
         self.p = {n: self.ea.paquete(self.base, n) for n in nombres}
 
     def registrar(self, d, archivo):
@@ -716,8 +716,10 @@ class Generador:
     def arquitectura(self):
         from arquitectura import Arquitectura
         from estados import Estados
+        from fundamentacion import Fundamentacion
         self.diagramas += Arquitectura(self.ea, self.p["7 Arquitectura"]).construir()
         self.diagramas += Estados(self.ea, self.p["8 Estados"]).construir()
+        self.diagramas += Fundamentacion(self.ea, self.p["9 Fundamentacion"]).construir()
 
     # ---- todo
     def correr(self):

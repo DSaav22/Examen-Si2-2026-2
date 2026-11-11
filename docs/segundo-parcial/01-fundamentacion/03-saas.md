@@ -35,8 +35,6 @@ Los modelos de despliegue del NIST son nube privada, comunitaria, pública e hí
 | Datos y configuración | Cliente | Cliente | Cliente | Cliente | Cliente |
 | Pago típico | Licencia y mantenimiento | Cuota de alojamiento | Por recurso | Por recurso | Suscripción o uso |
 
-![Figura 3.1: Responsabilidad de cada capa según el modelo de entrega. En SaaS el cliente solo conserva sus datos y su configuración; el resto lo gestiona el proveedor.](../imagenes/fundamentacion/fig-3-1-pila-modelos.png)
-
 ## 3.3 Variantes del modelo SaaS
 
 ### 3.3.1 SaaS horizontal y vertical
@@ -55,7 +53,7 @@ En la variante white-label, el cliente presenta el servicio con su propia identi
 
 La guía SaaS Architecture Fundamentals de AWS divide toda solución SaaS en dos planos. El plano de control reúne los servicios para incorporar, autenticar, administrar, operar y analizar inquilinos: alta, identidad, registro de inquilinos, facturación, métricas y consola del proveedor. El plano de aplicación contiene la funcionalidad de negocio que usan los inquilinos. El documento aclara que los servicios del plano de control no son multi-inquilino: son globales y ven a todos los clientes, mientras que el plano de aplicación sí debe aplicar aislamiento. Esta separación ayuda a razonar qué operaciones pueden cruzar inquilinos y cuáles nunca deben hacerlo.
 
-![Figura 3.2: Plano de aplicación y plano de control en EnsayAR. El plano de aplicación separa los datos por tienda; el plano de control es global y ve a todas las tiendas.](../imagenes/fundamentacion/fig-3-2-planos.png)
+![Figura 3.1: Plano de aplicación y plano de control en EnsayAR. Diagrama de componentes UML 2.5: el plano de aplicación solo accede a las filas de su tienda; el plano de control es global y lee las métricas de todas las tiendas.](../imagenes/ea/fun-planos.png)
 
 ## 3.4 Modelos de cobro
 
@@ -88,7 +86,7 @@ En un SaaS de autoservicio, cada etapa del ciclo de vida del inquilino debe comp
 
 Entre las etapas 4 y 5 hay un punto técnico delicado. El cobro ocurre en un sistema externo y el aprovisionamiento en la base propia, y no existe una transacción que abarque ambos. Si el cobro se aprueba y la creación del inquilino falla, el cliente pagó por nada. La solución habitual es tratar el proceso como una saga: se cobra, se aprovisiona en una transacción local y, si esta falla, se ejecuta una acción compensatoria que reembolsa el pago.
 
-![Figura 3.3: Ciclo de vida de la suscripción con compensación. Si el aprovisionamiento falla después del cobro, la pasarela reembolsa el pago y la plataforma informa el fallo.](../imagenes/fundamentacion/fig-3-3-ciclo-vida.png)
+![Figura 3.2: Ciclo de vida de la suscripción con compensación. Diagrama de actividad UML 2.5 con particiones: si el aprovisionamiento falla después del cobro, la pasarela reembolsa el pago y la plataforma informa el fallo.](../imagenes/ea/fun-ciclo-suscripcion.png)
 
 ## 3.6 Métricas de negocio
 

@@ -61,7 +61,7 @@ Azure usa nombres equivalentes: despliegues automatizados de un solo inquilino, 
 | Cumplimiento y residencia de datos | Más sencillo de demostrar | Intermedio | Requiere controles y auditoría adicionales |
 | Reportes globales del proveedor | Consultas a muchas bases | Consultas a muchos esquemas | Una consulta |
 
-![Figura 4.1: Modelos de aislamiento silo, bridge y pool. Los tres comparten la aplicación; cambia la base, el esquema o la tabla que guarda los datos de cada tienda.](../imagenes/fundamentacion/fig-4-1-modelos-multitenant.png)
+![Figura 4.1: Modelos de aislamiento silo, bridge y pool. Diagrama de despliegue UML 2.5: los tres comparten la aplicación; cambia la base, el esquema o la tabla que guarda los datos de cada tienda.](../imagenes/ea/fun-modelos-aislamiento.png)
 
 ## 4.4 Resolución del inquilino en cada petición
 
@@ -127,7 +127,7 @@ La documentación advierte detalles que deben tenerse en cuenta. Los superusuari
 
 El punto delicado con un ORM es el pool de conexiones: cada consulta puede usar una conexión distinta. El ejemplo oficial de Prisma para RLS resuelve esto fijando la variable con set_config en modo local y ejecutando la consulta en la misma transacción por lotes, de modo que comparten conexión y la variable desaparece al terminar. El propio ejemplo aclara que no está pensado para producción y que las transacciones explícitas pueden no comportarse como se espera. Azure, por su parte, señala que muchas soluciones multi-inquilino no usan RLS por la complejidad de diseñarla, probarla y mantenerla. RLS es la defensa más fuerte del modelo pool, pero su costo de adopción es real.
 
-![Figura 4.2: Capas de aislamiento entre inquilinos en EnsayAR. Cada capa repite la restricción por tienda, de modo que la falla de una no expone datos de otra tienda.](../imagenes/fundamentacion/fig-4-2-capas-aislamiento.png)
+![Figura 4.2: Capas de aislamiento entre inquilinos en EnsayAR. Diagrama de componentes UML 2.5: cada capa repite la restricción por tienda, de modo que la falla de una no expone datos de otra tienda.](../imagenes/ea/fun-capas-aislamiento.png)
 
 ## 4.7 Resolución paso a paso en NestJS con Prisma
 
@@ -172,7 +172,7 @@ else if (operation === 'create') a.data = conCreate(model, a.data, tiendaId);
 
 Con estos cinco pasos, los servicios de negocio escriben consultas como si la aplicación tuviera una sola tienda; la tienda se resuelve una vez en el borde y se aplica de forma transversal.
 
-![Figura 4.3: Resolución de la tienda en una petición GET /catalogo/productos. El guard fija la tienda en el contexto y la extensión de Prisma la aplica en la consulta.](../imagenes/fundamentacion/fig-4-3-secuencia-tenant.png)
+![Figura 4.3: Resolución de la tienda en una petición GET /catalogo/productos. Diagrama de secuencia UML 2.5: el guard fija la tienda en el contexto y la extensión de Prisma la aplica en la consulta.](../imagenes/ea/fun-seq-tenant.png)
 
 ## 4.8 SQL crudo con set_config
 
