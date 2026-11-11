@@ -6,9 +6,14 @@ El código está en https://github.com/DSaav22/Examen-Si2-2026-2 (backend, front
 
 ## 14.2 URL de despliegue y código QR
 
-URL de despliegue: se completa al publicar.
+El sistema está desplegado en Microsoft Azure (región Brazil South), con la infraestructura definida en `infra/app.bicep`.
 
-Espacio para el código QR de la web o del repositorio.
+| Componente | URL |
+|---|---|
+| Aplicación web (PWA) | https://ensayar-web-2xhvsljjqvilk.azurewebsites.net |
+| API REST | https://ensayar-api-2xhvsljjqvilk.azurewebsites.net/api |
+
+![Figura 14.1: Código QR de acceso a la aplicación web](../imagenes/qr-web.png)
 
 ## 14.3 Puesta en marcha local
 

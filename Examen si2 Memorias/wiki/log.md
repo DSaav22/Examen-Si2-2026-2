@@ -257,3 +257,11 @@ Se tomó del PDF de otro grupo, con las mismas funcionalidades, solo la explicac
 - **Texto.** RNF01–RNF12, reglas RN01–RN15, plan de pruebas y casos CP01–CP19.
 - **Informe.** Figuras de arquitectura y estados en páginas horizontales; PDF de 274 páginas.
 
+## [2026-11-11] update | Informe completo en formato APA 7 con carátula oficial
+
+- **Contenido.** Capítulo 5 (pagos: métodos por país, costos con fuentes, Bolivia/PayPal, PCI DSS, saga con reembolso) y capítulo 8 (analítica: pronóstico de demanda con Random Forest y segmentación RFM con k-means sobre datos sintéticos) completos. Sección 1.10 con la evaluación de la arquitectura heredada y los tres caminos (se eligió modificar capas). Anexo 14.2 con URL de Azure y código QR (URL antigua; pendiente la nueva).
+- **Figuras.** Las 12 figuras conceptuales de los capítulos 3, 4, 6 y 7 se dibujan con `imagenes/fundamentacion/_figuras.py`.
+- **Formato.** `_build_docx.py` aplica APA 7: Times New Roman 12, interlineado doble, márgenes de 2,54 cm, sangría de 1,27 cm, niveles de título APA, tablas con solo bordes horizontales, figuras con número y título arriba y nota abajo, número de página arriba a la derecha y referencias en una sola lista con sangría francesa (capítulo 13).
+- **Carátula.** La oficial está en `portada-oficial.docx` y Word la inserta sin cambios al exportar.
+- **Tono.** Se quitaron las referencias por capítulo y las frases de borrador. PDF de 383 páginas.
+

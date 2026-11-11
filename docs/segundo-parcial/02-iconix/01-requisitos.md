@@ -1087,8 +1087,6 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 
 ### Lote 4: Analítica con aprendizaje automático
 
-> Alcance acordado con el integrante a cargo; el texto se ajusta a su implementación.
-
 #### UC52 Ver dashboard predictivo
 
 **Actores:** Administrador. **Paquete:** Analítica. **Requisitos:** A1, A2, A3. **Pantallas:** Dashboard de analítica.
@@ -1118,8 +1116,6 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 - **2a.** Pocos datos: el sistema avisa que la segmentación no es confiable.
 
 ### Lote 5: Pagos para países hispanohablantes
-
-> Alcance acordado con el integrante a cargo; el texto se ajusta a su implementación.
 
 #### UC54 Pagar con pasarela internacional
 

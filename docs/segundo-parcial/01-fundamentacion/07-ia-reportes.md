@@ -124,7 +124,7 @@ El costo es la expresividad: no se puede pedir lo que el catálogo no describe. 
 
 El módulo se organiza como una tubería (pipeline) de ocho etapas. Cada una recibe una representación del pedido y entrega otra más precisa: audio, texto, texto normalizado, especificación propuesta, especificación validada, SQL con parámetros, filas, y finalmente presentación y registro de auditoría.
 
-> Figura 7.1: Tubería del reporte inteligente. De izquierda a derecha: captura (texto o voz), normalización, interpretación (modelo de Azure OpenAI con respaldo por reglas), validación contra el catálogo, compilación a SQL parametrizado, ejecución dentro de una transacción con la tienda fijada en la sesión, presentación (tabla, barras, narración, PDF o Excel) y auditoría. Debajo, la capa semántica alimenta la interpretación, la validación y la compilación.
+![Figura 7.1: Tubería del reporte inteligente. La capa semántica alimenta la interpretación, la validación y la compilación a SQL.](../imagenes/fundamentacion/fig-7-1-tuberia-reporte.png)
 
 El servicio expone cinco rutas, protegidas por autenticación JWT y por un guardia que solo admite los roles ADMIN, ENCARGADO y SUPERADMIN:
 
@@ -632,21 +632,3 @@ Generar reportes dinámicos con IA no se reduce a pedirle SQL a un modelo. Para 
 Alrededor de esa traducción, los componentes deterministas aportan lo que el modelo no garantiza: un catálogo que define qué se puede pedir, un validador por lista blanca, SQL parametrizado y reproducible, aislamiento por tienda, una narración que no inventa cifras, exportaciones auditables y un registro de cada ejecución. La degradación al intérprete por reglas asegura que el negocio no se quede sin reportes cuando la IA falla, como demuestra el estado actual del proyecto.
 
 El diseño combina la representación intermedia de las primeras NLIDB, la capa semántica de la inteligencia de negocios y la capacidad lingüística de los modelos actuales. Así, un usuario puede pedir con su voz la lista de clientas que le deben entre 500 y 3000 bolivianos, con nombre, dirección y email, y recibirla en segundos en pantalla, en PDF o en Excel.
-
-## Referencias del capítulo
-
-1. Androutsopoulos, I., Ritchie, G. D., & Thanisch, P. (1995). Natural Language Interfaces to Databases – An Introduction. Natural Language Engineering, Cambridge University Press. arXiv: cmp-lg/9503016. https://arxiv.org/abs/cmp-lg/9503016
-2. Yu, T., Zhang, R., Yang, K., et al. (2018). Spider: A Large-Scale Human-Labeled Dataset for Complex and Cross-Domain Semantic Parsing and Text-to-SQL Task. Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP), 3911–3921. arXiv: 1809.08887. https://arxiv.org/abs/1809.08887
-3. Li, J., Hui, B., Qu, G., et al. (2023). Can LLM Already Serve as A Database Interface? A BIg Bench for Large-Scale Database Grounded Text-to-SQLs (BIRD). arXiv: 2305.03111. https://arxiv.org/abs/2305.03111
-4. Hong, Z., Yuan, Z., Zhang, Q., Chen, H., Dong, J., Huang, F., & Huang, X. (2024). Next-Generation Database Interfaces: A Survey of LLM-based Text-to-SQL. arXiv: 2406.08426. https://arxiv.org/abs/2406.08426
-5. Brown, T. B., Mann, B., Ryder, N., et al. (2020). Language Models are Few-Shot Learners. arXiv: 2005.14165. https://arxiv.org/abs/2005.14165
-6. Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., & Sutskever, I. (2022). Robust Speech Recognition via Large-Scale Weak Supervision. arXiv: 2212.04356. https://arxiv.org/abs/2212.04356
-7. Microsoft. How to use JSON mode with Azure OpenAI in Microsoft Foundry Models. Microsoft Learn. https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/json-mode
-8. Microsoft. How to use structured outputs with Azure OpenAI. Microsoft Learn. https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/structured-outputs
-9. Microsoft. What is speech to text? Azure Speech. Microsoft Learn. https://learn.microsoft.com/en-us/azure/ai-services/speech-service/speech-to-text
-10. Mozilla. Web Speech API. MDN Web Docs. https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API
-11. dbt Labs. dbt Semantic Layer. dbt Developer Hub. https://docs.getdbt.com/docs/use-dbt-semantic-layer/dbt-sl
-12. Google Cloud. Introduction to LookML. Looker Documentation. https://cloud.google.com/looker/docs/what-is-lookml
-13. Cube Dev. Data modeling: Getting started. Cube Documentation. https://cube.dev/docs/product/data-modeling/overview
-14. OWASP Foundation. SQL Injection Prevention Cheat Sheet. OWASP Cheat Sheet Series. https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
-15. PostgreSQL Global Development Group. PostgreSQL 18 Documentation: 9.28 System Administration Functions; 5.9 Row Security Policies. https://www.postgresql.org/docs/current/functions-admin.html y https://www.postgresql.org/docs/current/ddl-rowsecurity.html
