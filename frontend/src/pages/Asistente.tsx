@@ -1,19 +1,39 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { leerCarrito } from '../carrito'
 
 type Turno = { rol: 'clienta' | 'asistente'; texto: string }
 
-const SUGERENCIAS_CUENTA = [
-  '¿Qué tallas hay de esta prenda?',
-  '¿Hay stock en Santa Cruz?',
-  '¿Cómo van mis pedidos?',
-]
-const SUGERENCIAS_INVITADA = [
+const SUGERENCIAS_FICHA = [
   '¿Qué tallas hay de esta prenda?',
   '¿Hay stock en Santa Cruz?',
   '¿Qué colores tienen disponibles?',
+]
+
+const SUGERENCIAS_CARRITO_CUENTA = [
+  '¿Hay stock de las prendas de mi carrito?',
+  '¿Qué tallas tienen estas prendas?',
+  '¿Cómo van mis pedidos?',
+]
+
+const SUGERENCIAS_CARRITO_INVITADA = [
+  '¿Hay stock de las prendas de mi carrito?',
+  '¿Qué tallas tienen estas prendas?',
+  '¿Qué colores tienen disponibles?',
+]
+
+const SUGERENCIAS_GENERAL_CUENTA = [
+  '¿Qué prendas tienen disponibles?',
+  '¿Hay stock en Santa Cruz?',
+  '¿Cómo van mis pedidos?',
+]
+
+const SUGERENCIAS_GENERAL_INVITADA = [
+  '¿Qué prendas tienen disponibles?',
+  '¿Hay stock en Santa Cruz?',
+  '¿Qué tallas y colores tienen?',
 ]
 
 export function Asistente() {
@@ -27,7 +47,16 @@ export function Asistente() {
   const lista = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const guest = !user
-  const sugerencias = guest ? SUGERENCIAS_INVITADA : SUGERENCIAS_CUENTA
+
+  const enCarritoConItems = useMemo(() => {
+    return location.pathname.startsWith('/carrito') && leerCarrito().length > 0
+  }, [location.pathname, abierto])
+
+  const sugerencias = useMemo(() => {
+    if (productoId) return SUGERENCIAS_FICHA
+    if (enCarritoConItems) return guest ? SUGERENCIAS_CARRITO_INVITADA : SUGERENCIAS_CARRITO_CUENTA
+    return guest ? SUGERENCIAS_GENERAL_INVITADA : SUGERENCIAS_GENERAL_CUENTA
+  }, [productoId, enCarritoConItems, guest])
 
   useEffect(() => {
     lista.current?.scrollTo({ top: lista.current.scrollHeight, behavior: 'smooth' })
@@ -44,10 +73,17 @@ export function Asistente() {
     setTurno(actual => [...actual, { rol: 'clienta', texto: limpio }])
     setTexto('')
     setEnviando(true)
+    const carrito = leerCarrito()
+    const carritoIds = carrito.map(c => c.productoId).filter(Boolean)
     try {
       const res = await api<{ respuesta: string }>('/ia/bot', {
         method: 'POST',
-        body: JSON.stringify({ mensaje: limpio, productoId, historial }),
+        body: JSON.stringify({
+          mensaje: limpio,
+          productoId,
+          carritoIds: carritoIds.length ? carritoIds : undefined,
+          historial,
+        }),
       })
       setTurno(actual => [...actual, { rol: 'asistente', texto: res.respuesta }])
     } catch {
@@ -80,11 +116,13 @@ export function Asistente() {
                 <p className="assistant-status">
                   {enviando
                     ? 'Escribiendo…'
-                    : guest
-                      ? 'Invitada · catálogo'
-                      : productoId
-                        ? 'Mirando esta ficha'
-                        : 'En línea'}
+                    : productoId
+                      ? 'Mirando esta prenda'
+                      : enCarritoConItems
+                        ? 'Revisando tu carrito'
+                        : guest
+                          ? 'Invitada · catálogo'
+                          : 'En línea'}
                 </p>
               </div>
             </div>
@@ -102,9 +140,13 @@ export function Asistente() {
             {turno.length === 0 ? (
               <div className="assistant-welcome">
                 <p>
-                  {guest
-                    ? 'Preguntame por tallas y stock. Para pedidos, creá una cuenta al pagar.'
-                    : `Preguntame por tallas, stock o tus pedidos.${productoId ? ' Estoy viendo la prenda abierta.' : ''}`}
+                  {productoId
+                    ? 'Preguntame por tallas, colores o stock de esta prenda.'
+                    : enCarritoConItems
+                      ? 'Preguntame por stock, tallas de tus prendas en el carrito o tus pedidos.'
+                      : guest
+                        ? 'Preguntame por prendas, tallas y stock del catálogo.'
+                        : 'Preguntame por prendas del catálogo, tallas, stock o tus pedidos.'}
                 </p>
                 <div className="assistant-suggestions">
                   {sugerencias.map(idea => (

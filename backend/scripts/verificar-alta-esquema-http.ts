@@ -26,6 +26,7 @@ async function main() {
   assert.ok(sesion.accessToken && sesion.tienda.id);
   assert.ok(sesion.tiendas.some(t => t.tiendaId === sesion.tienda.id));
   const tiendaId = sesion.tienda.id;
+  await global.tienda.update({ where: { id: tiendaId }, data: { esPrueba: true } });
   const local = clientes.clienteTienda(tiendaId);
   assert.deepEqual(await Promise.all([local.usuario.count(), local.sucursal.count(), local.almacen.count(), local.categoria.count()]), [1, 1, 1, 6]);
   assert.equal(await global.pagoSuscripcion.count({ where: { idempotencyKey } }), 1);
@@ -50,6 +51,7 @@ async function main() {
   const segunda = await fetch('http://127.0.0.1:3301/plataforma/suscribir', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(tienda2) });
   if (segunda.status !== 201) throw new Error(`SEGUNDA_TIENDA_HTTP_${segunda.status}: ${await segunda.text()}`);
   const otra = await segunda.json() as { tienda: { id: string; slug: string } };
+  await global.tienda.update({ where: { id: otra.tienda.id }, data: { esPrueba: true } });
   const cuentaConDos = await fetch('http://127.0.0.1:3301/plataforma/cuenta', { headers: { Authorization: `Bearer ${token}` } });
   const ambas = await cuentaConDos.json() as { tiendas: { tiendaId: string }[] };
   assert.ok(ambas.tiendas.some(t => t.tiendaId === tiendaId) && ambas.tiendas.some(t => t.tiendaId === otra.tienda.id));

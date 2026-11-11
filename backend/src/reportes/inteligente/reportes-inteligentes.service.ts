@@ -198,7 +198,7 @@ export class ReportesInteligentesService {
       sql: r.sql,
       parametros: r.parametros,
       avisos: r.avisos,
-      motor: r.motor === 'modelo' ? 'IA (Azure OpenAI)' : r.motor === 'reglas' ? 'reglas locales' : 'edición manual',
+      motor: r.motor === 'modelo' ? 'IA (Google Gemini)' : r.motor === 'reglas' ? 'reglas locales' : 'edición manual',
     };
     const base = r.titulo.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'reporte';
     if (formato === 'excel') {

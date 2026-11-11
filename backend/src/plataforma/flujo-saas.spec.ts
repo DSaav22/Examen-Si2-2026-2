@@ -185,6 +185,7 @@ describe('Flujo SaaS integral: planes, cuentas, verificación, pagos simulados y
 
       expect(pasarela.cobrar).toHaveBeenCalled();
       expect(prisma.tienda.create).toHaveBeenCalled();
+      expect(prisma.tienda.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ esPrueba: false }) }));
       expect(esquemas.crear).toHaveBeenCalled();
       expect(auth.cambiarTienda).toHaveBeenCalled();
       expect(res.user.rol).toBe('ADMIN');
@@ -275,6 +276,7 @@ describe('Flujo SaaS integral: planes, cuentas, verificación, pagos simulados y
       limites.uso.mockResolvedValue({ usuarios: 2, sucursales: 1, productos: 100 });
       prisma.suscripcion = {
         findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn().mockResolvedValue({ id: 's2' }),
       };
       prisma.tienda.update = jest.fn();

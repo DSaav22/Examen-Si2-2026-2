@@ -2078,6 +2078,15 @@ body.ops-drawer-open {
 .home-product-card { min-width: 0; position: relative; }
 .home-product-media { position: relative; aspect-ratio: .68; overflow: hidden; background: var(--color-gallery, #e9e6e1); }
 .home-product-media > img { width: 100%; height: 100%; object-fit: cover; transition: transform 280ms ease; }
+.home-image-link, .catalog-image-link { display: block; width: 100%; height: 100%; }
+.detail-related-grid .detail-related-card { display: flex; flex-direction: row; align-items: center; gap: 1rem; min-width: 0; padding: .75rem; text-decoration: none; }
+.detail-related-image { display: block; flex: 0 0 88px; height: 112px; overflow: hidden; border-radius: 4px; background: var(--color-gallery, #e9e6e1); }
+.detail-related-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.detail-related-placeholder { display: grid; width: 100%; height: 100%; place-items: center; color: var(--muted); font-size: .72rem; text-align: center; }
+.detail-related-copy { display: flex; flex-direction: column; gap: .5rem; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .detail-related-grid .detail-related-card { gap: .65rem; padding: .5rem; } .detail-related-image { flex-basis: 64px; height: 84px; } }
+.home-image-link img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 280ms ease; }
+.home-product-card:hover .home-image-link img { transform: scale(1.03); }
 .home-product-card:hover .home-product-media > img { transform: scale(1.03); }
 .home-product-placeholder { display: grid; width: 100%; height: 100%; place-items: center; color: var(--muted); background: var(--line); font-weight: 800; letter-spacing: .25em; }
 .home-product-badges { position: absolute; top: 10px; left: 10px; display: flex; gap: .25rem; }
@@ -2688,7 +2697,8 @@ body.ops-drawer-open {
   padding-top: 0.25rem;
   border-top: 1px solid var(--line);
 }
-.bag-form label {
+.bag-form label,
+.bag-address-section .bag-label-text {
   display: grid;
   gap: 0.35rem;
   font-size: 0.72rem;
@@ -2696,6 +2706,10 @@ body.ops-drawer-open {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+}
+.bag-address-section {
+  display: grid;
+  gap: 0.35rem;
 }
 .bag-form select,
 .bag-form input {

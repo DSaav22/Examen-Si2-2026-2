@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { alCambiarCola, listarOps, quitarOp, reintentar, type OperacionOffline } from '../offline/cola'
-import { activarPush, desactivarPush, estadoPush, instalada, useInstalar, type EstadoPush } from '../offline/pwa'
+import { activarPush, desactivarPush, estadoPush, type EstadoPush } from '../offline/pwa'
+import { InstalarApp } from './InstalarApp'
 import { sincronizar, useEstadoSync } from '../offline/sync'
 import { OpsBtn, OpsStatus } from './ops/OpsUi'
 
@@ -160,20 +161,14 @@ export function ColaDispositivo({ turnoId, vacio }: { turnoId?: string; vacio?: 
 
 /** Instalar la app y activar notificaciones push. */
 export function AccionesPwa() {
-  const { puede, instalar } = useInstalar()
   const [push, setPush] = useState<EstadoPush>('inactivo')
   const [msg, setMsg] = useState('')
   useEffect(() => {
     void estadoPush().then(setPush)
   }, [])
-  if (push === 'no-soportado' && !puede) return null
   return (
     <div className="pwa-acciones">
-      {puede && !instalada() ? (
-        <button type="button" className="ops-tool-link" onClick={() => void instalar()}>
-          Instalar app
-        </button>
-      ) : null}
+      <InstalarApp />
       {push === 'inactivo' ? (
         <button
           type="button"

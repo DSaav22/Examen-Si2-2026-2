@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ModeloClient } from '../ia/modelo.client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,13 +16,13 @@ export class ReportesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly modelo: ModeloClient,
-    @Optional() private readonly esquemas?: PrismaEsquemasService,
-    @Optional() private readonly config?: ConfigService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
 
   private db(): PrismaService {
     const tiendaId = TenantContext.tiendaId();
-    if (tiendaId && this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' && this.esquemas) {
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
       return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
     }
     return this.prisma;

@@ -75,7 +75,7 @@ export function SelectorTienda() {
 }
 
 /** /t/:slug abre la vitrina de esa tienda (y cambia la sesión si la cuenta también trabaja allí). */
-export function TiendaPorSlug() {
+export function TiendaPorSlug({ administrar = false }: { administrar?: boolean }) {
   const { slug = '' } = useParams()
   const { user, tienda, tiendas, cambiarTienda, logout } = useAuth()
 
@@ -89,14 +89,14 @@ export function TiendaPorSlug() {
       }
       if (!vivo) return
       if (tiendaActiva() !== slug) fijarTienda(slug)
-      window.location.replace('/inicio')
+      window.location.replace(administrar ? '/login?next=%2Fadmin' : '/inicio')
     })()
     return () => {
       vivo = false
     }
     // Solo al entrar a la ruta.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug])
+  }, [slug, administrar])
 
   return <p style={{ padding: '3rem', textAlign: 'center' }}>Abriendo tienda…</p>
 }

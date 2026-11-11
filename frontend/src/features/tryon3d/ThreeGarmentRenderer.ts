@@ -22,6 +22,7 @@ export class ThreeGarmentRenderer implements GarmentRenderer {
   private readonly modelRoot = new Group()
   private model: Group | null = null
   private sourceWidth = 1
+  private aspect = 1
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' })
@@ -61,6 +62,7 @@ export class ThreeGarmentRenderer implements GarmentRenderer {
 
   resize(width: number, height: number) {
     const aspect = Math.max(width / Math.max(height, 1), 0.1)
+    this.aspect = aspect
     this.camera.left = -aspect
     this.camera.right = aspect
     this.camera.top = 1
@@ -71,11 +73,10 @@ export class ThreeGarmentRenderer implements GarmentRenderer {
 
   render(pose: TryOnPose | null, extraRotation = 0) {
     if (this.model && pose?.visible) {
-      // Cámara ortográfica: el ancho visible es ~2.1 unidades. Una prenda
-      // completa suele medir 1.85 veces el ancho entre hombros.
-      const scale = (pose.shoulderWidth * 2.1 * 1.85) / this.sourceWidth
+      // El adaptador ya ajusta el ancho de la prenda según su categoría.
+      const scale = (pose.shoulderWidth * 2 * this.aspect) / this.sourceWidth
       this.anchor.visible = true
-      this.anchor.position.set((pose.torsoX - 0.5) * 2.1, (0.5 - pose.torsoY) * 2.05, 0)
+      this.anchor.position.set((pose.torsoX - 0.5) * 2 * this.aspect, (0.5 - pose.torsoY) * 2, 0)
       this.anchor.scale.setScalar(scale)
       this.anchor.rotation.set(0, pose.turnRadians + extraRotation, 0)
     } else {

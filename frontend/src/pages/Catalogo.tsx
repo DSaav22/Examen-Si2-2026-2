@@ -156,7 +156,7 @@ function ProductCard({
   return (
     <article onClick={() => rememberProduct(product.id)} className={`catalog-product-card${selected ? ' is-selected' : ''}`}>
       <div className="catalog-product-media">
-        <ProductImage product={product} />
+        <Link to={`/ficha/${product.id}?vista=tienda`} className="catalog-image-link" aria-label={`Ver ${product.nombre}`}><ProductImage product={product} /></Link>
         <div className="catalog-badges">
           {discount > 0 ? <span>-{discount}%</span> : null}
           {stock.low ? <span>Últimas unidades</span> : null}
@@ -168,7 +168,7 @@ function ProductCard({
         <button type="button" className="catalog-quick-view" onClick={onQuickView}>Vista rápida</button>
       </div>
       <div className="catalog-product-info">
-        <Link to={`/ficha/${product.id}`} className="catalog-product-name">{product.nombre}</Link>
+        <Link to={`/ficha/${product.id}?vista=tienda`} className="catalog-product-name">{product.nombre}</Link>
         <span className="catalog-product-meta">{catalogLabel(product.categoria)} · {catalogLabel(product.ocasion)}</span>
         <span className="catalog-product-sku">SKU {variant?.sku ?? 'No disponible'}</span>
         <div className="catalog-price-row">
@@ -328,7 +328,7 @@ function ComparePanel({ products, onClose }: { products: Producto[]; onClose: ()
               <span>{catalogLabel(product.ocasion)}</span>
               <span>{catalogLabel(product.material) || 'No especificado'}</span>
               <span>{catalogLabel(product.ajuste) || 'No especificado'}</span>
-              <Link className="ui-button ui-button--secondary" to={`/ficha/${product.id}`}>
+              <Link className="ui-button ui-button--secondary" to={`/ficha/${product.id}?vista=tienda`}>
                 Ver detalle
               </Link>
             </div>
@@ -805,10 +805,10 @@ export function Catalogo() {
   }, [compare.length])
 
   useEffect(() => {
-    api<{ id: string; nombre: string }[]>('/catalogo/categorias')
+    api<Producto[]>('/catalogo/productos')
       .then(list => {
-        const names = list.map(c => c.nombre).filter(Boolean)
-        if (names.length) setCategorias(names)
+        const names = [...new Set(list.map(producto => producto.categoria?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'))
+        setCategorias(names)
       })
       .catch(() => undefined)
   }, [])
@@ -1355,7 +1355,7 @@ export function Catalogo() {
               <h2 id="quick-title">{quickView.nombre}</h2>
               <p>{quickView.descripcion}</p>
               <strong>Bs {precioEfectivo(quickView).toFixed(2)}</strong>
-              <Link className="ui-button ui-button--primary" to={`/ficha/${quickView.id}`}>
+              <Link className="ui-button ui-button--primary" to={`/ficha/${quickView.id}?vista=tienda`}>
                 Abrir detalle
               </Link>
             </div>

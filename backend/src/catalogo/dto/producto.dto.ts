@@ -9,6 +9,12 @@ import {
 } from 'class-validator';
 
 export class CrearProductoDto {
+  @IsOptional() @IsString() material?: string;
+  @IsOptional() @IsString() ajuste?: string;
+  @IsOptional() @IsString() composicion?: string;
+  @IsOptional() @IsString() cuidados?: string;
+  @IsOptional() @IsString() origen?: string;
+  @IsOptional() @IsString() modelo?: string;
   @IsString()
   nombre!: string;
 
@@ -60,6 +66,12 @@ export class CrearProductoDto {
 }
 
 export class ActualizarProductoDto {
+  @IsOptional() @IsString() material?: string;
+  @IsOptional() @IsString() ajuste?: string;
+  @IsOptional() @IsString() composicion?: string;
+  @IsOptional() @IsString() cuidados?: string;
+  @IsOptional() @IsString() origen?: string;
+  @IsOptional() @IsString() modelo?: string;
   @IsOptional()
   @IsString()
   nombre?: string;

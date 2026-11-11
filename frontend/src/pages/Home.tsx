@@ -37,7 +37,7 @@ function HomeProductCard({
   return (
     <article className="home-product-card">
       <div className="home-product-media">
-        <ProductImage product={product} variant={variant} />
+        <Link to={`/ficha/${product.id}?vista=tienda`} className="home-image-link" aria-label={`Ver ${product.nombre}`}><ProductImage product={product} variant={variant} /></Link>
         <div className="home-product-badges">
           {discount > 0 ? <span>-{discount}%</span> : null}
         </div>
@@ -50,11 +50,11 @@ function HomeProductCard({
         >
           {loved ? '♥' : '♡'}
         </button>
-        <Link className="home-product-quick" to={`/ficha/${product.id}`}>
+        <Link className="home-product-quick" to={`/ficha/${product.id}?vista=tienda`}>
           Ver prenda
         </Link>
       </div>
-      <Link className="home-product-info" to={`/ficha/${product.id}`}>
+      <Link className="home-product-info" to={`/ficha/${product.id}?vista=tienda`}>
         <strong>{product.nombre}</strong>
         <span>
           {catalogLabel(product.categoria)} · {catalogLabel(product.ocasion)}
@@ -325,7 +325,7 @@ export function Home() {
           <p>Tres piezas de la selección para un uniforme contemporáneo.</p>
           <div className="home-look-list">
             {look.map(product => (
-              <Link key={product.id} to={`/ficha/${product.id}`}>
+              <Link key={product.id} to={`/ficha/${product.id}?vista=tienda`}>
                 <span>{product.nombre}</span>
                 <b>Bs {precioEfectivo(product).toFixed(0)}</b>
               </Link>

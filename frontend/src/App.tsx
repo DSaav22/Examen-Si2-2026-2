@@ -30,6 +30,7 @@ import { Sincronizacion } from './pages/Sincronizacion'
 import { Creditos } from './pages/Creditos'
 import { PlataformaLayout } from './plataforma/comun'
 import { Planes } from './plataforma/Planes'
+import { Portada } from './plataforma/Portada'
 import { Empezar, PlataformaLogin, Verificar } from './plataforma/Acceso'
 import { MisTiendas } from './plataforma/MisTiendas'
 import { NuevaTienda } from './plataforma/NuevaTienda'
@@ -71,7 +72,9 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Registro />} />
             <Route path="/t/:slug" element={<TiendaPorSlug />} />
+            <Route path="/t/:slug/admin" element={<TiendaPorSlug administrar />} />
             <Route element={<PlataformaLayout />}>
+              <Route path="/" element={<Portada />} />
               <Route path="/planes" element={<Planes />} />
               <Route path="/empezar" element={<Empezar />} />
               <Route path="/verificar" element={<Verificar />} />
@@ -80,7 +83,6 @@ export default function App() {
               <Route path="/plataforma/nueva" element={<NuevaTienda />} />
               <Route path="/plataforma/admin" element={<MetricasPlataforma />} />
             </Route>
-            <Route path="/" element={<Navigate to="/inicio" replace />} />
             <Route element={<Shell />}>
               <Route path="/inicio" element={<Home />} />
               <Route path="/catalogo" element={<Catalogo />} />

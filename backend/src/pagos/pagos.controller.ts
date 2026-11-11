@@ -8,7 +8,6 @@ import {
   Get,
   Logger,
   NotFoundException,
-  Optional,
   Param,
   Post,
   UseGuards,
@@ -43,13 +42,13 @@ export class PagosController {
     private readonly inventario: InventarioService,
     private readonly ventas: VentasService,
     private readonly notificaciones: NotificacionesService,
-    @Optional() private readonly esquemas?: PrismaEsquemasService,
-    @Optional() private readonly config?: ConfigService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
 
   private db(): PrismaService {
     const tiendaId = TenantContext.tiendaId();
-    if (tiendaId && (this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas) {
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
       return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
     }
     return this.prisma;
@@ -58,7 +57,7 @@ export class PagosController {
   @Get('metodos')
   @Roles(Rol.CLIENTA, Rol.ADMIN, Rol.CAJERO, Rol.ENCARGADO, Rol.SUPERADMIN)
   async metodos() {
-    const tienda = await ((this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas
+    const tienda = await (this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true'
       ? this.esquemas.clientePlataforma()
       : this.prisma).tienda.findUniqueOrThrow({ where: { id: TenantContext.tiendaIdOrThrow() }, select: { pais: true } });
     return { pais: tienda.pais, metodos: metodosSimuladosPorPais(tienda.pais) };
@@ -101,7 +100,7 @@ export class PagosController {
       throw new ForbiddenException({ codigo: 'NO_ES_TU_PAGO' });
     }
 
-    const tienda = await ((this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas
+    const tienda = await (this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true'
       ? this.esquemas.clientePlataforma()
       : this.prisma).tienda.findUniqueOrThrow({ where: { id: TenantContext.tiendaIdOrThrow() }, select: { pais: true } });
     const metodo = pago.referencia?.startsWith('SIM:') ? pago.referencia.split(':')[1] : undefined;

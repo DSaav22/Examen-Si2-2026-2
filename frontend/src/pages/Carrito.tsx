@@ -1,4 +1,5 @@
 import { BotonesPago, medioDeMetodo, useMetodosPago } from '../shared/PagosSimulados'
+import { LogoPago } from '../shared/LogosPagos'
 import { useEstadoSync } from '../offline/sync'
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
@@ -54,6 +55,36 @@ export function Carrito() {
   const [cuponCodigo, setCuponCodigo] = useState('')
   const [enviandoCorreo, setEnviandoCorreo] = useState(false)
   const [correoMsg, setCorreoMsg] = useState('')
+
+  // Formulario rápido para agregar dirección desde el carrito
+  const [creandoDireccion, setCreandoDireccion] = useState(false)
+  const [nuevaDir, setNuevaDir] = useState({ etiqueta: 'Casa', detalle: '', ciudad: '' })
+  const [guardandoDir, setGuardandoDir] = useState(false)
+  const [dirError, setDirError] = useState('')
+
+  async function handleCrearDireccion(e: React.FormEvent) {
+    e.preventDefault()
+    setDirError('')
+    if (!nuevaDir.detalle.trim() || !nuevaDir.ciudad.trim()) {
+      setDirError('Completá la dirección y la ciudad.')
+      return
+    }
+    setGuardandoDir(true)
+    try {
+      const creada = await api<Direccion>('/cliente/direcciones', {
+        method: 'POST',
+        body: JSON.stringify(nuevaDir),
+      })
+      setDirecciones(prev => [creada, ...prev])
+      setDireccionId(creada.id)
+      setCreandoDireccion(false)
+      setNuevaDir({ etiqueta: 'Casa', detalle: '', ciudad: '' })
+    } catch {
+      setDirError('No se pudo guardar la dirección. Revisá los datos.')
+    } finally {
+      setGuardandoDir(false)
+    }
+  }
 
   useEffect(() => {
     api<Sucursal[]>('/catalogo/sucursales').then(s => {
@@ -319,18 +350,110 @@ export function Carrito() {
                 void pedir()
               }}
             >
-              <label>
-                Dirección de envío
-                {sinDireccion ? (
-                  <p className="bag-form-hint error">
-                    No tenés direcciones.{' '}
-                    <Link to="/cuenta">Agregar en Mi cuenta</Link>
-                  </p>
+              <div className="bag-address-section">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="bag-label-text">Dirección de envío</span>
+                  {!creandoDireccion && (
+                    <button
+                      type="button"
+                      className="bag-link-btn"
+                      onClick={() => {
+                        setCreandoDireccion(true)
+                        setDirError('')
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--wine, #7e1d35)', cursor: 'pointer', padding: 0, fontSize: '0.78rem', textDecoration: 'underline', fontWeight: 600 }}
+                    >
+                      + Nueva dirección
+                    </button>
+                  )}
+                </div>
+
+                {creandoDireccion ? (
+                  <div
+                    className="bag-new-address-box"
+                    style={{
+                      border: '1px solid var(--line, #e2ded9)',
+                      padding: '0.75rem',
+                      background: 'var(--surface, #faf8f5)',
+                      display: 'grid',
+                      gap: '0.5rem',
+                      marginTop: '0.35rem',
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Añadir dirección de entrega
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                      <input
+                        placeholder="Etiqueta (ej. Casa, Trabajo)"
+                        value={nuevaDir.etiqueta}
+                        onChange={e => setNuevaDir({ ...nuevaDir, etiqueta: e.target.value })}
+                        style={{ fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
+                      />
+                      <input
+                        placeholder="Ciudad (ej. Santa Cruz)"
+                        value={nuevaDir.ciudad}
+                        onChange={e => setNuevaDir({ ...nuevaDir, ciudad: e.target.value })}
+                        style={{ fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
+                        required
+                      />
+                    </div>
+                    <input
+                      placeholder="Dirección exacta (Calle, número, barrio)"
+                      value={nuevaDir.detalle}
+                      onChange={e => setNuevaDir({ ...nuevaDir, detalle: e.target.value })}
+                      style={{ fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
+                      required
+                    />
+                    {dirError && (
+                      <p className="error" style={{ margin: 0, fontSize: '0.75rem' }}>
+                        {dirError}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                      <button
+                        type="button"
+                        className="ui-button ui-button--primary"
+                        style={{ minHeight: '34px', fontSize: '0.78rem', padding: '0 0.8rem', flex: 1 }}
+                        disabled={guardandoDir}
+                        onClick={e => void handleCrearDireccion(e)}
+                      >
+                        {guardandoDir ? 'Guardando...' : 'Guardar y usar'}
+                      </button>
+                      <button
+                        type="button"
+                        className="ui-button ui-button--secondary"
+                        style={{ minHeight: '34px', fontSize: '0.78rem', padding: '0 0.8rem' }}
+                        disabled={guardandoDir}
+                        onClick={() => {
+                          setCreandoDireccion(false)
+                          setDirError('')
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : sinDireccion ? (
+                  <div className="bag-form-hint" style={{ marginTop: '0.25rem' }}>
+                    <p style={{ margin: '0 0 0.4rem', color: 'var(--muted, #666)' }}>
+                      No tenés direcciones guardadas para el envío.
+                    </p>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--secondary"
+                      style={{ minHeight: '36px', width: '100%', fontSize: '0.82rem' }}
+                      onClick={() => setCreandoDireccion(true)}
+                    >
+                      + Añadir dirección aquí
+                    </button>
+                  </div>
                 ) : (
                   <select
                     value={direccionId}
                     onChange={e => setDireccionId(e.target.value)}
                     required
+                    style={{ marginTop: '0.35rem' }}
                   >
                     {direcciones.map(d => (
                       <option key={d.id} value={d.id}>
@@ -339,7 +462,7 @@ export function Carrito() {
                     ))}
                   </select>
                 )}
-              </label>
+              </div>
 
               <label>
                 Retiro / despacho desde
@@ -364,7 +487,26 @@ export function Carrito() {
                 />
               </label>
 
-              <button type="button" className="ui-button ui-button--secondary" aria-pressed={medio === 'contra_entrega'} onClick={() => { setMedio('contra_entrega'); setMetodo('') }}>Contra entrega</button>
+              <button
+                type="button"
+                className={`ui-button ${medio === 'contra_entrega' ? 'ui-button--primary' : 'ui-button--secondary'}`}
+                aria-pressed={medio === 'contra_entrega'}
+                onClick={() => { setMedio('contra_entrega'); setMetodo('') }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  padding: '8px 12px',
+                  marginBottom: '0.6rem',
+                  borderRadius: 8,
+                  fontWeight: medio === 'contra_entrega' ? 700 : 500,
+                  border: medio === 'contra_entrega' ? '2px solid var(--accent, #74253a)' : undefined,
+                }}
+              >
+                <LogoPago codigo="contra_entrega" size={26} />
+                <span>Pago contra entrega</span>
+              </button>
               <BotonesPago disabled={procesandoPago || !!pagoId} pais={pagos.pais} metodos={pagos.metodos} valor={metodo} onChange={codigo => { setMetodo(codigo); setMedio(medioDeMetodo(codigo)) }} />
               {pagos.error ? <p role="alert">{pagos.error}</p> : null}
 

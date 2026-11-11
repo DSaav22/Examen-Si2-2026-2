@@ -105,6 +105,7 @@ model Tienda {
   slug          String        @unique
   nombre        String
   logo          String?
+  esPrueba      Boolean       @default(false) @map("es_prueba")
   pais          String        @default("BO")
   moneda        String        @default("BOB")
   estado        EstadoTienda  @default(activa)

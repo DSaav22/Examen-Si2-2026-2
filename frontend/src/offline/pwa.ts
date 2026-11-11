@@ -19,17 +19,25 @@ if (typeof window !== 'undefined') {
 }
 
 export function instalada() {
-  return window.matchMedia('(display-mode: standalone)').matches
+  return window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
 }
 
 /** El navegador ofrece instalar la PWA: devuelve la acción para mostrar el diálogo. */
 export function useInstalar() {
   const [puede, setPuede] = useState(() => Boolean(aviso))
+  const [estaInstalada, setEstaInstalada] = useState(instalada)
   useEffect(() => {
     const fn = () => setPuede(Boolean(aviso))
+    const media = window.matchMedia('(display-mode: standalone)')
+    const actualizar = () => setEstaInstalada(instalada())
+    const confirmar = () => setEstaInstalada(true)
     oyentes.add(fn)
+    media.addEventListener('change', actualizar)
+    window.addEventListener('appinstalled', confirmar)
     return () => {
       oyentes.delete(fn)
+      media.removeEventListener('change', actualizar)
+      window.removeEventListener('appinstalled', confirmar)
     }
   }, [])
   async function instalar() {
@@ -37,10 +45,10 @@ export function useInstalar() {
     await aviso.prompt()
     const { outcome } = await aviso.userChoice
     aviso = null
-    setPuede(false)
+    oyentes.forEach(fn => fn())
     return outcome === 'accepted'
   }
-  return { puede, instalar }
+  return { puede, instalar, estaInstalada }
 }
 
 export type EstadoPush = 'no-soportado' | 'denegado' | 'activo' | 'inactivo'

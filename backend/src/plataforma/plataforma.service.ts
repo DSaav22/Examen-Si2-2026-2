@@ -69,6 +69,21 @@ export class PlataformaService {
     return planes.map((p) => this.planPublico(p));
   }
 
+  /** Solo identidad pública; nunca cuentas, usuarios, ventas o datos de facturación. */
+  async directorio() {
+    const ahora = new Date();
+    return TenantContext.sinFiltro(() => this.prisma.tienda.findMany({
+      where: {
+        esPrueba: false,
+        estado: 'activa',
+        suscripciones: { some: { estado: 'activa', inicio: { lte: ahora }, venceEn: { gt: ahora } } },
+      },
+      select: { slug: true, nombre: true, logo: true, pais: true },
+      orderBy: [{ nombre: 'asc' }, { slug: 'asc' }],
+      take: 60,
+    }));
+  }
+
   private planPublico(p: Plan) {
     const mensual = Number(p.precioMensual);
     return {
@@ -202,6 +217,7 @@ export class PlataformaService {
               slug,
               nombre: dto.tienda.nombre.trim(),
               logo,
+              esPrueba: this.config.get<string>('TENANT_ALTA_PRUEBA') === 'true',
               pais,
               moneda,
               duenoCuentaId: cuenta.id,

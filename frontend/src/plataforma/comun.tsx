@@ -5,6 +5,7 @@ import { apiCuenta } from '../api'
 import { homePorRol } from '../roles'
 import type { TiendaDeCuenta } from '../tienda'
 import type { Rol } from '../types'
+import { ThemeToggle } from '../shared/ThemeToggle'
 import '../styles/plataforma.css'
 
 export type Periodo = 'MENSUAL' | 'TRIMESTRAL' | 'ANUAL'
@@ -107,8 +108,9 @@ export function usePlataforma() {
 export function PlataformaLayout() {
   const ruta = useLocation().pathname
   const esPlanes = ruta === '/planes'
+  const esPortada = ruta === '/'
   const esWizard = ruta === '/plataforma/nueva'
-  const esMarketing = esPlanes || ruta === '/empezar' || ruta === '/verificar' || ruta === '/plataforma/login' || ruta === '/plataforma' || esWizard
+  const esMarketing = esPortada || esPlanes || ruta === '/empezar' || ruta === '/verificar' || ruta === '/plataforma/login' || ruta === '/plataforma' || esWizard
   const [sesion, setSesion] = useState<SesionCuenta | null>(leerCuenta)
   const { abrirSesion } = useAuth()
   const navigate = useNavigate()
@@ -162,20 +164,23 @@ export function PlataformaLayout() {
   return (
     <div className={`pf${esMarketing ? ' pf--planes' : ''}${esWizard ? ' pf--wizard' : ''}`}>
       <header className="pf-top">
-        <Link to="/planes" className="pf-brand">
+        <Link to="/" className="pf-brand">
           <span className="pf-brand-mark">EnsayAR</span>
           {!esMarketing && <span className="pf-brand-sub">Cloud para tiendas de moda</span>}
         </Link>
         {!esWizard && <nav className="pf-nav" aria-label="Plataforma">
-          {esMarketing && <a href={esPlanes ? '#funcionalidades' : '/planes#funcionalidades'}>Funcionalidades</a>}
+          <NavLink to="/" end>Inicio</NavLink>
+          {esMarketing && <a href={esPortada ? '#funcionalidades' : '/#funcionalidades'}>Funcionalidades</a>}
+          {esMarketing && <a href={esPortada ? '#empresas' : '/#empresas'}>Tiendas</a>}
           {esMarketing ? <a href={esPlanes ? '#planes' : '/planes#planes'}>Planes</a> : <NavLink to="/planes">Planes</NavLink>}
           {esMarketing && <a href={esPlanes ? '#ayuda' : '/planes#ayuda'}>Ayuda</a>}
           {sesion ? <NavLink to="/plataforma" end>Mis tiendas</NavLink> : null}
           {sesion?.cuenta.plataforma ? <NavLink to="/plataforma/admin">Métricas</NavLink> : null}
           {!esMarketing && <Link to="/t/vesta">Ver tienda demo</Link>}
         </nav>}
-        {!esWizard && <div className="pf-top-actions">
-          {sesion ? (
+        <div className="pf-top-actions">
+          <ThemeToggle />
+          {!esWizard && (sesion ? (
             <>
               <span className="pf-who" title={sesion.cuenta.email}>{sesion.cuenta.nombre || sesion.cuenta.email}</span>
               <button type="button" className="pf-btn pf-btn--ghost" onClick={salir}>Salir</button>
@@ -185,8 +190,8 @@ export function PlataformaLayout() {
               <Link className={esMarketing ? 'pf-login-link' : 'pf-btn pf-btn--ghost'} to="/plataforma/login">Iniciar sesión</Link>
               <Link className="pf-btn" to="/empezar">Crear mi tienda</Link>
             </>
-          )}
-        </div>}
+          ))}
+        </div>
       </header>
       <main className="pf-main">
         <Outlet context={ctx} />

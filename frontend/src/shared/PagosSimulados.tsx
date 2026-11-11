@@ -3,49 +3,16 @@ import { api } from '../api'
 import { tiendaActiva } from '../tienda'
 import { conCache } from '../offline/cache'
 import { esFalloRed } from '../offline/red'
+import { LogoPago } from './LogosPagos'
 
 export type MetodoSimulado = { codigo: string; nombre: string; simulado: boolean }
 export function medioDeMetodo(codigo: string): 'tarjeta' | 'transferencia' | 'qr' {
   return codigo === 'tarjeta' ? 'tarjeta' : codigo === 'transferencia' ? 'transferencia' : 'qr'
 }
 
-/** Icono geométrico y genérico para métodos simulados, sin marcas comerciales. */
+/** Icono / Logo oficial del método de pago */
 export function IconoPagoSimulado({ codigo }: { codigo: string }) {
-  const tarjeta = codigo === 'tarjeta'
-  const qr = codigo === 'qr_bolivia' || codigo === 'pix' || codigo.startsWith('qr')
-  const banco = codigo === 'transferencia' || codigo === 'pse' || codigo === 'spei' || codigo === 'banco_popular'
-  return (
-    <svg
-      style={{ width: 16, height: 16, verticalAlign: 'middle', marginRight: 6, flexShrink: 0 }}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {tarjeta ? (
-        <>
-          <rect x="2" y="5" width="20" height="14" rx="2" />
-          <path d="M2 9h20M5 15h4" />
-        </>
-      ) : qr ? (
-        <>
-          <path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM20 15v3M15 21h3M21 21h.01" />
-        </>
-      ) : banco ? (
-        <>
-          <path d="M3 9l9-6 9 6M4 10h16M4 19h16M7 10v9M12 10v9M17 10v9" />
-        </>
-      ) : (
-        <>
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <path d="M3 9h18M15 14h3" />
-        </>
-      )}
-    </svg>
-  )
+  return <LogoPago codigo={codigo} size={22} className="pago-logo-badge" />
 }
 
 export function useMetodosPago() {
@@ -65,22 +32,41 @@ export function useMetodosPago() {
   return { ...datos, error }
 }
 export function BotonesPago({ metodos, pais, valor, onChange, disabled = false }: { metodos: MetodoSimulado[]; pais: string; valor: string; onChange: (codigo: string) => void; disabled?: boolean }) {
-  return <fieldset><legend>Pago simulado {pais ? `- ${pais}` : ''}</legend>
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      {metodos.map(m => (
-        <button
-          type="button"
-          disabled={disabled}
-          className="ui-button ui-button--secondary"
-          key={m.codigo}
-          aria-pressed={valor === m.codigo}
-          onClick={() => onChange(m.codigo)}
-          style={{ display: 'inline-flex', alignItems: 'center' }}
-        >
-          <IconoPagoSimulado codigo={m.codigo} />
-          {valor === m.codigo ? 'Seleccionado: ' : ''}{m.nombre}
-        </button>
-      ))}
-    </div><small>Demostración: no se cobra dinero real.</small>
+  return <fieldset style={{ border: '1px solid var(--line, #e0d7d3)', borderRadius: 8, padding: '0.8rem' }}><legend style={{ padding: '0 6px', fontWeight: 600 }}>Método de pago {pais ? `(${pais})` : ''}</legend>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 10, marginTop: 4 }}>
+      {metodos.map(m => {
+        const seleccionado = valor === m.codigo
+        return (
+          <button
+            type="button"
+            disabled={disabled}
+            className={`ui-button ${seleccionado ? 'ui-button--primary' : 'ui-button--secondary'}`}
+            key={m.codigo}
+            aria-pressed={seleccionado}
+            onClick={() => onChange(m.codigo)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 12px',
+              minHeight: 46,
+              textAlign: 'left',
+              justifyContent: 'flex-start',
+              border: seleccionado ? '2px solid var(--accent, #74253a)' : undefined,
+              boxShadow: seleccionado ? '0 2px 8px rgba(116, 37, 58, 0.25)' : undefined,
+              borderRadius: 8,
+              transition: 'all 0.2s ease',
+              width: '100%',
+            }}
+          >
+            <LogoPago codigo={m.codigo} size={28} />
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+              <span style={{ fontSize: '0.88rem', fontWeight: seleccionado ? 700 : 500 }}>{m.nombre}</span>
+              <span style={{ fontSize: '0.72rem', opacity: 0.75 }}>Simulado</span>
+            </div>
+          </button>
+        )
+      })}
+    </div><small style={{ display: 'block', marginTop: 8, color: 'var(--muted, #666)' }}>Modo demostración: no se descuenta dinero real.</small>
   </fieldset>
 }

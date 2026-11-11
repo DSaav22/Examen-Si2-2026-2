@@ -18,7 +18,7 @@ async function main() {
   const cuenta = await global.cuenta.findFirstOrThrow({ where: { emailVerificado: true } });
   const abortada = randomUUID();
   await assert.rejects(() => global.$transaction(async tx => {
-    await tx.tienda.create({ data: { id: abortada, slug: `lab-fallo-${abortada}`, nombre: 'Laboratorio fallo', duenoCuentaId: cuenta.id } });
+    await tx.tienda.create({ data: { id: abortada, esPrueba: true, slug: `lab-fallo-${abortada}`, nombre: 'Laboratorio fallo', duenoCuentaId: cuenta.id } });
     await provisionador.crear(tx, abortada, cuenta, 'Laboratorio fallo');
     throw new Error('FALLO_INYECTADO');
   }, { timeout: 60000 }), /FALLO_INYECTADO/);
@@ -29,7 +29,7 @@ async function main() {
 
   const tienda = randomUUID();
   await global.$transaction(async tx => {
-    await tx.tienda.create({ data: { id: tienda, slug: `lab-alta-${tienda}`, nombre: 'Laboratorio sintético', duenoCuentaId: cuenta.id } });
+    await tx.tienda.create({ data: { id: tienda, esPrueba: true, slug: `lab-alta-${tienda}`, nombre: 'Laboratorio sintético', duenoCuentaId: cuenta.id } });
     await provisionador.crear(tx, tienda, cuenta, 'Laboratorio sintético');
   }, { timeout: 60000 });
   const local = clientes.clienteTienda(tienda);

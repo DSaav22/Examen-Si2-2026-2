@@ -410,3 +410,91 @@
 .tienda-switch-meta { margin: .3rem 0 0; font-size: .75rem; opacity: .75; }
 .tienda-switch-meta a { color: inherit; }
 .tienda-switch-error { margin: .3rem 0 0; font-size: .75rem; color: #e5484d; }
+
+/* Tema claro para la plataforma y el proceso de creación de tienda. */
+[data-theme='light'] .pf--planes {
+  --pf-bg: #f7f3ee;
+  --pf-card: #fff;
+  --pf-ink: #211b1c;
+  --pf-muted: #6f6262;
+  --pf-line: #dfd4cd;
+  --pf-accent: #70283d;
+  --pf-accent-ink: #fff;
+  --pf-soft: #f4e9ec;
+  --pf-ok: #28734d;
+}
+.pf .theme-toggle { color: var(--pf-ink); border-color: var(--pf-line); white-space: nowrap; }
+.pf .theme-toggle:hover { color: var(--pf-ink); background: var(--pf-soft); }
+.pf--wizard .pf-top-actions { margin-left: auto; }
+[data-theme='light'] .pf--planes .pf-brand-mark,
+[data-theme='light'] .pf--planes .pf-nav a,
+[data-theme='light'] .pf--planes .pf-login-link,
+[data-theme='light'] .pf--planes .pf-account-brand,
+[data-theme='light'] .pf--planes .pf-email-value { color: var(--pf-ink); }
+[data-theme='light'] .pf--planes .pf-toggle { background: #e9dfd9; }
+[data-theme='light'] .pf--planes .pf-features li::before { color: var(--pf-ok); }
+[data-theme='light'] .pf--planes .pf-account-card,
+[data-theme='light'] .pf--planes .pf-store,
+[data-theme='light'] .pf--planes .pf-empty,
+[data-theme='light'] .pf--wizard .pf-plan-option,
+[data-theme='light'] .pf--wizard .pf-store-form,
+[data-theme='light'] .pf--wizard .pf-subscription-payment,
+[data-theme='light'] .pf--wizard .pf-success-card,
+[data-theme='light'] .pf-selection { background: var(--pf-card); border-color: var(--pf-line); }
+[data-theme='light'] .pf--planes .pf-account-card .pf-form label,
+[data-theme='light'] .pf--wizard .pf-plan-option .pf-pick-price,
+[data-theme='light'] .pf-selection-total span,
+[data-theme='light'] .pf-wizard-count,
+[data-theme='light'] .pf-success-details dt,
+[data-theme='light'] .pf--wizard .pf-subscription-payment .pf-summary h2,
+[data-theme='light'] .pf-subscription-methods legend { color: var(--pf-muted); }
+[data-theme='light'] .pf--planes .pf-account-card input { background: #fff; color: var(--pf-ink); border-color: #cfc2bc; }
+[data-theme='light'] .pf--planes .pf-account-card input.is-valid { border-color: #28734d; }
+[data-theme='light'] .pf--planes .pf-account-card input.is-invalid { border-color: #b42318; }
+[data-theme='light'] .pf-validation-ok,
+[data-theme='light'] .pf-password-rules .is-met,
+[data-theme='light'] .pf-password-rules li span { color: #28734d; }
+[data-theme='light'] .pf-validation-error { color: #a8201a; }
+[data-theme='light'] .pf-password-rules { color: var(--pf-muted); }
+[data-theme='light'] .pf-verify-card .pf-verify-demo { color: #70452f; background: #fff6ed; border-color: #d6ad92; }
+[data-theme='light'] .pf--wizard .pf-wizard-steps li.is-on,
+[data-theme='light'] .pf-pick-price strong { color: var(--pf-ink); }
+[data-theme='light'] .pf--wizard .pf-plan-option.is-on,
+[data-theme='light'] .pf--wizard .pf-subscription-methods .pf-payment-option.is-selected { background: var(--pf-soft); border-color: var(--pf-accent); }
+[data-theme='light'] .pf--wizard .pf-subscription-methods .pf-payment-option { background: #faf7f4; }
+[data-theme='light'] .pf-payment-simulated-detail { background: #faf5f3; border-color: var(--pf-line); }
+[data-theme='light'] .pf-payment-simulated-detail small { color: var(--pf-muted); }
+[data-theme='light'] .pf-payment-disclaimer { color: #84573d; }
+[data-theme='light'] .pf-checkout-error { background: #fff0ee; border-color: #cf8b83; color: #8e2920; }
+[data-theme='light'] .pf-checkout-error small { color: #8e2920; }
+[data-theme='light'] .pf-compare-link,
+[data-theme='light'] .pf-success-back { color: var(--pf-accent) !important; }
+
+/* La cabecera contrasta con el tema elegido para el contenido. */
+[data-theme='light'] .pf--planes .pf-top {
+  background: #24191d;
+  border-bottom: 1px solid #56323f;
+}
+[data-theme='light'] .pf--planes .pf-top .pf-brand-mark,
+[data-theme='light'] .pf--planes .pf-top .pf-nav a,
+[data-theme='light'] .pf--planes .pf-top .pf-login-link,
+[data-theme='light'] .pf--planes .pf-top .pf-who,
+[data-theme='light'] .pf--planes .pf-top .theme-toggle,
+[data-theme='light'] .pf--planes .pf-top .pf-btn--ghost { color: #fff8f4 !important; }
+[data-theme='light'] .pf--planes .pf-top .theme-toggle,
+[data-theme='light'] .pf--planes .pf-top .pf-btn--ghost { border-color: #9c7b85; }
+[data-theme='light'] .pf--planes .pf-top .theme-toggle:hover { background: #49313a; }
+
+[data-theme='dark'] .pf--planes .pf-top {
+  background: #f2e6dd;
+  border-bottom: 1px solid #d8c5bc;
+}
+[data-theme='dark'] .pf--planes .pf-top .pf-brand-mark,
+[data-theme='dark'] .pf--planes .pf-top .pf-nav a,
+[data-theme='dark'] .pf--planes .pf-top .pf-login-link,
+[data-theme='dark'] .pf--planes .pf-top .pf-who,
+[data-theme='dark'] .pf--planes .pf-top .theme-toggle,
+[data-theme='dark'] .pf--planes .pf-top .pf-btn--ghost { color: #3b202a !important; }
+[data-theme='dark'] .pf--planes .pf-top .theme-toggle,
+[data-theme='dark'] .pf--planes .pf-top .pf-btn--ghost { border-color: #b99da6; }
+[data-theme='dark'] .pf--planes .pf-top .theme-toggle:hover { background: #e6d3d1; }

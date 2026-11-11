@@ -1,8 +1,29 @@
-const VERSION = 'v3'
+const VERSION = 'v4'
 const SHELL = `ensayar-shell-${VERSION}`
 const ESTATICOS = `ensayar-estaticos-${VERSION}`
 const API = `ensayar-api-${VERSION}`
 const VIGENTES = [SHELL, ESTATICOS, API]
+
+const PRECACHE_IMAGENES = [
+  '/catalogo/ropa/producto-001.jpg',
+  '/catalogo/ropa/producto-002.jpg',
+  '/catalogo/ropa/producto-003.jpg',
+  '/catalogo/ropa/producto-004.jpg',
+  '/catalogo/ropa/producto-005.jpg',
+  '/catalogo/ropa/producto-006.jpg',
+  '/catalogo/ropa/producto-007.jpg',
+  '/catalogo/ropa/producto-008.jpg',
+  '/catalogo/ropa/producto-009.jpg',
+  '/catalogo/ropa/producto-010.jpg',
+  '/catalogo/ropa/producto-012.jpg',
+  '/catalogo/ropa/producto-014.jpg',
+  '/catalogo/ropa/producto-026.jpg',
+  '/catalogo/ropa/producto-034.jpg',
+  '/catalogo/ropa/producto-038.jpg',
+  '/catalogo/ropa/producto-040.jpg',
+  '/catalogo/ropa/producto-043.jpg',
+  '/catalogo/ropa/producto-044.jpg',
+]
 
 /**
  * Lecturas de la API que se guardan para consultarlas sin red. El POS además
@@ -26,7 +47,12 @@ const API_LECTURA = [
 const ESPERA_API_MS = 4000
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(['/', '/manifest.webmanifest', '/favicon.svg'])))
+  event.waitUntil(
+    Promise.all([
+      caches.open(SHELL).then((cache) => cache.addAll(['/', '/manifest.webmanifest', '/favicon.svg'])),
+      caches.open(ESTATICOS).then((cache) => cache.addAll(PRECACHE_IMAGENES).catch(() => undefined)),
+    ]),
+  )
   self.skipWaiting()
 })
 

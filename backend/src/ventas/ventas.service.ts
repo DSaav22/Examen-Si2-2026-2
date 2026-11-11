@@ -1,5 +1,5 @@
 import { metodoDeVenta, validarPagoVenta } from '../pagos/metodos-pais';
-import { ConflictException, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { Canal, EstadoVenta, Prisma, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
@@ -32,13 +32,13 @@ export class VentasService {
     private readonly prisma: PrismaService,
     private readonly inventario: InventarioService,
     private readonly notificaciones: NotificacionesService,
-    @Optional() private readonly esquemas?: PrismaEsquemasService,
-    @Optional() private readonly config?: ConfigService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
 
   private db(): PrismaService {
     const tiendaId = TenantContext.tiendaId();
-    if (tiendaId && (this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas) {
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
       return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
     }
     return this.prisma;
@@ -82,7 +82,7 @@ export class VentasService {
       throw new TurnoRequeridoError();
     }
     const tiendaId = TenantContext.tiendaIdOrThrow();
-    const tienda = await ((this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas
+    const tienda = await (this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true'
       ? this.esquemas.clientePlataforma()
       : this.prisma).tienda.findUniqueOrThrow({ where: { id: tiendaId }, select: { pais: true } });
     const metodo = validarPagoVenta(tienda.pais, dto.medioPago, dto.metodoPasarela);
@@ -132,7 +132,6 @@ export class VentasService {
     }
 
     const creada = await this.transaccionVenta(dto, async (tx) => {
-      const tiendaId = TenantContext.tiendaId();
       if (dto.canal === Canal.pos && dto.cajaTurnoId) {
         await this.validarTurnoEnTx(
           tx,
@@ -206,7 +205,6 @@ export class VentasService {
 
       const venta = await tx.venta.create({
         data: {
-          ...(tiendaId ? { tiendaId } : {}),
           uuid: dto.uuid,
           canal: dto.canal,
           estado,
@@ -218,7 +216,6 @@ export class VentasService {
           clientaId: dto.clientaId,
           lineas: {
             create: lineasConPrecio.map((l) => ({
-              ...(tiendaId ? { tiendaId } : {}),
               varianteId: l.varianteId,
               cantidad: l.cantidad,
               precioUnitario: l.precioUnitario,
@@ -231,7 +228,6 @@ export class VentasService {
       if (pendientePago) {
         await tx.pagoSimulado.create({
           data: {
-            ...(tiendaId ? { tiendaId } : {}),
             ventaId: venta.id,
             estado: 'pendiente',
             referencia: `SIM:${metodo}:${venta.id}`,
@@ -239,7 +235,6 @@ export class VentasService {
         });
         for (const [varianteId, cantidad] of pedidas) {
           await this.inventario.registrar(tx, {
-            tiendaId,
             tipo: 'reserva',
             varianteId,
             almacenId: dto.almacenId,
@@ -252,7 +247,6 @@ export class VentasService {
       } else {
         for (const [varianteId, cantidad] of pedidas) {
           await this.inventario.registrar(tx, {
-            tiendaId,
             tipo: 'venta',
             varianteId,
             almacenId: dto.almacenId,
@@ -277,7 +271,6 @@ export class VentasService {
         plazo.setDate(plazo.getDate() + PLAZO_CREDITO_DIAS);
         await tx.cuentaCobrar.create({
           data: {
-            ...(tiendaId ? { tiendaId } : {}),
             ventaId: venta.id,
             clientaId: dto.clientaId!,
             monto: total,
@@ -287,15 +280,7 @@ export class VentasService {
         });
       }
 
-      await tx.auditoria.create({
-        data: {
-          ...(tiendaId ? { tiendaId } : {}),
-          accion: 'venta_creada',
-          recurso: venta.id,
-          detalle: dto.canal,
-          usuarioId: actor?.id ?? dto.clientaId,
-        },
-      });
+      await tx.auditoria.create({ data: { accion: 'venta_creada', recurso: venta.id, detalle: dto.canal, usuarioId: actor?.id ?? dto.clientaId } });
 
       if (estado === 'cobrada' && dto.canal === 'online' && dto.clientaId) {
         await this.abrirPedido(tx, {
@@ -475,10 +460,8 @@ export class VentasService {
           where: { usuarioId: venta.clientaId },
           orderBy: { id: 'desc' },
         });
-    const tiendaId = TenantContext.tiendaId();
     return tx.pedido.create({
       data: {
-        ...(tiendaId ? { tiendaId } : {}),
         usuarioId: venta.clientaId,
         ventaId: venta.id,
         total: venta.total,

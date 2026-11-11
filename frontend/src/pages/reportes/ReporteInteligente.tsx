@@ -50,7 +50,7 @@ function crearReconocimiento(): Reconocimiento | null {
   return Clase ? new Clase() : null
 }
 
-const MOTOR: Record<Motor, string> = { modelo: 'Interpretado con IA', reglas: 'Interpretado con reglas locales', manual: 'Criterios editados' }
+const MOTOR: Record<Motor, string> = { modelo: 'Interpretado con Gemini', reglas: 'Interpretado con reglas locales', manual: 'Criterios editados' }
 
 function celda(c: Columna, v: string | number | null | undefined) {
   if (v == null || v === '') return '—'

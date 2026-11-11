@@ -1,0 +1,17 @@
+.pwa-install-button { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; padding: .6rem .8rem; border: 1px solid currentColor; border-radius: 999px; background: transparent; color: inherit; font: 600 .75rem/1.2 sans-serif; cursor: pointer; white-space: nowrap; min-height: 40px; }
+.pwa-install-button:hover:not(:disabled) { background: #8b647722; }
+.pwa-install-button:disabled { opacity: .65; cursor: default; }
+.pwa-install-button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.pwa-install-short { display: none; }
+.pwa-install-dialog { box-sizing: border-box; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 1.6rem; border: 1px solid #d5c8c7; border-radius: 16px; background: #faf7f3; color: #2c2426; font: 400 .95rem/1.65 sans-serif; text-align: left; white-space: normal; }
+.pwa-install-dialog::backdrop { background: #0009; }
+.pwa-install-dialog-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.pwa-install-dialog-head h2 { margin: 0; color: #2c2426; font: 400 1.65rem/1.25 Georgia, serif; }
+.pwa-install-dialog-head button { flex: 0 0 36px; height: 36px; border: 1px solid #d5c8c7; border-radius: 50%; background: transparent; color: #2c2426; font-size: 1.4rem; cursor: pointer; }
+.pwa-install-dialog p { color: #51484a; font-size: .9rem; }
+.pwa-install-dialog ol { padding-left: 1.3rem; margin-block: 1.2rem; }
+.pwa-install-dialog li { margin-bottom: .9rem; color: #2c2426; }
+.pwa-install-dialog .pwa-install-help { font-size: .8rem; }
+.pwa-install-done { border: 0; border-radius: 999px; padding: .8rem 1.4rem; background: #70283d; color: #fff; font: 600 .9rem sans-serif; cursor: pointer; }
+@media (max-width: 1200px) { .shell-actions .pwa-install-label { display: none; } .shell-actions .pwa-install-short { display: inline; } }
+@media (max-width: 540px) { .shell-actions .pwa-install-button { padding: .4rem .5rem; gap: .25rem; min-height: 34px; font-size: .65rem; } .shell-actions .pwa-install-button svg { width: 15px; } }

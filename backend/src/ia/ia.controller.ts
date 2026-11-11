@@ -39,6 +39,11 @@ class BotDto {
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
+  carritoIds?: string[];
+
+  @IsOptional()
+  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TurnoDto)
   historial?: TurnoDto[];
@@ -68,21 +73,21 @@ export class IaController {
 
   /** Público: invitadas preguntan por catálogo; con sesión CLIENTA también ve pedidos. */
   @Post('bot')
-  bot(@Req() request: Request, @Body() dto: BotDto) {
+  async bot(@Req() request: Request, @Body() dto: BotDto) {
     let clientaId: string | null = null;
     const header = request.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     if (token) {
       try {
         const payload = this.tokens.verify(token);
-        if (payload.tipo === 'tienda' && payload.tiendaId === TenantContext.tiendaId() && payload.rol === Rol.CLIENTA) {
+        if (payload.tipo === 'tienda' && payload.tiendaId === TenantContext.tiendaId() && payload.rol === Rol.CLIENTA && !await this.tokens.isRevoked(token)) {
           clientaId = payload.sub;
         }
       } catch {
         /* invitada */
       }
     }
-    return this.ia.bot(clientaId, dto.mensaje.trim(), dto.productoId, dto.historial ?? []);
+    return this.ia.bot(clientaId, dto.mensaje.trim(), dto.productoId, dto.historial ?? [], dto.carritoIds);
   }
 
   /** Try-on con FLUX (Azure AI). Solo clienta; la foto no se reutiliza fuera de esta petición. */

@@ -16,6 +16,11 @@ import { metodosSimuladosPorPais } from '../pagos/metodos-pais';
 export class PlataformaController {
   constructor(private readonly plataforma: PlataformaService) {}
 
+  @Get('directorio')
+  directorio() {
+    return this.plataforma.directorio();
+  }
+
   @Get('planes')
   planes() {
     return this.plataforma.planes();

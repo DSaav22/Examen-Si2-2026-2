@@ -33,6 +33,9 @@ async function api(metodo: string, ruta: string, opts: { token?: string; tienda?
   } catch {
     /* texto plano */
   }
+  if (ruta === '/plataforma/suscribir' && r.ok && body?.tienda?.id) {
+    await db.tienda.update({ where: { id: body.tienda.id }, data: { esPrueba: true } });
+  }
   return { status: r.status, body };
 }
 

@@ -8,6 +8,7 @@ import { NotificacionesBell } from '../shared/NotificacionesBell'
 import { SelectorTienda, useTiendaPublica } from '../shared/SelectorTienda'
 import { SidePanel } from '../shared/Visual'
 import { AccionesPwa, BannerOffline, EstadoConexion } from '../shared/Offline'
+import { InstalarApp } from '../shared/InstalarApp'
 import { api } from '../api'
 import type { Sucursal } from '../types'
 import {
@@ -22,6 +23,7 @@ import {
 } from '../roles'
 import { Asistente } from './Asistente'
 import { MarcaTienda } from '../shared/MarcaTienda'
+import { catalogLabel } from '../text'
 
 function Icon({
   name,
@@ -211,15 +213,26 @@ function CampaignBar() {
 }
 
 function CatalogMegaMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [categorias, setCategorias] = useState<string[]>([])
+  useEffect(() => {
+    if (!open) return
+    let vigente = true
+    api<{ categoria: string }[]>('/catalogo/productos')
+      .then(items => { if (vigente) setCategorias([...new Set(items.map(item => item.categoria?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'))) })
+      .catch(() => { if (vigente) setCategorias([]) })
+    return () => { vigente = false }
+  }, [open])
   if (!open) return null
   return (
     <div className="mega-menu" role="region" aria-label="Categorías de catálogo">
       <div className="mega-menu-inner">
         <div>
           <p className="mega-label">CATEGORÍAS</p>
-          <Link onClick={onClose} to="/catalogo?categoria=vestidos">Vestidos</Link>
-          <Link onClick={onClose} to="/catalogo?categoria=sastreria">Sastrería</Link>
-          <Link onClick={onClose} to="/catalogo?categoria=abrigos">Abrigos</Link>
+          {categorias.length ? categorias.map(categoria => (
+            <Link key={categoria} onClick={onClose} to={`/catalogo?categoria=${encodeURIComponent(categoria)}`}>
+              {catalogLabel(categoria)}
+            </Link>
+          )) : <Link onClick={onClose} to="/catalogo">Ver catálogo</Link>}
         </div>
         <div className="mega-feature">
           <span>Selección editorial</span>
@@ -702,6 +715,7 @@ function ClientShell({
           </nav>
           <div className="shell-actions">
             <BranchSelector fallback="La Paz" label="Retiro" />
+            <InstalarApp />
             <button
               className="shell-icon-button"
               type="button"

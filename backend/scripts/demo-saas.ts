@@ -58,7 +58,7 @@ async function crearDemo(d: Demo, passwordHash: string, adminVestaId: string | n
   const monto = precioPeriodo(Number(plan.precioMensual), d.periodo);
 
   const tienda = await base.tienda.create({
-    data: { slug: d.slug, nombre: d.nombre, pais: d.pais, moneda: d.moneda, creadaEn: alta, duenoCuentaId: dueno.id },
+    data: { slug: d.slug, nombre: d.nombre, pais: d.pais, moneda: d.moneda, creadaEn: alta, duenoCuentaId: dueno.id, esPrueba: true },
   });
 
   // Historial: una suscripción por período hasta hoy; con baja, solo los períodos que terminan antes de ella.

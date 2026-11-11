@@ -5,8 +5,6 @@ import { assetUrl } from '../asset'
 import { useAuth } from '../auth'
 import {
   CAJA_FIJA,
-  cajaDesdeHombros,
-  cajaDesdeLandmarks,
   crearPose,
   type CajaOverlay,
 } from '../pose'
@@ -14,7 +12,8 @@ import { TryOn3DOverlay } from '../features/tryon3d/TryOn3DOverlay'
 import { poseFromMediaPipe } from '../features/tryon3d/mediapipePoseAdapter'
 import type { TryOnPose } from '../features/tryon3d/domain'
 import type { Producto } from '../types'
-import { anchorFromShoulders, cutoutLightBackground, projectToPreview, smoothAnchor, type GarmentAnchor } from '../features/tryon3d/garment2d'
+import { anchorFromLandmarks, cutoutLightBackground, projectToPreview, smoothAnchor, type GarmentAnchor } from '../features/tryon3d/garment2d'
+import { garmentProfile } from '../features/tryon3d/garmentProfile'
 
 type Overlay = {
   varianteId: string
@@ -24,6 +23,7 @@ type Overlay = {
   producto: string
   urlModelo: string
   urlFoto?: string
+  categoria?: string
 }
 
 function soportaTransform3d(): boolean {
@@ -61,6 +61,7 @@ export function Probador() {
   const [recorte, setRecorte] = useState('')
   const [estadoPrenda, setEstadoPrenda] = useState<'cargando' | 'lista' | 'error'>('cargando')
   const [anchor, setAnchor] = useState<GarmentAnchor | null>(null)
+  const perfil = useMemo(() => garmentProfile(overlay?.categoria, overlay?.producto), [overlay?.categoria, overlay?.producto])
   const puede3d = useMemo(() => soportaTransform3d(), [])
   const esAdmin = user?.rol === 'ADMIN' || user?.rol === 'SUPERADMIN'
   const tieneModelo = Boolean(overlay?.urlModelo?.trim())
@@ -71,6 +72,7 @@ export function Probador() {
     || overlay.urlOverlay.includes('overlay-polera')
   const mostrarCloth =
     Boolean(overlay) &&
+    perfil.kind !== 'no-compatible' &&
     Boolean(recorte || !overlayEsPlaceholder) &&
     (fotoCuerpo || !sinCamara) &&
     !vistaIa &&
@@ -85,18 +87,19 @@ export function Probador() {
     setAviso('')
     setVista3d(false)
     setVistaIa('')
+    setToques([])
+    setCaja(CAJA_FIJA)
+    setPoseEnVivo(null)
     api<Overlay>(`/catalogo/variantes/${varianteId}/overlay`)
       .then(async data => {
         // Versiones anteriores del backend no devuelven urlFoto en /overlay.
         // Recuperarla desde catálogo sin sustituirla por una prenda distinta.
-        let urlFoto = data.urlFoto
-        if (!urlFoto && (!data.urlOverlay || data.urlOverlay.includes('overlay-polera'))) {
-          const productos = await api<Producto[] | { items: Producto[] }>('/catalogo/productos')
-          const items = Array.isArray(productos) ? productos : productos.items
-          urlFoto = items.flatMap(p => p.variantes).find(v => v.id === varianteId)?.urlFoto
-        }
+        const productos = await api<Producto[] | { items: Producto[] }>('/catalogo/productos').catch(() => [])
+        const items = Array.isArray(productos) ? productos : productos.items
+        const producto = items.find(p => p.variantes.some(v => v.id === varianteId))
+        const urlFoto = data.urlFoto || producto?.variantes.find(v => v.id === varianteId)?.urlFoto
         if (!active) return
-        const next = { ...data, urlFoto, urlModelo: data.urlModelo ?? '' }
+        const next = { ...data, urlFoto, categoria: data.categoria ?? producto?.categoria, urlModelo: data.urlModelo ?? '' }
         setOverlay(next)
       })
       .catch(() => {
@@ -149,7 +152,7 @@ export function Probador() {
     // La cámara sigue activa en modo 3D: MediaPipe alimenta el anclaje del GLB.
     // Una foto conserva el flujo 2D/IA; al abrir 3D volvemos a la cámara
     // porque el seguimiento de MediaPipe debe recibir video en vivo.
-    if (vistaIa || (fotoCuerpo && !vista3d)) return
+    if (!overlay || vistaIa || (fotoCuerpo && !vista3d)) return
     let stream: MediaStream | undefined
     let alive = true
     let raf = 0
@@ -173,21 +176,16 @@ export function Probador() {
             const res = pose.detectForVideo(video, performance.now())
             const lm = res.landmarks[0]
             if (lm) {
-              setPoseEnVivo(poseFromMediaPipe(lm))
               const stage = stageRef.current
-              if (stage && lm[11] && lm[12]) {
+              if (stage) {
                 const rect = stage.getBoundingClientRect()
-                const left = projectToPreview(lm[11], video.videoWidth, video.videoHeight, rect.width, rect.height)
-                const right = projectToPreview(lm[12], video.videoWidth, video.videoHeight, rect.width, rect.height)
-                const current = anchorFromShoulders(left, right)
+                const projected = lm.map(point => projectToPreview(point, video.videoWidth, video.videoHeight, rect.width, rect.height))
+                const current = anchorFromLandmarks(projected, perfil)
+                setPoseEnVivo(poseFromMediaPipe(lm, perfil, video.videoWidth, video.videoHeight, rect.width, rect.height))
                 if (current) {
                   anchorRef.current = smoothAnchor(anchorRef.current, current)
                   setAnchor(anchorRef.current)
                 } else { anchorRef.current = null; setAnchor(null) }
-              }
-              const next = cajaDesdeLandmarks(lm)
-              if (next) {
-                setCaja(next)
               }
             } else {
               setPoseEnVivo(null)
@@ -198,7 +196,10 @@ export function Probador() {
           }
           raf = requestAnimationFrame(tick)
         } catch {
-          setModo('Tocá los dos hombros en la vista para anclar')
+          stream?.getTracks().forEach(track => track.stop())
+          setSinCamara(true)
+          setAviso('No se pudo iniciar el seguimiento corporal. Subí una foto para ubicar la prenda manualmente.')
+          setModo('Seguimiento no disponible')
         }
       })
       .catch(() => {
@@ -212,10 +213,10 @@ export function Probador() {
       cancelAnimationFrame(raf)
       stream?.getTracks().forEach(t => t.stop())
     }
-  }, [fotoCuerpo, vista3d, vistaIa])
+  }, [fotoCuerpo, vista3d, vistaIa, overlay, perfil])
 
   function tocar(e: MouseEvent<HTMLDivElement>) {
-    if (vistaIa) return
+    if (vistaIa || !fotoCuerpo || perfil.kind === 'no-compatible') return
     const rect = e.currentTarget.getBoundingClientRect()
     const punto = {
       x: (e.clientX - rect.left) / rect.width,
@@ -224,7 +225,14 @@ export function Probador() {
     const next = [...toques, punto].slice(-2)
     setToques(next)
     if (next.length === 2) {
-      setCaja(cajaDesdeHombros(next[0], next[1]))
+      const [left, right] = next[0].x <= next[1].x ? next : [next[1], next[0]]
+      const dx = (right.x - left.x) * rect.width
+      const dy = (right.y - left.y) * rect.height
+      const ancho = Math.min(1, Math.hypot(dx, dy) / rect.width * perfil.widthFactor)
+      const x = (left.x + right.x) / 2
+      const y = (left.y + right.y) / 2
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI
+      setCaja({ left: `${x * 100}%`, top: `${y * 100}%`, width: `${ancho * 100}%`, height: 'auto', transform: `translate(-50%, -${perfil.imageOrigin * 100}%) rotate(${angle}deg)` })
       setModo('Anclado a tus toques')
     }
   }
@@ -233,13 +241,11 @@ export function Probador() {
     setFotoArchivo(file)
     setFotoCuerpo(previewUrl)
     setVistaIa('')
+    setToques([])
+    setCaja(CAJA_FIJA)
     setError('')
     setAviso('')
-    setModo(
-      overlayEsPlaceholder
-        ? 'Foto lista · usá «Ver vista realista» (este producto no tiene overlay 2D)'
-        : 'Foto lista · tocá Vista realista o ajustá el overlay',
-    )
+    setModo(`Foto lista · tocá los dos lados de ${perfil.reference} para ajustar la prenda`)
   }
 
   function cargarFoto(e: ChangeEvent<HTMLInputElement>) {
@@ -334,6 +340,10 @@ export function Probador() {
   }
 
   function toggleModelo3d() {
+    if (perfil.kind === 'no-compatible') {
+      setAdminMsg('Esta categoría todavía no tiene seguimiento corporal compatible.')
+      return
+    }
     if (!tieneModelo) {
       setAdminMsg('Esta variante todavía no tiene un archivo GLB asociado.')
       return
@@ -346,9 +356,11 @@ export function Probador() {
     setFotoArchivo(null)
     setFotoCuerpo('/cuerpo-demo.svg')
     setVistaIa('')
+    setToques([])
+    setCaja(CAJA_FIJA)
     setError('')
     setAviso('')
-    setModo('Silueta demo · tocá Vista realista o los hombros')
+    setModo(`Silueta demo · tocá los dos puntos de ${perfil.reference} para ubicar la prenda`)
   }
 
   const etapa = vistaIa ? 3 : tieneFoto || !sinCamara ? 2 : 1
@@ -356,9 +368,13 @@ export function Probador() {
     ? 'Preparando la imagen de la prenda…'
     : estadoPrenda === 'error'
       ? 'No hay una imagen compatible para esta prenda'
+      : perfil.kind === 'no-compatible'
+        ? 'Esta categoría todavía no tiene seguimiento corporal compatible'
       : anchor
         ? 'Prenda superpuesta · seguimiento activo'
-        : 'Buscando hombros · alejate para ver ambos'
+        : perfil.reference === 'caderas'
+          ? 'Buscando caderas · alejate y mostrálas a cámara'
+          : 'Buscando hombros · alejate para ver ambos'
 
   return (
     <section className="tryon-page">
@@ -390,7 +406,7 @@ export function Probador() {
       <div className="tryon">
         <div className="tryon-stage-wrap">
           {mostrando3d ? (
-            <div className="uc28-scene" aria-label="Probador 3D">
+            <div ref={stageRef} className="uc28-scene" aria-label="Probador 3D">
               {sinCamara ? (
                 <div className="tryon-three-empty">
                   Activá el permiso de cámara para probar la prenda en movimiento.
@@ -401,6 +417,7 @@ export function Probador() {
               {overlay?.urlModelo ? (
                 <TryOn3DOverlay modelUrl={overlay.urlModelo} pose={poseEnVivo} rotation={rotacion} />
               ) : null}
+              {!sinCamara && !poseEnVivo ? <span className="tryon-badge" role="status">{perfil.reference === 'caderas' ? 'Mostrá ambas caderas para ubicar la prenda' : 'Mostrá ambos hombros para ubicar la prenda'}</span> : null}
               <label className="uc28-giro">
                 Girar
                 <input
@@ -435,7 +452,7 @@ export function Probador() {
               ) : (
                 <video ref={videoRef} autoPlay muted playsInline />
               )}
-              {mostrarCloth && (fotoCuerpo || anchor) ? (
+              {mostrarCloth && (fotoCuerpo ? perfil.reference !== 'caderas' || toques.length === 2 : anchor) ? (
                 <img
                   className="cloth"
                   src={recorte || assetUrl(overlay!.urlOverlay)}
@@ -443,7 +460,7 @@ export function Probador() {
                   onError={() => setEstadoPrenda('error')}
                   style={!fotoCuerpo && anchor ? {
                     left: `${anchor.x}px`, top: `${anchor.y}px`, width: `${anchor.width}px`, height: 'auto',
-                    transformOrigin: '50% 15%', transform: `translate(-50%, -15%) rotate(${anchor.angle}rad)`,
+                    transformOrigin: `50% ${anchor.originY * 100}%`, transform: `translate(-50%, -${anchor.originY * 100}%) rotate(${anchor.angle}rad)`,
                   } : caja}
                 />
               ) : null}
@@ -513,7 +530,9 @@ export function Probador() {
                   Silueta demo
                 </button>
               </div>
-              <p className="tryon-hint">De frente, buena luz. Ideal cuerpo completo.</p>
+              <p className="tryon-hint">{perfil.reference === 'caderas' ? 'Mostrá la cintura y ambas caderas; para pantalones, incluí también las piernas.' : 'Mostrá ambos hombros de frente y con buena luz.'}</p>
+              {perfil.kind === 'no-compatible' ? <p className="tryon-hint">El seguimiento para esta categoría aún no está disponible.</p> : null}
+              {fotoCuerpo && perfil.reference === 'caderas' ? <p className="tryon-hint">En la foto, tocá los lados izquierdo y derecho de la cintura para ubicar la prenda.</p> : null}
               {estadoPrenda === 'error' ? (
                 <p className="tryon-hint">
                   No se pudo cargar o recortar la foto de esta variante. Probá otra prenda
@@ -552,7 +571,7 @@ export function Probador() {
             </div>
           ) : null}
 
-          {tieneModelo && puede3d ? (
+          {tieneModelo && puede3d && perfil.kind !== 'no-compatible' ? (
             <div className="tryon-block">
               <button
                 type="button"

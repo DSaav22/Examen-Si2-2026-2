@@ -3,19 +3,14 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { apiCuenta, type ApiError } from '../api'
 import type { SesionTienda } from '../auth'
 import { MODULOS, PAISES, PERIODOS, usd, usePlataforma, type Periodo, type PlanPublico } from './comun'
+import { LogoPago } from '../shared/LogosPagos'
 
 export type Tarjeta = { titular: string; numero: string; vence: string; cvc: string }
 export type MetodoPagoPais = { codigo: string; nombre: string; simulado: boolean }
 export const TARJETA_SIMULADA: Tarjeta = { titular: 'Pago simulado', numero: '4242 4242 4242 4242', vence: '12/30', cvc: '123' }
 
 function IconoPago({ codigo }: { codigo: string }) {
-  const tarjeta = codigo === 'tarjeta'
-  const qr = codigo === 'qr_bolivia' || codigo === 'pix'
-  return <svg className="pf-payment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {tarjeta ? <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 9h20M5 15h4" /></>
-      : qr ? <><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM20 15v3M15 21h3M21 21h.01" /></>
-        : <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18M15 14h3" /></>}
-  </svg>
+  return <LogoPago codigo={codigo} size={30} className="pf-payment-logo-badge" />
 }
 
 export function SelectorPagoPais({ pais, metodo, onChange }: { pais: string; metodo: string; onChange: (valor: string) => void }) {
@@ -41,10 +36,13 @@ export function SelectorPagoPais({ pais, metodo, onChange }: { pais: string; met
     <fieldset className="pf-payment-methods">
       <legend>Método de pago simulado</legend>
       <div className="pf-payment-grid">
-        {metodos.map(m => <label className={`pf-payment-option${metodo === m.codigo ? ' is-selected' : ''}`} key={m.codigo}>
+        {metodos.map(m => <label className={`pf-payment-option${metodo === m.codigo ? ' is-selected' : ''}`} key={m.codigo} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <input type="radio" name="metodo-pago-pais" value={m.codigo} checked={metodo === m.codigo} onChange={() => onChange(m.codigo)} required />
           <IconoPago codigo={m.codigo} />
-          <span>{m.nombre}<small>Simulado</small></span>
+          <span style={{ display: 'flex', flexDirection: 'column' }}>
+            <strong style={{ fontSize: '0.9rem', color: 'inherit' }}>{m.nombre}</strong>
+            <small style={{ opacity: 0.75, fontSize: '0.72rem' }}>Simulado</small>
+          </span>
         </label>)}
       </div>
     </fieldset>

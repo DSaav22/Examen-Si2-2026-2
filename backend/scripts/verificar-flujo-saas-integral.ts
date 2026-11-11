@@ -44,6 +44,7 @@ const config = new ConfigService({
   JWT_SECRET: process.env.JWT_SECRET || 'clave-sintetica-prueba-local-no-utilizar',
   TENANT_SCHEMAS_ALTA: 'true',
   TENANT_SCHEMAS_PERFILES: 'true',
+  TENANT_ALTA_PRUEBA: 'true',
 });
 
 const prisma = new PrismaService();

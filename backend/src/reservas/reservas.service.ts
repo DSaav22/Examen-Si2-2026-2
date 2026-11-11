@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { EstadoReserva } from '@prisma/client';
@@ -25,13 +24,13 @@ export class ReservasService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventario: InventarioService,
-    @Optional() private readonly esquemas?: PrismaEsquemasService,
-    @Optional() private readonly config?: ConfigService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
 
   private db(): PrismaService {
     const tiendaId = TenantContext.tiendaId();
-    if (tiendaId && (this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas) {
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
       return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
     }
     return this.prisma;
@@ -108,10 +107,8 @@ export class ReservasService {
         });
       }
 
-      const tiendaId = TenantContext.tiendaId();
       const reserva = await tx.reserva.create({
         data: {
-          ...(tiendaId ? { tiendaId } : {}),
           clientaId,
           sucursalId: data.sucursalId,
           horario: new Date(data.horario),
@@ -119,7 +116,6 @@ export class ReservasService {
           estado: 'pendiente',
           lineas: {
             create: data.lineas.map((l) => ({
-              ...(tiendaId ? { tiendaId } : {}),
               varianteId: l.varianteId,
               cantidad: l.cantidad,
             })),
@@ -263,10 +259,8 @@ export class ReservasService {
           (acc, l) => acc + l.precioUnitario * l.cantidad,
           0,
         );
-        const tiendaId = TenantContext.tiendaId();
         const venta = await tx.venta.create({
           data: {
-            ...(tiendaId ? { tiendaId } : {}),
             uuid: randomUUID(),
             canal: 'pos',
             estado: 'cobrada',
@@ -276,7 +270,6 @@ export class ReservasService {
             clientaId: reserva.clientaId,
             lineas: {
               create: lineasConPrecio.map((l) => ({
-                ...(tiendaId ? { tiendaId } : {}),
                 varianteId: l.varianteId,
                 cantidad: l.cantidad,
                 precioUnitario: l.precioUnitario,

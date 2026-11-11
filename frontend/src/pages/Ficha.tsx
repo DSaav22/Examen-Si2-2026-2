@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { assetUrl } from '../asset'
 import { catalogLabel } from '../text'
@@ -199,9 +199,30 @@ function ProductImage({
   )
 }
 
+function RelatedProductCard({ product }: { product: Producto }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const photo = product.variantes.find(variant => variant.urlFoto?.trim())?.urlFoto
+  return (
+    <Link className="detail-related-card" to={`/ficha/${product.id}?vista=tienda`}>
+      <span className="detail-related-image">
+        {photo && !imageFailed ? (
+          <img src={assetUrl(photo)} alt={`Foto de ${product.nombre}`} loading="lazy" onError={() => setImageFailed(true)} />
+        ) : (
+          <span className="detail-related-placeholder">Sin imagen</span>
+        )}
+      </span>
+      <span className="detail-related-copy">
+        <span>{product.nombre}</span>
+        <b>Bs {precioEfectivo(product).toFixed(2)}</b>
+      </span>
+    </Link>
+  )
+}
+
 export function Ficha() {
   const { user } = useAuth()
-  const internal = Boolean(user && internalRoles.includes(user.rol))
+  const [params] = useSearchParams()
+  const internal = params.get('vista') !== 'tienda' && Boolean(user && internalRoles.includes(user.rol))
   if (internal) return <FichaOps />
   return <FichaClient />
 }
@@ -227,18 +248,20 @@ function FichaClient() {
 
   async function load() {
     if (!id) return
+    setError('')
+    setProduct(null)
     const current = await api<Producto>(`/catalogo/productos/${id}`)
     setProduct(current)
     const first = current.variantes[0]
     setSelectedVariantId(first?.id ?? '')
     setSelectedImage(first?.urlFoto ?? '')
-    const candidates = await api<Producto[]>(
-      `/catalogo/productos?categoria=${encodeURIComponent(current.categoria)}`,
-    )
-    setRelated(candidates.filter(item => item.id !== current.id).slice(0, 4))
-    api<Producto[]>(`/catalogo/productos/${current.id}/complementarios`)
-      .then(items => setRelated(currentItems => [...currentItems, ...items].slice(0, 6)))
-      .catch(() => undefined)
+    try {
+      const candidates = await api<Producto[]>(`/catalogo/productos?categoria=${encodeURIComponent(current.categoria)}`)
+      setRelated(candidates.filter(item => item.id !== current.id).slice(0, 4))
+      api<Producto[]>(`/catalogo/productos/${current.id}/complementarios`)
+        .then(items => setRelated(currentItems => [...currentItems, ...items].slice(0, 6)))
+        .catch(() => undefined)
+    } catch { setRelated([]) }
   }
 
   useEffect(() => {
@@ -246,7 +269,7 @@ function FichaClient() {
       .then(() => {
         if (id) rememberProduct(id)
       })
-      .catch(() => setError('No se encontró la prenda.'))
+      .catch((cause: Error & { status?: number }) => setError(cause.status === 404 ? 'No se encontró la prenda en esta tienda.' : 'No se pudo cargar la prenda. Revisá la conexión e intentá nuevamente.'))
   }, [id])
 
   const selectedVariant = useMemo(
@@ -524,7 +547,7 @@ function FichaClient() {
           ) : (
             <Link
               className="ui-button ui-button--secondary detail-reserve-button"
-              to={`/login?next=${encodeURIComponent(`/ficha/${product.id}`)}`}
+              to={`/login?next=${encodeURIComponent(`/ficha/${product.id}?vista=tienda`)}`}
             >
               Ingresá para reservar en tienda
             </Link>
@@ -619,12 +642,7 @@ function FichaClient() {
           </div>
         </div>
         <div className="detail-related-grid">
-          {related.map(item => (
-            <Link key={item.id} to={`/ficha/${item.id}`}>
-              <span>{item.nombre}</span>
-              <b>Bs {precioEfectivo(item).toFixed(2)}</b>
-            </Link>
-          ))}
+          {related.map(item => <RelatedProductCard key={item.id} product={item} />)}
         </div>
       </section>
       <section className="detail-look">

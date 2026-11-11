@@ -1,42 +1,30 @@
 import type { TryOnPose } from './domain'
-
-type MediaPipeLandmark = { x: number; y: number; z?: number; visibility?: number }
+import type { GarmentProfile } from './garmentProfile'
+import { anchorFromLandmarks, projectToPreview, type Point } from './garment2d'
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
 
-/**
- * Convierte landmarks de MediaPipe a coordenadas independientes del motor 3D.
- * Índices BlazePose: hombros 11/12 y caderas 23/24.
- */
-export function poseFromMediaPipe(landmarks: MediaPipeLandmark[]): TryOnPose | null {
-  const leftShoulder = landmarks[11]
-  const rightShoulder = landmarks[12]
-  const leftHip = landmarks[23]
-  const rightHip = landmarks[24]
-  // Para el AR de una prenda basta con los hombros. Exigir las caderas hacía
-  // fallar el reconocimiento cuando la cámara mostraba sólo el torso.
-  if (!leftShoulder || !rightShoulder) return null
-  if ([leftShoulder, rightShoulder].some(point => (point.visibility ?? 1) < 0.35)) return null
-
-  const shoulderWidth = Math.hypot(rightShoulder.x - leftShoulder.x, rightShoulder.y - leftShoulder.y)
-  if (shoulderWidth < 0.04) return null
-  const shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2
-  const shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2
-  const hipsVisible = leftHip && rightHip
-    && (leftHip.visibility ?? 1) >= 0.35
-    && (rightHip.visibility ?? 1) >= 0.35
-  const hipMidY = hipsVisible ? (leftHip.y + rightHip.y) / 2 : shoulderMidY + shoulderWidth * 1.35
-  const depthDelta = (rightShoulder.z ?? 0) - (leftShoulder.z ?? 0)
-
+/** Proyecta los puntos con el mismo object-fit y reflejo que el video. */
+export function poseFromMediaPipe(landmarks: Point[], profile: GarmentProfile, frameWidth: number, frameHeight: number, width: number, height: number): TryOnPose | null {
+  if (!frameWidth || !frameHeight || !width || !height) return null
+  const projected = landmarks.map(point => projectToPreview(point, frameWidth, frameHeight, width, height))
+  const anchor = anchorFromLandmarks(projected, profile)
+  if (!anchor) return null
+  const indices = profile.reference === 'caderas' ? [23, 24] : [11, 12]
+  const depthDelta = (landmarks[indices[1]]?.z ?? 0) - (landmarks[indices[0]]?.z ?? 0)
+  let centerY = anchor.y + anchor.width * profile.centerFactor3d
+  if (profile.reference === 'caderas') {
+    const knees = [projected[25], projected[26]].filter(point => point && (point.visibility ?? 1) >= 0.35)
+    if (knees.length) {
+      const kneeY = knees.reduce((sum, point) => sum + point.y, 0) / knees.length
+      if (kneeY > anchor.y) centerY = anchor.y + (kneeY - anchor.y) * (profile.kind === 'falda' ? 0.55 : 1)
+    }
+  }
   return {
     visible: true,
-    // El video se refleja para que actúe como espejo; la pose debe reflejarse
-    // igual para que la prenda no se desplace al lado contrario.
-    torsoX: clamp(1 - shoulderMidX, 0, 1),
-    torsoY: clamp(shoulderMidY + (hipMidY - shoulderMidY) * 0.35, 0, 1),
-    shoulderWidth: clamp(shoulderWidth, 0.08, 0.65),
-    // La profundidad monocular de BlazePose es ruidosa. Un rango corto evita
-    // que una diferencia mínima entre hombros gire violentamente la prenda.
+    torsoX: clamp(anchor.x / width, 0, 1),
+    torsoY: clamp(centerY / height, 0, 1),
+    shoulderWidth: clamp(anchor.width / width, 0.02, 1.5),
     turnRadians: clamp(-depthDelta * 1.4, -0.35, 0.35),
   }
 }

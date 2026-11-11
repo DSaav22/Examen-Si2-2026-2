@@ -1,5 +1,6 @@
-export type Point = { x: number; y: number; visibility?: number }
-export type GarmentAnchor = { x: number; y: number; width: number; angle: number }
+import type { GarmentProfile } from './garmentProfile'
+export type Point = { x: number; y: number; z?: number; visibility?: number }
+export type GarmentAnchor = { x: number; y: number; width: number; angle: number; originY: number }
 
 /** Mapea el fotograma a un contenedor con object-fit: contain y efecto espejo. */
 export function projectToPreview(point: Point, frameWidth: number, frameHeight: number, width: number, height: number): Point {
@@ -20,12 +21,33 @@ export function anchorFromShoulders(a: Point, b: Point): GarmentAnchor | null {
   const dy = right.y - left.y
   const span = Math.hypot(dx, dy)
   if (span < 10) return null
-  return { x: (left.x + right.x) / 2, y: (left.y + right.y) / 2, width: span * 1.85, angle: Math.max(-0.6, Math.min(0.6, Math.atan2(dy, dx))) }
+  return { x: (left.x + right.x) / 2, y: (left.y + right.y) / 2, width: span * 1.85, angle: Math.max(-0.6, Math.min(0.6, Math.atan2(dy, dx))), originY: 0.15 }
+}
+
+/** Los puntos deben estar proyectados a la vista de cámara y ya reflejados. */
+export function anchorFromLandmarks(points: Point[], profile: GarmentProfile): GarmentAnchor | null {
+  if (profile.kind === 'no-compatible') return null
+  const [a, b] = profile.reference === 'caderas' ? [points[23], points[24]] : [points[11], points[12]]
+  if (!a || !b || [a, b].some(p => (p.visibility ?? 1) < 0.35 || !Number.isFinite(p.x) || !Number.isFinite(p.y))) return null
+  const [left, right] = a.x <= b.x ? [a, b] : [b, a]
+  const dx = right.x - left.x, dy = right.y - left.y
+  const span = Math.hypot(dx, dy)
+  if (span < 10) return null
+  let y = (left.y + right.y) / 2
+  if (profile.reference === 'caderas') {
+    const shoulders = [points[11], points[12]]
+    if (shoulders.every(p => p && (p.visibility ?? 1) >= 0.35 && Number.isFinite(p.y))) {
+      const shoulderY = (shoulders[0].y + shoulders[1].y) / 2
+      y -= Math.max(0, y - shoulderY) * 0.18
+    }
+  }
+  return { x: (left.x + right.x) / 2, y, width: span * profile.widthFactor,
+    angle: Math.max(-0.6, Math.min(0.6, Math.atan2(dy, dx))), originY: profile.imageOrigin }
 }
 
 export function smoothAnchor(previous: GarmentAnchor | null, next: GarmentAnchor, alpha = 0.28): GarmentAnchor {
   if (!previous) return next
-  return { x: previous.x + (next.x - previous.x) * alpha, y: previous.y + (next.y - previous.y) * alpha, width: previous.width + (next.width - previous.width) * alpha, angle: previous.angle + (next.angle - previous.angle) * alpha }
+  return { x: previous.x + (next.x - previous.x) * alpha, y: previous.y + (next.y - previous.y) * alpha, width: previous.width + (next.width - previous.width) * alpha, angle: previous.angle + (next.angle - previous.angle) * alpha, originY: next.originY }
 }
 
 /** Quita sólo el fondo claro conectado a los bordes; no elimina blancos internos. */

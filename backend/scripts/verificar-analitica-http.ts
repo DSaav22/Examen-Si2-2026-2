@@ -17,7 +17,7 @@ async function crearTienda(planId: string) {
   const cuenta = await global.cuenta.findFirstOrThrow({ where: { emailVerificado: true } });
   const id = randomUUID();
   await global.$transaction(async tx => {
-    await tx.tienda.create({ data: { id, slug: `lab-ml-${id.replace(/-/g, '').slice(0, 20)}`, nombre: 'Analítica sintética', duenoCuentaId: cuenta.id } });
+    await tx.tienda.create({ data: { id, esPrueba: true, slug: `lab-ml-${id.replace(/-/g, '').slice(0, 20)}`, nombre: 'Analítica sintética', duenoCuentaId: cuenta.id } });
     await tx.suscripcion.create({ data: { tiendaId: id, planId, periodo: 'MENSUAL', monto: 0, venceEn: new Date(Date.now() + 30 * 86400_000) } });
     await provisionador.crear(tx, id, cuenta, 'Analítica sintética');
   }, { timeout: 60000 });
