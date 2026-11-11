@@ -335,6 +335,10 @@ Se finalizaron y probaron de extremo a extremo las capacidades offline de la web
   3. Flujo completo offline: registro triple (venta, cliente, producto), supervivencia a recarga sin red, aislamiento por tienda, conflicto de stock con reintento, e idempotencia (`verificar-flujo-offline-completo.mjs`).
 - **Verificación backend:** 14 pruebas de `backend/scripts/verificar-offline.ts` superadas sobre la base de datos `ensayar_copia`. Ver [[Modo offline]].
 
+## [2026-11-11] update | Perfiles y reportes inteligentes por esquema
+
+Se migró sin borrar la fuente la tienda que carecía de esquema en `ensayar_copia`, tras un respaldo. El descubrimiento de perfiles ya no usa usuarios de `public` como alternativa y falla si falta un esquema. Los reportes inteligentes consultan y registran sus ejecuciones en el esquema activo. Se verificaron dos tiendas y exportaciones en una copia aislada; la migración del resto de módulos continúa pendiente. La batería general conserva una prueba SaaS fallida por un mock incompleto de `updateMany`.
+
 ## [2026-11-11] update | Informe completo en formato APA 7 con carátula oficial
 
 - **Contenido.** Capítulo 5 (pagos: métodos por país, costos con fuentes, Bolivia/PayPal, PCI DSS, saga con reembolso) y capítulo 8 (analítica: pronóstico de demanda con Random Forest y segmentación RFM con k-means sobre datos sintéticos) completos. Sección 1.10 con la evaluación de la arquitectura heredada y los tres caminos (se eligió modificar capas). Anexo 14.2 con URL de Azure y código QR (URL antigua; pendiente la nueva).

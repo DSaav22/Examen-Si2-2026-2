@@ -5,7 +5,6 @@ import { randomBytes } from 'crypto';
 import { Cuenta } from '@prisma/client';
 import { CorreoService } from '../correo/correo.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TenantContext } from '../tenancy/tenant-context';
 import { TiendasService } from '../tenancy/tiendas.service';
 import { nombreSchemaTienda } from '../tenancy/schema-nombre';
 
@@ -128,12 +127,7 @@ export class CuentasService {
 
   /** Todas las tiendas donde la cuenta tiene un perfil activo. */
   async tiendasDe(cuentaId: string): Promise<TiendaDeCuenta[]> {
-    const usarEsquemas = this.config.get<string>('TENANT_SCHEMAS_PERFILES') !== 'false' || this.config.get<string>('TENANT_SCHEMAS_ALTA') === 'true';
-    const perfiles = usarEsquemas
-      ? await this.perfilesEnEsquemas(cuentaId)
-      : await TenantContext.sinFiltro(() => this.prisma.usuario.findMany({
-          where: { cuentaId, activo: true }, select: { tiendaId: true, rol: true },
-        }));
+    const perfiles = await this.perfilesEnEsquemas(cuentaId);
     const out: TiendaDeCuenta[] = [];
     for (const p of perfiles) {
       const t = await this.tiendas.porId(p.tiendaId);
@@ -152,7 +146,7 @@ export class CuentasService {
     return out.sort((a, b) => a.nombre.localeCompare(b.nombre));
   }
 
-  /** Descubre solo perfiles activos en esquemas derivados de tiendas registradas con esquema existente, o tablas compartidas como respaldo. */
+  /** Descubre perfiles únicamente en esquemas derivados de tiendas registradas. */
   private async perfilesEnEsquemas(cuentaId: string): Promise<{ tiendaId: string; rol: string }[]> {
     const tiendas = await this.prisma.tienda.findMany({ select: { id: true } });
     if (!tiendas.length) return [];
@@ -161,6 +155,7 @@ export class CuentasService {
     const existentes = await this.prisma.$queryRaw<{ nspname: string }[]>`
       SELECT nspname FROM pg_namespace WHERE nspname = ANY(${nombres}::text[])`;
     const disponibles = new Set(existentes.map(e => e.nspname));
+    if (nombres.some(e => !disponibles.has(e))) throw new Error('ESQUEMA_TIENDA_INEXISTENTE');
     const esquemasActivos = nombres.filter(e => disponibles.has(e));
 
     const perfiles: { tiendaId: string; rol: string }[] = [];
@@ -175,17 +170,6 @@ export class CuentasService {
       const ids = new Set(tiendas.map(t => t.id));
       if (deEsquemas.some(p => !ids.has(p.tiendaId) || p.tiendaId !== p.esquemaTiendaId)) throw new Error('PERFIL_TIENDA_INCONSISTENTE');
       for (const p of deEsquemas) perfiles.push({ tiendaId: p.tiendaId, rol: p.rol });
-    }
-
-    const tiendasSinEsquema = tiendas.filter(t => !disponibles.has(nombreSchemaTienda(t.id))).map(t => t.id);
-    if (tiendasSinEsquema.length > 0) {
-      const dePublic = await TenantContext.sinFiltro(() =>
-        this.prisma.usuario.findMany({
-          where: { cuentaId, activo: true, tiendaId: { in: tiendasSinEsquema } },
-          select: { tiendaId: true, rol: true },
-        }),
-      );
-      for (const p of dePublic) perfiles.push({ tiendaId: p.tiendaId, rol: p.rol });
     }
 
     return perfiles;
