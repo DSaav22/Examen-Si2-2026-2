@@ -4,6 +4,7 @@
 Uso: python generar_md.py
 """
 import os
+import re
 import sys
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -228,21 +229,31 @@ def requisitos():
         o.append(fig(f"cu-{slug(nombre)}", f"Casos de uso del {LOTES[lote][0].lower()}, {LOTES[lote][1]}"))
 
     o += ["## 9.1.6 Texto de los casos de uso\n",
-          "Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, sustantivos tomados del "
-          "dominio y fronteras con nombre. El curso básico es el camino en que todo sale bien; cada curso alterno se "
-          "numera con el paso donde se desvía (4a, 4b) y dice cómo termina. Los casos UC01 a UC35 son las fichas del "
-          "primer ciclo reescritas con estas reglas.\n"]
+          "Cada caso sigue la regla de los dos párrafos de ICONIX (Rosenberg y Stephens, 2007): un curso básico, "
+          "que narra el camino en que todo sale bien como una secuencia de evento y respuesta entre el actor y el "
+          "sistema, y los cursos alternos, cada uno encabezado por la condición que lo dispara y con la respuesta "
+          "del sistema. El texto va en voz activa, nombra los objetos del dominio tal como figuran en el modelo de "
+          "dominio (en singular y sin tilde cuando son nombres de clase, como Categoria o Suscripcion) y nombra la "
+          "pantalla donde ocurre cada acción. El código entre paréntesis de cada alterno indica la oración del curso "
+          "básico donde se desvía (3a es la primera desviación de la tercera oración) y es el mismo que aparece en "
+          "las guardas de los diagramas de secuencia. Los casos UC01 a UC35 son los del primer ciclo reescritos con "
+          "estas reglas.\n"]
+
+    def orden(alterno):
+        m = re.match(r"(\d+)(\w*)", alterno[0])
+        return (int(m.group(1)), m.group(2))
+
     for lote in LOTES:
         o.append(f"### {LOTES[lote][0]}: {LOTES[lote][1]}\n")
         for c in [x for x in CASOS if x["lote"] == lote]:
             o.append(f"#### {c['id']} {c['nombre']}\n")
             o.append(f"**Actores:** {lista(c['actores'])}. **Paquete:** {c['paquete']}. "
                      f"**Requisitos:** {', '.join(c['req'])}. **Pantallas:** {lista(c['fronteras'])}.\n")
-            o.append("**Curso básico**\n")
-            o += [f"{i}. {p}" for i, p in enumerate(c["basico"], 1)]
-            o.append("\n**Cursos alternos**\n")
-            o += [f"- **{a}.** {t}" for a, t in c["alternos"]]
-            o.append("")
+            o.append(f"**Curso básico:** {' '.join(c['basico'])}\n")
+            o.append("**Cursos alternos:**\n")
+            for cod, texto in sorted(c["alternos"], key=orden):
+                condicion, respuesta = texto.split(":", 1)
+                o.append(f"*{condicion.strip()} ({cod}):* {respuesta.strip()}\n")
 
     o += ["## 9.1.7 Revisión de requisitos\n",
           "La revisión se hizo por lotes, justo antes de pasar cada uno a robustez, con la lista de verificación de "

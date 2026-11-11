@@ -299,7 +299,7 @@ Los casos se agrupan por lote. El lote 0 reúne los 35 casos heredados, dividido
 
 ## 9.1.6 Texto de los casos de uso
 
-Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, sustantivos tomados del dominio y fronteras con nombre. El curso básico es el camino en que todo sale bien; cada curso alterno se numera con el paso donde se desvía (4a, 4b) y dice cómo termina. Los casos UC01 a UC35 son las fichas del primer ciclo reescritas con estas reglas.
+Cada caso sigue la regla de los dos párrafos de ICONIX (Rosenberg y Stephens, 2007): un curso básico, que narra el camino en que todo sale bien como una secuencia de evento y respuesta entre el actor y el sistema, y los cursos alternos, cada uno encabezado por la condición que lo dispara y con la respuesta del sistema. El texto va en voz activa, nombra los objetos del dominio tal como figuran en el modelo de dominio (en singular y sin tilde cuando son nombres de clase, como Categoria o Suscripcion) y nombra la pantalla donde ocurre cada acción. El código entre paréntesis de cada alterno indica la oración del curso básico donde se desvía (3a es la primera desviación de la tercera oración) y es el mismo que aparece en las guardas de los diagramas de secuencia. Los casos UC01 a UC35 son los del primer ciclo reescritos con estas reglas.
 
 ### Lote 0: Casos heredados del primer ciclo, revisados con robustez y secuencia
 
@@ -307,522 +307,391 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 
 **Actores:** Clienta. **Paquete:** Catálogo. **Requisitos:** B1. **Pantallas:** Pantalla Catálogo.
 
-**Curso básico**
+**Curso básico:** La Clienta abre la Pantalla Catálogo de la tienda. El sistema resuelve la Tienda activa y lista los Productos publicados con precio y disponibilidad por Sucursal. La Clienta filtra por Categoria, ocasión, talla, color, precio o sucursal, o escribe una búsqueda. El sistema vuelve a listar solo los productos que cumplen los filtros. La Clienta elige un producto y pasa a la ficha (UC02).
 
-1. La Clienta abre la Pantalla Catálogo de la tienda.
-2. El sistema resuelve la Tienda activa y lista los Producto publicados con precio y disponibilidad por Sucursal.
-3. La Clienta filtra por Categoria, ocasión, talla, color, precio o sucursal, o escribe una búsqueda.
-4. El sistema vuelve a listar solo los productos que cumplen los filtros.
-5. La Clienta elige un producto y pasa a la ficha (UC02).
+**Cursos alternos:**
 
-**Cursos alternos**
+*Sin conexión (1a):* la PWA muestra el catálogo guardado en caché con un aviso de datos no actualizados.
 
-- **4a.** Ningún producto coincide: la Pantalla Catálogo muestra la lista vacía y ofrece limpiar filtros.
-- **1a.** Sin conexión: la PWA muestra el catálogo guardado en caché con un aviso de datos no actualizados.
+*Ningún producto coincide (4a):* la Pantalla Catálogo muestra la lista vacía y ofrece limpiar filtros.
 
 #### UC02 Ver ficha y variantes
 
 **Actores:** Clienta. **Paquete:** Catálogo. **Requisitos:** B1. **Pantallas:** Pantalla Ficha de producto.
 
-**Curso básico**
+**Curso básico:** La Clienta abre la Pantalla Ficha de producto desde el catálogo. El sistema carga el Producto con sus Variantes, fotos, composición y cuidados. La Clienta elige talla y color. El sistema muestra el precio y el stock de la variante en cada Sucursal. Desde la ficha la Clienta puede probar (UC03), reservar (UC11), opinar (UC20) o agregar al carrito (UC05).
 
-1. La Clienta abre la Pantalla Ficha de producto desde el catálogo.
-2. El sistema carga el Producto con sus Variante, fotos, composición y cuidados.
-3. La Clienta elige talla y color.
-4. El sistema muestra el precio y el stock de la variante en cada Sucursal.
-5. Desde la ficha la Clienta puede probar (UC03), reservar (UC11), opinar (UC20) o agregar al carrito (UC05).
+**Cursos alternos:**
 
-**Cursos alternos**
+*El producto no existe o es de otra tienda (2a):* el sistema responde 404 y vuelve al catálogo.
 
-- **4a.** La variante está agotada: la ficha la muestra deshabilitada y ofrece pedir alerta (UC21).
-- **2a.** El producto no existe o es de otra tienda: el sistema responde 404 y vuelve al catálogo.
+*La variante está agotada (4a):* la ficha la muestra deshabilitada y ofrece pedir alerta (UC21).
 
 #### UC03 Usar el probador virtual
 
 **Actores:** Clienta. **Paquete:** Probador. **Requisitos:** B1. **Pantallas:** Pantalla Probador y Cámara del dispositivo.
 
-**Curso básico**
+**Curso básico:** La Clienta pulsa Probar en la Pantalla Ficha de producto y el sistema abre la Pantalla Probador. La Clienta autoriza la Cámara del dispositivo o carga una foto; el video no sale del dispositivo. El sistema pide el overlay de la Variante y estima los puntos del cuerpo en el dispositivo. El sistema coloca la prenda anclada a los hombros; si la variante tiene modelo 3D usa UC28. La Clienta cambia de color y vuelve a la ficha.
 
-1. La Clienta pulsa Probar en la Pantalla Ficha de producto y el sistema abre la Pantalla Probador.
-2. La Clienta autoriza la Cámara del dispositivo o carga una foto; el video no sale del dispositivo.
-3. El sistema pide el overlay de la Variante y estima los puntos del cuerpo en el dispositivo.
-4. El sistema coloca la prenda anclada a los hombros; si la variante tiene modelo 3D usa UC28.
-5. La Clienta cambia de color y vuelve a la ficha.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Sin permiso de cámara (2a):* la Clienta marca los hombros a mano sobre una foto o una silueta.
 
-- **2a.** Sin permiso de cámara: la Clienta marca los hombros a mano sobre una foto o una silueta.
-- **4a.** La variante no tiene overlay: el sistema avisa y ofrece otra variante.
+*La variante no tiene overlay (4a):* el sistema avisa y ofrece otra variante.
 
 #### UC04 Consultar la ficha con el asistente
 
 **Actores:** Clienta y Servicio de IA. **Paquete:** Bot. **Requisitos:** B1. **Pantallas:** Pantalla Ficha de producto y Interfaz Azure OpenAI.
 
-**Curso básico**
+**Curso básico:** La Clienta escribe una pregunta sobre precio, talla, color, ocasión o cuidados en la Pantalla Ficha de producto. El sistema arma el contexto con los datos guardados del Producto y sus Variantes. El sistema consulta al Servicio de IA por la Interfaz Azure OpenAI con ese contexto. El sistema muestra la respuesta en la ficha.
 
-1. La Clienta escribe una pregunta sobre precio, talla, color, ocasión o cuidados en la Pantalla Ficha de producto.
-2. El sistema arma el contexto con los datos guardados del Producto y sus Variante.
-3. El sistema consulta al Servicio de IA por la Interfaz Azure OpenAI con ese contexto.
-4. El sistema muestra la respuesta en la ficha.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El Servicio de IA no responde (3a):* el sistema contesta con reglas sobre los mismos datos de la ficha.
 
-- **3a.** El Servicio de IA no responde: el sistema contesta con reglas sobre los mismos datos de la ficha.
-- **4a.** El dato no está en la ficha: la respuesta dice que no lo tiene y no inventa stock ni precios.
+*El dato no está en la ficha (4a):* la respuesta dice que no lo tiene y no inventa stock ni precios.
 
 #### UC05 Comprar en línea
 
 **Actores:** Clienta. **Paquete:** Ventas. **Requisitos:** B1, O5, O6. **Pantallas:** Pantalla Carrito y Pantalla Comprobante.
 
-**Curso básico**
+**Curso básico:** La Clienta revisa la Pantalla Carrito con las variantes elegidas. La Clienta puede aplicar un Cupon (UC22) y elige el medio de pago (UC27). La Clienta confirma la compra; el carrito envía la Venta con un uuid generado en el cliente. El sistema recalcula precios en el servidor, descuenta el StockAlmacen con una actualización condicional y registra la Venta, cada LineaVenta y el MovimientoInventario en una transacción. El sistema crea el Pedido para despacho y muestra la Pantalla Comprobante (UC34).
 
-1. La Clienta revisa la Pantalla Carrito con las variantes elegidas.
-2. La Clienta puede aplicar un Cupon (UC22) y elige el medio de pago (UC27).
-3. La Clienta confirma la compra; el carrito envía la Venta con un uuid generado en el cliente.
-4. El sistema recalcula precios en el servidor, descuenta el StockAlmacen con una actualización condicional y registra la Venta, sus LineaVenta y el MovimientoInventario en una transacción.
-5. El sistema crea el Pedido para despacho y muestra la Pantalla Comprobante (UC34).
+**Cursos alternos:**
 
-**Cursos alternos**
+*La Clienta pulsa confirmar dos veces (3a):* el uuid repetido devuelve la misma venta sin cobrar de nuevo.
 
-- **4a.** El disponible cambió: el sistema rechaza la línea con conflicto de stock y no deja saldo negativo.
-- **3a.** La Clienta pulsa confirmar dos veces: el uuid repetido devuelve la misma venta sin cobrar de nuevo.
-- **4b.** El pago simulado es rechazado: no se registra la venta ni baja el stock.
+*El disponible cambió (4a):* el sistema rechaza la línea con conflicto de stock y no deja saldo negativo.
+
+*El pago simulado es rechazado (4b):* no se registra la venta ni baja el stock.
 
 #### UC06 Abrir caja
 
 **Actores:** Cajero. **Paquete:** Caja. **Requisitos:** B1, O6. **Pantallas:** Pantalla Punto de venta.
 
-**Curso básico**
+**Curso básico:** El Cajero indica la Sucursal y el fondo inicial en la Pantalla Punto de venta. El sistema verifica que el Cajero no tenga otro CajaTurno abierto. El sistema abre el CajaTurno con el fondo inicial y lo muestra en pantalla.
 
-1. El Cajero indica la Sucursal y el fondo inicial en la Pantalla Punto de venta.
-2. El sistema verifica que el Cajero no tenga otro CajaTurno abierto.
-3. El sistema abre el CajaTurno con el fondo inicial y lo muestra en pantalla.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Fondo negativo o sucursal ajena (1a):* el sistema rechaza la apertura.
 
-- **2a.** Ya hay un turno abierto: el sistema muestra ese turno en lugar de abrir otro.
-- **1a.** Fondo negativo o sucursal ajena: el sistema rechaza la apertura.
+*Ya hay un turno abierto (2a):* el sistema muestra ese turno en lugar de abrir otro.
 
 #### UC07 Registrar venta en el punto de venta
 
 **Actores:** Cajero. **Paquete:** Ventas. **Requisitos:** B1, O5, O6, O7. **Pantallas:** Pantalla Punto de venta.
 
-**Curso básico**
+**Curso básico:** El Cajero arma el ticket en la Pantalla Punto de venta con variantes y cantidades. El Cajero puede asociar una clienta y un Cupon, y elige el medio de pago. El sistema verifica que haya un CajaTurno abierto y comprueba el disponible en StockAlmacen. El sistema descuenta el stock con una actualización condicional y registra la Venta, cada LineaVenta y el MovimientoInventario en una transacción. El sistema suma el total al CajaTurno y emite el ticket y el comprobante (UC34).
 
-1. El Cajero arma el ticket en la Pantalla Punto de venta con variantes y cantidades.
-2. El Cajero puede asociar una clienta y un Cupon, y elige el medio de pago.
-3. El sistema verifica que haya un CajaTurno abierto y comprueba el disponible en StockAlmacen.
-4. El sistema descuenta el stock con una actualización condicional y registra la Venta, sus LineaVenta y el MovimientoInventario en una transacción.
-5. El sistema suma el total al CajaTurno y emite el ticket y el comprobante (UC34).
+**Cursos alternos:**
 
-**Cursos alternos**
+*Sin red (1a):* la venta en efectivo se guarda en la cola local y se sincroniza después (UC42).
 
-- **3a.** Sin turno abierto o sin stock: el sistema no cobra y explica el motivo.
-- **4a.** El mismo uuid llega dos veces: el sistema devuelve la venta ya cobrada sin descontar de nuevo.
-- **1a.** Sin red: la venta en efectivo se guarda en la cola local y se sincroniza después (UC42).
+*Sin turno abierto o sin stock (3a):* el sistema no cobra y explica el motivo.
+
+*El mismo uuid llega dos veces (4a):* el sistema devuelve la venta ya cobrada sin descontar de nuevo.
 
 #### UC08 Cerrar caja
 
 **Actores:** Cajero. **Paquete:** Caja. **Requisitos:** B1, O1. **Pantallas:** Pantalla Punto de venta.
 
-**Curso básico**
+**Curso básico:** El Cajero declara el monto contado en la Pantalla Punto de venta. El sistema calcula el total del CajaTurno y la diferencia con lo contado. El sistema cierra el CajaTurno y muestra el arqueo.
 
-1. El Cajero declara el monto contado en la Pantalla Punto de venta.
-2. El sistema calcula el total del CajaTurno y la diferencia con lo contado.
-3. El sistema cierra el CajaTurno y muestra el arqueo.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Hay operaciones offline pendientes o en conflicto (1a):* el sistema bloquea el cierre hasta sincronizarlas.
 
-- **1a.** Hay operaciones offline pendientes o en conflicto: el sistema bloquea el cierre hasta sincronizarlas.
-- **2a.** El turno es de otra sucursal: el sistema no lo cierra.
+*El turno es de otra sucursal (2a):* el sistema no lo cierra.
 
 #### UC09 Administrar catálogo
 
 **Actores:** Administrador. **Paquete:** Catálogo. **Requisitos:** B1, O1. **Pantallas:** Pantalla Administración de catálogo.
 
-**Curso básico**
+**Curso básico:** El Administrador crea o edita un Producto en la Pantalla Administración de catálogo. El Administrador agrega Variante con talla, color, fotos, overlay o modelo 3D y precio. El Administrador asigna Categoria, Temporada y Coleccion (UC24). El sistema valida que el plan de la Tienda permita el alta y guarda el producto. El Administrador fija el stock inicial (UC25).
 
-1. El Administrador crea o edita un Producto en la Pantalla Administración de catálogo.
-2. El Administrador agrega Variante con talla, color, fotos, overlay o modelo 3D y precio.
-3. El Administrador asigna Categoria, Temporada y Coleccion (UC24).
-4. El sistema valida que el plan de la Tienda permita el alta y guarda el producto.
-5. El Administrador fija el stock inicial (UC25).
+**Cursos alternos:**
 
-**Cursos alternos**
+*SKU repetido o talla y color ya existentes (4a):* el sistema rechaza el alta.
 
-- **4a.** SKU repetido o talla y color ya existentes: el sistema rechaza el alta.
-- **4b.** Sin red: el alta del producto queda en la cola local con uuid y se sincroniza después (UC43).
+*Sin red (4b):* el alta del producto queda en la cola local con uuid y se sincroniza después (UC43).
 
 #### UC10 Pedir reporte predefinido
 
 **Actores:** Administrador y Encargado. **Paquete:** Reportes. **Requisitos:** B1, S1. **Pantallas:** Pantalla Reportes.
 
-**Curso básico**
+**Curso básico:** El Administrador elige en la Pantalla Reportes un ranking rápido, el reporte del día o el de inventario. El sistema fija la tienda de la sesión en la consulta y agrega las ventas o el stock del período. El sistema registra la ReporteEjecucion y muestra la tabla con su narración.
 
-1. El Administrador elige en la Pantalla Reportes un ranking rápido, el reporte del día o el de inventario.
-2. El sistema fija la tienda de la sesión en la consulta y agrega las ventas o el stock del período.
-3. El sistema registra la ReporteEjecucion y muestra la tabla con su narración.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El Encargado solo ve su sucursal (1a):* el sistema fuerza ese filtro.
 
-- **1a.** El Encargado solo ve su sucursal: el sistema fuerza ese filtro.
-- **2a.** No hay datos en el período: el sistema muestra el reporte vacío.
+*No hay datos en el período (2a):* el sistema muestra el reporte vacío.
 
 #### UC11 Reservar una prenda
 
 **Actores:** Clienta. **Paquete:** Reservas. **Requisitos:** B1. **Pantallas:** Pantalla Ficha de producto y Pantalla Reservas.
 
-**Curso básico**
+**Curso básico:** La Clienta elige variante y Sucursal en la Pantalla Ficha de producto y pide reservar. El sistema comprueba el disponible y aumenta la cantidad reservada en StockAlmacen; la física no baja. El sistema crea la Reserva con su horario y la muestra en la Pantalla Reservas.
 
-1. La Clienta elige variante y Sucursal en la Pantalla Ficha de producto y pide reservar.
-2. El sistema comprueba el disponible y aumenta la cantidad reservada en StockAlmacen; la física no baja.
-3. El sistema crea la Reserva con su horario y la muestra en la Pantalla Reservas.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** Sin disponible en esa sucursal: el sistema no crea la reserva y sugiere otra sucursal.
+*Sin disponible en esa sucursal (2a):* el sistema no crea la reserva y sugiere otra sucursal.
 
 #### UC12 Atender reservas
 
 **Actores:** Encargado. **Paquete:** Reservas. **Requisitos:** B1. **Pantallas:** Pantalla Encargado.
 
-**Curso básico**
+**Curso básico:** El Encargado ve las Reservas pendientes de su Sucursal en la Pantalla Encargado. El Encargado completa o cancela una reserva. Al completar, el sistema genera la Venta, descuenta la cantidad física y libera el reservado. Al cancelar, el sistema solo libera el reservado.
 
-1. El Encargado ve las Reserva pendientes de su Sucursal en la Pantalla Encargado.
-2. El Encargado completa o cancela una reserva.
-3. Al completar, el sistema genera la Venta, descuenta la cantidad física y libera el reservado.
-4. Al cancelar, el sistema solo libera el reservado.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** La reserva es de otra sucursal: el sistema no la modifica.
+*La reserva es de otra sucursal (2a):* el sistema no la modifica.
 
 #### UC13 Ingresar mercadería
 
 **Actores:** Proveedor. **Paquete:** Proveedores. **Requisitos:** B1. **Pantallas:** Pantalla Proveedor.
 
-**Curso básico**
+**Curso básico:** El Proveedor elige producto, variante, Almacen y cantidad en la Pantalla Proveedor. El sistema verifica que el Producto sea de ese Proveedor. El sistema suma el StockAlmacen y escribe el MovimientoInventario de ingreso.
 
-1. El Proveedor elige producto, variante, Almacen y cantidad en la Pantalla Proveedor.
-2. El sistema verifica que el Producto sea de ese Proveedor.
-3. El sistema suma el StockAlmacen y escribe el MovimientoInventario de ingreso.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** El producto es de otro proveedor: el sistema rechaza el ingreso.
+*El producto es de otro proveedor (2a):* el sistema rechaza el ingreso.
 
 #### UC14 Registrarse como clienta
 
 **Actores:** Clienta. **Paquete:** Auth. **Requisitos:** B1, S7. **Pantallas:** Pantalla Registro.
 
-**Curso básico**
+**Curso básico:** La Clienta indica nombre, correo y clave en la Pantalla Registro de la tienda. El sistema busca o crea la Cuenta global con la clave cifrada. El sistema crea el Usuario con rol clienta en la Tienda e inicia la sesión.
 
-1. La Clienta indica nombre, correo y clave en la Pantalla Registro de la tienda.
-2. El sistema busca o crea la Cuenta global con la clave cifrada.
-3. El sistema crea el Usuario con rol clienta en la Tienda e inicia la sesión.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Clave débil o correo inválido (1a):* el sistema no crea la cuenta.
 
-- **2a.** El correo ya tiene cuenta en la plataforma: el sistema exige su clave y la une a esta tienda.
-- **1a.** Clave débil o correo inválido: el sistema no crea la cuenta.
+*El correo ya tiene cuenta en la plataforma (2a):* el sistema exige su clave y la une a esta tienda.
 
 #### UC15 Iniciar y cerrar sesión
 
 **Actores:** Clienta, Cajero, Encargado, Administrador y Proveedor. **Paquete:** Auth. **Requisitos:** B1, S1. **Pantallas:** Pantalla Login.
 
-**Curso básico**
+**Curso básico:** El usuario ingresa correo y clave en la Pantalla Login de la tienda. El sistema valida la clave contra la Cuenta y busca su Usuario en la Tienda. El sistema entrega un token JWT con rol, sucursal y tienda. Al salir, el sistema guarda el token en TokenRevocado.
 
-1. El usuario ingresa correo y clave en la Pantalla Login de la tienda.
-2. El sistema valida la clave contra la Cuenta y busca su Usuario en la Tienda.
-3. El sistema entrega un token JWT con rol, sucursal y tienda.
-4. Al salir, el sistema guarda el token en TokenRevocado.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Clave incorrecta, usuario inactivo o tienda suspendida (2a):* el sistema no entrega token.
 
-- **2a.** Clave incorrecta, usuario inactivo o tienda suspendida: el sistema no entrega token.
-- **2b.** La cuenta no pertenece a esa tienda: el sistema responde que no tiene acceso.
+*La cuenta no pertenece a esa tienda (2b):* el sistema responde que no tiene acceso.
 
 #### UC16 Cambiar clave
 
 **Actores:** Clienta, Cajero, Encargado, Administrador y Proveedor. **Paquete:** Auth. **Requisitos:** B1. **Pantallas:** Pantalla Cuenta.
 
-**Curso básico**
+**Curso básico:** El usuario escribe la clave actual y la nueva en la Pantalla Cuenta. El sistema valida la clave actual contra la Cuenta. El sistema reemplaza el hash de la clave.
 
-1. El usuario escribe la clave actual y la nueva en la Pantalla Cuenta.
-2. El sistema valida la clave actual contra la Cuenta.
-3. El sistema reemplaza el hash de la clave.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** La clave actual no coincide: el sistema no cambia la clave.
+*La clave actual no coincide (2a):* el sistema no cambia la clave.
 
 #### UC17 Gestionar favoritos
 
 **Actores:** Clienta. **Paquete:** Cliente. **Requisitos:** B1. **Pantallas:** Pantalla Favoritos.
 
-**Curso básico**
+**Curso básico:** La Clienta marca un Producto como favorito desde la ficha. El sistema guarda el Favorito sin duplicarlo. La Clienta ve sus favoritos en la Pantalla Favoritos y puede quitar uno.
 
-1. La Clienta marca un Producto como favorito desde la ficha.
-2. El sistema guarda el Favorito sin duplicarlo.
-3. La Clienta ve sus favoritos en la Pantalla Favoritos y puede quitar uno.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** El producto ya era favorito: el sistema no crea un registro repetido.
+*El producto ya era favorito (2a):* el sistema no crea un registro repetido.
 
 #### UC18 Gestionar perfil y direcciones
 
 **Actores:** Clienta. **Paquete:** Cliente. **Requisitos:** B1. **Pantallas:** Pantalla Cuenta.
 
-**Curso básico**
+**Curso básico:** La Clienta abre la Pantalla Cuenta y consulta su nombre y correo. La Clienta agrega o edita una DireccionCliente de entrega. El sistema valida y guarda la dirección.
 
-1. La Clienta abre la Pantalla Cuenta y consulta su nombre y correo.
-2. La Clienta agrega o edita una DireccionCliente de entrega.
-3. El sistema valida y guarda la dirección.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **3a.** La dirección está incompleta: el sistema no la guarda.
+*La dirección está incompleta (3a):* el sistema no la guarda.
 
 #### UC19 Ver historial de compras
 
 **Actores:** Clienta, Cajero y Encargado. **Paquete:** Ventas. **Requisitos:** B1, S1. **Pantallas:** Pantalla Historial.
 
-**Curso básico**
+**Curso básico:** El usuario abre la Pantalla Historial. El sistema lista las Ventas propias de la Clienta, o las de la Sucursal para cajero y encargado. El usuario abre el detalle con LineaVenta y medio de pago.
 
-1. El usuario abre la Pantalla Historial.
-2. El sistema lista las Venta propias de la Clienta, o las de la Sucursal para cajero y encargado.
-3. El usuario abre el detalle con LineaVenta y medio de pago.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** El sistema nunca muestra ventas de otra persona, de otra sucursal ni de otra tienda.
+*Venta ajena (2a):* si la Venta pertenece a otra persona, otra Sucursal u otra Tienda, el sistema la excluye de la lista.
 
 #### UC20 Opinar un producto
 
 **Actores:** Clienta. **Paquete:** Cliente. **Requisitos:** B1. **Pantallas:** Pantalla Ficha de producto.
 
-**Curso básico**
+**Curso básico:** La Clienta escribe valoración y comentario en la Pantalla Ficha de producto. El sistema guarda la Opinion como pendiente de moderación (UC26).
 
-1. La Clienta escribe valoración y comentario en la Pantalla Ficha de producto.
-2. El sistema guarda la Opinion como pendiente de moderación (UC26).
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** Ya opinó ese producto: el sistema rechaza la segunda opinión.
+*Ya opinó ese producto (2a):* el sistema rechaza la segunda opinión.
 
 #### UC21 Pedir alerta de producto
 
 **Actores:** Clienta. **Paquete:** Cliente. **Requisitos:** B1. **Pantallas:** Pantalla Ficha de producto.
 
-**Curso básico**
+**Curso básico:** En la Pantalla Ficha de producto la Clienta pide aviso de disponibilidad o de precio. El sistema guarda la AlertaProducto y luego avisa con una Notificacion.
 
-1. En la Pantalla Ficha de producto la Clienta pide aviso de disponibilidad o de precio.
-2. El sistema guarda la AlertaProducto y luego avisa con una Notificacion.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** La misma alerta ya existe: el sistema no la duplica.
+*La misma alerta ya existe (2a):* el sistema no la duplica.
 
 #### UC22 Aplicar cupón
 
 **Actores:** Clienta y Cajero. **Paquete:** Ventas. **Requisitos:** B1. **Pantallas:** Pantalla Carrito y Pantalla Punto de venta.
 
-**Curso básico**
+**Curso básico:** La Clienta o el Cajero ingresa el código de Cupon durante la compra. El sistema valida vigencia y usos, y recalcula el total con el porcentaje. Al cobrar, el sistema suma un uso al cupón y la Venta guarda el descuento.
 
-1. La Clienta o el Cajero ingresa el código de Cupon durante la compra.
-2. El sistema valida vigencia y usos, y recalcula el total con el porcentaje.
-3. Al cobrar, el sistema suma un uso al cupón y la Venta guarda el descuento.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** Código inválido, vencido o agotado: el total no cambia y se informa el motivo.
+*Código inválido, vencido o agotado (2a):* el total no cambia y se informa el motivo.
 
 #### UC23 Gestionar usuarios
 
 **Actores:** Administrador. **Paquete:** Administración. **Requisitos:** B1, S3. **Pantallas:** Pantalla Usuarios.
 
-**Curso básico**
+**Curso básico:** El Administrador lista los Usuarios de su Tienda en la Pantalla Usuarios. El Administrador crea un usuario con rol y sucursal, o edita nombre, rol y estado. El sistema verifica el límite de usuarios del Plan y guarda el cambio con su Auditoria.
 
-1. El Administrador lista los Usuario de su Tienda en la Pantalla Usuarios.
-2. El Administrador crea un usuario con rol y sucursal, o edita nombre, rol y estado.
-3. El sistema verifica el límite de usuarios del Plan y guarda el cambio con su Auditoria.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El plan llegó a su límite de usuarios (3a):* el sistema rechaza el alta y sugiere cambiar de plan (UC39).
 
-- **3a.** El plan llegó a su límite de usuarios: el sistema rechaza el alta y sugiere cambiar de plan (UC39).
-- **3b.** El correo ya es usuario de la tienda: el sistema no lo duplica.
+*El correo ya es usuario de la tienda (3b):* el sistema no lo duplica.
 
 #### UC24 Gestionar sucursales, temporadas y colecciones
 
 **Actores:** Administrador. **Paquete:** Catálogo. **Requisitos:** B1, S3. **Pantallas:** Pantalla Configuración.
 
-**Curso básico**
+**Curso básico:** El Administrador crea o edita una Sucursal en la Pantalla Configuración. El sistema verifica el límite de sucursales del plan y crea su Almacen. El Administrador crea Temporada y Coleccion para asignarlas en UC09.
 
-1. El Administrador crea o edita una Sucursal en la Pantalla Configuración.
-2. El sistema verifica el límite de sucursales del plan y crea su Almacen.
-3. El Administrador crea Temporada y Coleccion para asignarlas en UC09.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Nombre vacío (1a):* el sistema no guarda.
 
-- **2a.** El plan no admite más sucursales: el sistema rechaza el alta.
-- **1a.** Nombre vacío: el sistema no guarda.
+*El plan no admite más sucursales (2a):* el sistema rechaza el alta.
 
 #### UC25 Ajustar inventario y ver el kardex
 
 **Actores:** Encargado y Administrador. **Paquete:** Inventario. **Requisitos:** B1, O6. **Pantallas:** Pantalla Inventario.
 
-**Curso básico**
+**Curso básico:** El Encargado consulta los registros de MovimientoInventario de su Sucursal en la Pantalla Inventario. El Encargado registra un ajuste con la cantidad resultante. El sistema actualiza el StockAlmacen y guarda el movimiento de ajuste.
 
-1. El Encargado consulta los MovimientoInventario de su sucursal en la Pantalla Inventario.
-2. El Encargado registra un ajuste con la cantidad resultante.
-3. El sistema actualiza el StockAlmacen y guarda el movimiento de ajuste.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **3a.** La cantidad nueva es menor que lo reservado: el sistema rechaza el ajuste.
+*La cantidad nueva es menor que lo reservado (3a):* el sistema rechaza el ajuste.
 
 #### UC26 Moderar opiniones y ver auditoría
 
 **Actores:** Administrador. **Paquete:** Administración. **Requisitos:** B1. **Pantallas:** Pantalla Moderación y Pantalla Bitácora.
 
-**Curso básico**
+**Curso básico:** El Administrador ve las Opiniones pendientes en la Pantalla Moderación y las publica o rechaza. El Administrador consulta la Auditoria en la Pantalla Bitácora.
 
-1. El Administrador ve las Opinion pendientes en la Pantalla Moderación y las publica o rechaza.
-2. El Administrador consulta la Auditoria en la Pantalla Bitácora.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **1a.** La opinión ya fue moderada: un doble clic no la vuelve a pendiente.
+*La opinión ya fue moderada (1a):* un doble clic no la vuelve a pendiente.
 
 #### UC27 Simular un pago
 
 **Actores:** Clienta y Cajero. **Paquete:** Pagos. **Requisitos:** B1, O8. **Pantallas:** Pantalla Pago.
 
-**Curso básico**
+**Curso básico:** La Clienta o el Cajero elige efectivo, QR, tarjeta o transferencia en la Pantalla Pago. Con QR o tarjeta, el sistema crea el PagoSimulado y espera su autorización. Solo si el pago es aprobado, la Venta continúa el cobro de UC05 o UC07.
 
-1. La Clienta o el Cajero elige efectivo, QR, tarjeta o transferencia en la Pantalla Pago.
-2. Con QR o tarjeta, el sistema crea el PagoSimulado y espera su autorización.
-3. Solo si el pago es aprobado, la Venta continúa el cobro de UC05 o UC07.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Sin red (1a):* QR y tarjeta no están disponibles porque necesitan confirmación en línea.
 
-- **3a.** El pago es rechazado: no hay venta cobrada y el stock no baja.
-- **1a.** Sin red: QR y tarjeta no están disponibles porque necesitan confirmación en línea.
+*El pago es rechazado (3a):* no hay venta cobrada y el stock no baja.
 
 #### UC28 Usar el probador 3D
 
 **Actores:** Clienta. **Paquete:** Probador. **Requisitos:** B1. **Pantallas:** Pantalla Probador.
 
-**Curso básico**
+**Curso básico:** Dentro de UC03, el sistema detecta que la Variante tiene modelo 3D. El sistema ajusta la prenda al torso estimado y muestra volumen y caída simplificada. La Clienta gira la vista o cambia de color.
 
-1. Dentro de UC03, el sistema detecta que la Variante tiene modelo 3D.
-2. El sistema ajusta la prenda al torso estimado y muestra volumen y caída simplificada.
-3. La Clienta gira la vista o cambia de color.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **1a.** El dispositivo no soporta el modelo: el sistema vuelve al overlay 2D sin perder la ficha.
+*El dispositivo no soporta el modelo (1a):* el sistema vuelve al overlay 2D sin perder la ficha.
 
 #### UC29 Hablar con el bot
 
 **Actores:** Clienta y Servicio de IA. **Paquete:** Bot. **Requisitos:** B1. **Pantallas:** Pantalla Bot y Interfaz Azure OpenAI.
 
-**Curso básico**
+**Curso básico:** La Clienta abre la Pantalla Bot y pregunta por talla, combinación, disponibilidad o su pedido. El sistema arma el contexto con Producto, StockAlmacen y las Ventas propias de la Clienta. El sistema consulta al Servicio de IA por la Interfaz Azure OpenAI y muestra la respuesta.
 
-1. La Clienta abre la Pantalla Bot y pregunta por talla, combinación, disponibilidad o su pedido.
-2. El sistema arma el contexto con Producto, StockAlmacen y las Venta propias de la Clienta.
-3. El sistema consulta al Servicio de IA por la Interfaz Azure OpenAI y muestra la respuesta.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Pide un reporte de la empresa (2a):* el bot responde que corresponde a administración.
 
-- **2a.** Pide un reporte de la empresa: el bot responde que corresponde a administración.
-- **3a.** El Servicio de IA no responde: el bot contesta con reglas sobre el catálogo.
+*El Servicio de IA no responde (3a):* el bot contesta con reglas sobre el catálogo.
 
 #### UC30 Aplicar precio mayorista
 
 **Actores:** Administrador y Clienta. **Paquete:** Catálogo. **Requisitos:** B1. **Pantallas:** Pantalla Administración de catálogo y Pantalla Carrito.
 
-**Curso básico**
+**Curso básico:** El Administrador carga precio mayorista y cantidad mínima en el Producto. La Clienta mayorista arma un carrito que alcanza el mínimo. Al cobrar, el sistema aplica el precio mayorista y la LineaVenta guarda el precio usado.
 
-1. El Administrador carga precio mayorista y cantidad mínima en el Producto.
-2. La Clienta mayorista arma un carrito que alcanza el mínimo.
-3. Al cobrar, el sistema aplica el precio mayorista y la LineaVenta guarda el precio usado.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **3a.** No alcanza el mínimo: el sistema aplica el precio de detalle.
+*No alcanza el mínimo (3a):* el sistema aplica el precio de detalle.
 
 #### UC31 Transferir stock entre almacenes
 
 **Actores:** Encargado. **Paquete:** Inventario. **Requisitos:** B1, O7. **Pantallas:** Pantalla Inventario.
 
-**Curso básico**
+**Curso básico:** El Encargado elige variante, Almacen de origen, destino y cantidad en la Pantalla Inventario. El sistema resta en origen con una actualización condicional y suma en destino. El sistema escribe dos registros de MovimientoInventario de transferencia en la misma transacción.
 
-1. El Encargado elige variante, Almacen de origen, destino y cantidad en la Pantalla Inventario.
-2. El sistema resta en origen con una actualización condicional y suma en destino.
-3. El sistema escribe dos MovimientoInventario de transferencia en la misma transacción.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** La cantidad supera el disponible u origen y destino son iguales: el sistema no transfiere.
+*La cantidad supera el disponible u origen y destino son iguales (2a):* el sistema no transfiere.
 
 #### UC32 Despachar un pedido
 
 **Actores:** Encargado. **Paquete:** Ventas. **Requisitos:** B1. **Pantallas:** Pantalla Despacho.
 
-**Curso básico**
+**Curso básico:** El Encargado ve los Pedidos pendientes en la Pantalla Despacho. El Encargado confirma el despacho. El sistema marca el pedido como enviado con su referencia y avisa a la Clienta con una Notificacion.
 
-1. El Encargado ve los Pedido pendientes en la Pantalla Despacho.
-2. El Encargado confirma el despacho.
-3. El sistema marca el pedido como enviado con su referencia y avisa a la Clienta con una Notificacion.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** La venta es de caja o el pedido ya fue enviado: el sistema no lo despacha.
+*La venta es de caja o el pedido ya fue enviado (2a):* el sistema no lo despacha.
 
 #### UC33 Devolver una venta
 
 **Actores:** Cajero. **Paquete:** Ventas. **Requisitos:** B1, R2. **Pantallas:** Pantalla Historial.
 
-**Curso básico**
+**Curso básico:** El Cajero elige la Venta y las líneas a devolver en la Pantalla Historial. El sistema repone el StockAlmacen y registra el MovimientoInventario de devolución. El sistema crea la Devolucion y ajusta la caja; si la venta fue al crédito, reduce el saldo de la CuentaCobrar.
 
-1. El Cajero elige la Venta y las líneas a devolver en la Pantalla Historial.
-2. El sistema repone el StockAlmacen y registra el MovimientoInventario de devolución.
-3. El sistema crea la Devolucion y ajusta la caja; si la venta fue al crédito, reduce el saldo de la CuentaCobrar.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Devolver más unidades que las vendidas (2a):* el sistema rechaza la devolución.
 
-- **2a.** Devolver más unidades que las vendidas: el sistema rechaza la devolución.
-- **3a.** Venta al crédito sin abonos: la deuda se cancela y no sale efectivo de la caja.
+*Venta al crédito sin abonos (3a):* la deuda se cancela y no sale efectivo de la caja.
 
 #### UC34 Emitir comprobante simulado
 
 **Actores:** Cajero. **Paquete:** Pagos. **Requisitos:** B1. **Pantallas:** Pantalla Comprobante.
 
-**Curso básico**
+**Curso básico:** Al terminar UC05 o UC07, el sistema arma el comprobante con Sucursal, LineaVenta, totales y un NIT de prueba. El sistema lo muestra en la Pantalla Comprobante y permite imprimirlo o enviarlo por correo.
 
-1. Al terminar UC05 o UC07, el sistema arma el comprobante con Sucursal, LineaVenta, totales y un NIT de prueba.
-2. El sistema lo muestra en la Pantalla Comprobante y permite imprimirlo o enviarlo por correo.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **1a.** Sin venta cobrada no hay comprobante; no se envía a un servicio tributario real.
+*Venta no cobrada (1a):* el sistema no genera el comprobante y la pantalla muestra el motivo.
 
 #### UC35 Instalar la tienda como PWA
 
 **Actores:** Clienta y Cajero. **Paquete:** Cliente. **Requisitos:** O1, O10. **Pantallas:** Navegador y Service Worker.
 
-**Curso básico**
+**Curso básico:** El Navegador ofrece instalar la aplicación a partir del manifest. El Service Worker guarda la estructura de la aplicación y los datos recientes en caché. La Clienta o el Cajero abre la tienda instalada desde el escritorio o el teléfono.
 
-1. El Navegador ofrece instalar la aplicación a partir del manifest.
-2. El Service Worker guarda la estructura de la aplicación y los datos recientes en caché.
-3. La Clienta o el Cajero abre la tienda instalada desde el escritorio o el teléfono.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El navegador no soporta instalación (1a):* la tienda funciona igual como sitio web.
 
-- **2a.** Sin red: la aplicación abre desde la caché y la caja trabaja en cola (UC42).
-- **1a.** El navegador no soporta instalación: la tienda funciona igual como sitio web.
+*Sin red (2a):* la aplicación abre desde la caché y la caja trabaja en cola (UC42).
 
 ### Lote 1: SaaS multi-tienda
 
@@ -830,95 +699,73 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 
 **Actores:** Suscriptor. **Paquete:** Plataforma. **Requisitos:** S2, S3, S4. **Pantallas:** Pantalla Planes y Pantalla Empezar.
 
-**Curso básico**
+**Curso básico:** El Suscriptor revisa módulos, planes y precios en la Pantalla Planes. El Suscriptor elige un plan y abre la Pantalla Empezar. El Suscriptor indica nombre, correo y clave. El sistema crea la Cuenta sin verificar y envía el enlace de verificación (UC37).
 
-1. El Suscriptor revisa módulos, planes y precios en la Pantalla Planes.
-2. El Suscriptor elige un plan y abre la Pantalla Empezar.
-3. El Suscriptor indica nombre, correo y clave.
-4. El sistema crea la Cuenta sin verificar y envía el enlace de verificación (UC37).
+**Cursos alternos:**
 
-**Cursos alternos**
+*El correo ya tiene cuenta (4a):* el sistema pide iniciar sesión en lugar de crear otra.
 
-- **4a.** El correo ya tiene cuenta: el sistema pide iniciar sesión en lugar de crear otra.
-- **4b.** No hay servidor de correo configurado: en demo, el enlace se muestra en pantalla.
+*No hay servidor de correo configurado (4b):* en demo, el enlace se muestra en pantalla.
 
 #### UC37 Verificar correo
 
 **Actores:** Suscriptor. **Paquete:** Plataforma. **Requisitos:** S6. **Pantallas:** Pantalla Verificar.
 
-**Curso básico**
+**Curso básico:** El Suscriptor abre el enlace recibido y llega a la Pantalla Verificar. El sistema valida el token y marca la Cuenta como verificada. El sistema inicia la sesión de plataforma y lleva al Suscriptor a elegir plan.
 
-1. El Suscriptor abre el enlace recibido y llega a la Pantalla Verificar.
-2. El sistema valida el token y marca la Cuenta como verificada.
-3. El sistema inicia la sesión de plataforma y lleva al Suscriptor a elegir plan.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El token venció o no existe (2a):* el sistema ofrece reenviar el correo.
 
-- **2a.** El token venció o no existe: el sistema ofrece reenviar el correo.
-- **2b.** Sin verificar, la cuenta no puede suscribirse ni entrar a una tienda.
+*Correo sin verificar (2b):* el sistema impide que la Cuenta se suscriba o entre a una Tienda.
 
 #### UC38 Suscribirse y crear tienda
 
 **Actores:** Suscriptor y Pasarela de pago. **Paquete:** Plataforma. **Requisitos:** S3, S4, S5, O6. **Pantallas:** Pantalla Nueva tienda y Interfaz pasarela.
 
-**Curso básico**
+**Curso básico:** El Suscriptor elige plan y duración (1, 3 o 12 meses) e indica nombre y dirección (slug) de la tienda en la Pantalla Nueva tienda. El sistema verifica que el slug esté libre. El Suscriptor ingresa la tarjeta de prueba; el sistema cobra por la Interfaz pasarela con una clave de idempotencia. Con el pago aprobado, el sistema crea en una transacción la Tienda, la Suscripcion, el PagoSuscripcion, la Sucursal, el Almacen y el Usuario administrador. El sistema entra a la tienda nueva sin pedir otro login.
 
-1. El Suscriptor elige plan y duración (1, 3 o 12 meses) e indica nombre y dirección (slug) de la tienda en la Pantalla Nueva tienda.
-2. El sistema verifica que el slug esté libre.
-3. El Suscriptor ingresa la tarjeta de prueba; el sistema cobra por la Interfaz pasarela con una clave de idempotencia.
-4. Con el pago aprobado, el sistema crea en una transacción la Tienda, la Suscripcion, el PagoSuscripcion, la Sucursal, el Almacen y el Usuario administrador.
-5. El sistema entra a la tienda nueva sin pedir otro login.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El slug está ocupado (2a):* el sistema sugiere otro.
 
-- **3a.** El pago es rechazado: no se crea la tienda y el Suscriptor puede reintentar.
-- **3b.** El Suscriptor pulsa pagar dos veces: la misma clave de idempotencia devuelve el primer resultado.
-- **2a.** El slug está ocupado: el sistema sugiere otro.
+*El pago es rechazado (3a):* no se crea la tienda y el Suscriptor puede reintentar.
+
+*El Suscriptor pulsa pagar dos veces (3b):* la misma clave de idempotencia devuelve el primer resultado.
 
 #### UC39 Renovar o cambiar de plan
 
 **Actores:** Suscriptor y Pasarela de pago. **Paquete:** Plataforma. **Requisitos:** S3, S4. **Pantallas:** Panel Mis tiendas y Interfaz pasarela.
 
-**Curso básico**
+**Curso básico:** El Suscriptor abre el detalle de su Tienda en el Panel Mis tiendas y ve uso y vencimiento. El Suscriptor elige renovar o cambiar a otro Plan y duración. El sistema cobra por la Interfaz pasarela y extiende la Suscripcion desde su vencimiento.
 
-1. El Suscriptor abre el detalle de su Tienda en el Panel Mis tiendas y ve uso y vencimiento.
-2. El Suscriptor elige renovar o cambiar a otro Plan y duración.
-3. El sistema cobra por la Interfaz pasarela y extiende la Suscripcion desde su vencimiento.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El plan nuevo tiene menos usuarios que los activos (2a):* el sistema avisa antes de cobrar.
 
-- **3a.** El pago es rechazado: la suscripción no cambia.
-- **2a.** El plan nuevo tiene menos usuarios que los activos: el sistema avisa antes de cobrar.
+*El pago es rechazado (3a):* la suscripción no cambia.
 
 #### UC40 Cambiar de tienda
 
 **Actores:** Administrador, Cajero y Encargado. **Paquete:** Auth. **Requisitos:** S7. **Pantallas:** Selector de tienda.
 
-**Curso básico**
+**Curso básico:** El usuario abre el Selector de tienda en la barra lateral. El sistema lista las Tiendas donde su Cuenta tiene un Usuario activo. El usuario elige otra tienda. El sistema emite un token nuevo para esa tienda y recarga los módulos sin pedir la clave.
 
-1. El usuario abre el Selector de tienda en la barra lateral.
-2. El sistema lista las Tienda donde su Cuenta tiene un Usuario activo.
-3. El usuario elige otra tienda.
-4. El sistema emite un token nuevo para esa tienda y recarga los módulos sin pedir la clave.
+**Cursos alternos:**
 
-**Cursos alternos**
+*La cuenta tiene una sola tienda (2a):* el selector no se muestra.
 
-- **3a.** La tienda está suspendida o vencida: el sistema no permite entrar y muestra el motivo.
-- **2a.** La cuenta tiene una sola tienda: el selector no se muestra.
+*La tienda está suspendida o vencida (3a):* el sistema no permite entrar y muestra el motivo.
 
 #### UC41 Ver métricas de suscripciones
 
 **Actores:** Dueño de plataforma. **Paquete:** Plataforma. **Requisitos:** S9. **Pantallas:** Panel de plataforma.
 
-**Curso básico**
+**Curso básico:** El Dueño de plataforma abre el Panel de plataforma. El sistema calcula MRR, ARR, ARPU, tiendas activas y churn a partir de Suscripcion y PagoSuscripcion. El sistema arma las series de 12 meses y la proyección a 6 meses y las muestra.
 
-1. El Dueño de plataforma abre el Panel de plataforma.
-2. El sistema calcula MRR, ARR, ARPU, tiendas activas y churn a partir de Suscripcion y PagoSuscripcion.
-3. El sistema arma las series de 12 meses y la proyección a 6 meses y las muestra.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **1a.** Un usuario que no es superadministrador no accede al panel.
+*Usuario sin rol de superadministrador (1a):* el sistema rechaza el acceso al panel.
 
 ### Lote 2: Operación sin conexión y sincronización
 
@@ -926,96 +773,71 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 
 **Actores:** Cajero y Dispositivo sin red. **Paquete:** Sincronización. **Requisitos:** O1, O2, O4, O8, O9. **Pantallas:** Pantalla Punto de venta y Cola local.
 
-**Curso básico**
+**Curso básico:** Sin red, el Cajero arma el ticket en la Pantalla Punto de venta y cobra en efectivo. El sistema genera el uuid de la Venta en el dispositivo y guarda la operación en la Cola local (IndexedDB en web, SQLite en móvil). El sistema descuenta el stock en la copia local y muestra el ticket marcado como pendiente. Al volver la red, la operación se envía en el siguiente lote de sincronización (UC44).
 
-1. Sin red, el Cajero arma el ticket en la Pantalla Punto de venta y cobra en efectivo.
-2. El sistema genera el uuid de la Venta en el dispositivo y guarda la operación en la Cola local (IndexedDB en web, SQLite en móvil).
-3. El sistema descuenta el stock en la copia local y muestra el ticket marcado como pendiente.
-4. Al volver la red, la operación se envía en el siguiente lote de sincronización (UC44).
+**Cursos alternos:**
 
-**Cursos alternos**
+*El Cajero elige QR, tarjeta o crédito (1a):* el sistema no lo permite sin red y lo explica.
 
-- **1a.** El Cajero elige QR, tarjeta o crédito: el sistema no lo permite sin red y lo explica.
-- **4a.** La operación supera la ventana offline de la tienda: llegará como vencida y se informa al Cajero.
+*La operación supera la ventana offline de la tienda (4a):* llegará como vencida y se informa al Cajero.
 
 #### UC43 Registrar clienta o producto sin conexión
 
 **Actores:** Cajero, Administrador y Dispositivo sin red. **Paquete:** Sincronización. **Requisitos:** O1, O2, O4. **Pantallas:** Pantalla Punto de venta, Pantalla Administración de catálogo y Cola local.
 
-**Curso básico**
+**Curso básico:** Sin red, el Cajero registra una clienta nueva, o el Administrador da de alta un producto. El sistema asigna el uuid en el dispositivo y guarda la operación en la Cola local. Las ventas posteriores pueden referir a esa clienta por su uuid antes de sincronizar.
 
-1. Sin red, el Cajero registra una clienta nueva, o el Administrador da de alta un producto.
-2. El sistema asigna el uuid en el dispositivo y guarda la operación en la Cola local.
-3. Las ventas posteriores pueden referir a esa clienta por su uuid antes de sincronizar.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **3a.** Al sincronizar, el correo de la clienta ya existía: el servidor fusiona con el Usuario existente.
+*Al sincronizar, el correo de la clienta ya existía (3a):* el servidor fusiona con el Usuario existente.
 
 #### UC44 Sincronizar operaciones pendientes
 
 **Actores:** Dispositivo sin red. **Paquete:** Sincronización. **Requisitos:** O3, O4, O6, O7. **Pantallas:** Cola local y Pantalla Sincronización.
 
-**Curso básico**
+**Curso básico:** Al volver la red, al abrir la app o cada 30 segundos, el sistema toma las operaciones de la Cola local. El sistema envía un lote con la cabecera de idempotencia y el identificador del Dispositivo. El servidor procesa cada operación en su propia transacción y guarda su OperacionSync. El servidor responde un estado por operación: aplicada, duplicada, conflicto, vencida o rechazada. El sistema actualiza la Cola local y muestra el resultado en la Pantalla Sincronización.
 
-1. Al volver la red, al abrir la app o cada 30 segundos, el sistema toma las operaciones de la Cola local.
-2. El sistema envía un lote con la cabecera de idempotencia y el identificador del Dispositivo.
-3. El servidor procesa cada operación en su propia transacción y guarda su OperacionSync.
-4. El servidor responde un estado por operación: aplicada, duplicada, conflicto, vencida o rechazada.
-5. El sistema actualiza la Cola local y muestra el resultado en la Pantalla Sincronización.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Se corta la red a mitad del envío (2a):* el lote se reintenta con la misma clave y no se duplica nada.
 
-- **3a.** Una operación ya había llegado: el servidor la marca duplicada y devuelve el resultado original.
-- **3b.** Falta stock: la operación queda en conflicto (UC45) y las demás siguen.
-- **2a.** Se corta la red a mitad del envío: el lote se reintenta con la misma clave y no se duplica nada.
+*Una operación ya había llegado (3a):* el servidor la marca duplicada y devuelve el resultado original.
+
+*Falta stock (3b):* la operación queda en conflicto (UC45) y las demás siguen.
 
 #### UC45 Resolver conflicto de stock
 
 **Actores:** Cajero y Encargado. **Paquete:** Sincronización. **Requisitos:** O5. **Pantallas:** Pantalla Sincronización.
 
-**Curso básico**
+**Curso básico:** Dos cajas vendieron sin red la última unidad; al sincronizar, la segunda operación queda en conflicto con el disponible real. El Cajero ve el conflicto en la Pantalla Sincronización con lo pedido y lo disponible. El Cajero elige vender lo disponible o descartar la operación. El sistema reintenta con la cantidad disponible, o marca la OperacionSync como descartada.
 
-1. Dos cajas vendieron sin red la última unidad; al sincronizar, la segunda operación queda en conflicto con el disponible real.
-2. El Cajero ve el conflicto en la Pantalla Sincronización con lo pedido y lo disponible.
-3. El Cajero elige vender lo disponible o descartar la operación.
-4. El sistema reintenta con la cantidad disponible, o marca la OperacionSync como descartada.
+**Cursos alternos:**
 
-**Cursos alternos**
+*Resolución por el Encargado (2a):* el Encargado resuelve desde el panel de la Tienda los conflictos de cualquier caja.
 
-- **3a.** Ya no queda nada disponible: solo se puede descartar.
-- **2a.** El Encargado puede resolver desde el panel de la tienda los conflictos de cualquier caja.
+*Ya no queda nada disponible (3a):* solo se puede descartar.
 
 #### UC46 Configurar ventana offline
 
 **Actores:** Administrador. **Paquete:** Sincronización. **Requisitos:** O8, O9. **Pantallas:** Pantalla Sincronización.
 
-**Curso básico**
+**Curso básico:** El Administrador abre la política offline en la Pantalla Sincronización. El sistema muestra qué funciona sin red y qué no, con el motivo de cada caso. El Administrador fija la ventana offline entre 1 y 30 días. El sistema guarda la ventana en la Tienda; las operaciones más viejas llegarán como vencidas.
 
-1. El Administrador abre la política offline en la Pantalla Sincronización.
-2. El sistema muestra qué funciona sin red y qué no, con el motivo de cada caso.
-3. El Administrador fija la ventana offline entre 1 y 30 días.
-4. El sistema guarda la ventana en la Tienda; las operaciones más viejas llegarán como vencidas.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **3a.** Valor fuera de rango: el sistema no lo guarda.
+*Valor fuera de rango (3a):* el sistema no lo guarda.
 
 #### UC47 Activar notificaciones push
 
 **Actores:** Clienta, Cajero y Administrador. **Paquete:** Notificaciones. **Requisitos:** O10. **Pantallas:** Navegador y Service Worker.
 
-**Curso básico**
+**Curso básico:** El usuario pulsa Activar notificaciones y el Navegador pide permiso. El sistema obtiene la clave pública VAPID y crea la suscripción en el Service Worker. El sistema guarda la PushSuscripcion del usuario. Ante un evento (venta, conflicto, despacho), el sistema envía el aviso y el Service Worker lo muestra aunque la app esté cerrada.
 
-1. El usuario pulsa Activar notificaciones y el Navegador pide permiso.
-2. El sistema obtiene la clave pública VAPID y crea la suscripción en el Service Worker.
-3. El sistema guarda la PushSuscripcion del usuario.
-4. Ante un evento (venta, conflicto, despacho), el sistema envía el aviso y el Service Worker lo muestra aunque la app esté cerrada.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El usuario niega el permiso (1a):* la app sigue funcionando sin push.
 
-- **1a.** El usuario niega el permiso: la app sigue funcionando sin push.
-- **4a.** El endpoint expiró: el sistema borra la suscripción.
+*El endpoint expiró (4a):* el sistema borra la suscripción.
 
 ### Lote 3: Reportes generativos y ventas al crédito
 
@@ -1023,67 +845,53 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 
 **Actores:** Administrador, Encargado y Servicio de IA. **Paquete:** Reportes. **Requisitos:** R1, R2, S1. **Pantallas:** Pantalla Reporte inteligente, Micrófono y Interfaz Azure OpenAI.
 
-**Curso básico**
+**Curso básico:** El Administrador escribe o dicta por el Micrófono el reporte que necesita en la Pantalla Reporte inteligente. El sistema normaliza el texto y pide al Servicio de IA una especificación JSON usando el catálogo semántico y los valores reales de la tienda. El sistema valida la especificación contra el catálogo y la compila a SQL con parámetros. El sistema ejecuta la consulta fijando la tienda de la sesión y registra la ReporteEjecucion. El sistema muestra criterios, tabla, totales, barras y la narración del resultado.
 
-1. El Administrador escribe o dicta por el Micrófono el reporte que necesita en la Pantalla Reporte inteligente.
-2. El sistema normaliza el texto y pide al Servicio de IA una especificación JSON usando el catálogo semántico y los valores reales de la tienda.
-3. El sistema valida la especificación contra el catálogo y la compila a SQL con parámetros.
-4. El sistema ejecuta la consulta fijando la tienda de la sesión y registra la ReporteEjecucion.
-5. El sistema muestra criterios, tabla, totales, barras y la narración del resultado.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El pedido dice en PDF o en Excel (1a):* el sistema genera el archivo al terminar (UC49).
 
-- **2a.** El Servicio de IA no responde o devuelve un JSON inválido: el intérprete por reglas arma la especificación.
-- **3a.** Se pide un campo inexistente (teléfono, edad): el sistema avisa y no lo inventa.
-- **1a.** El pedido dice en PDF o en Excel: el sistema genera el archivo al terminar (UC49).
+*El Servicio de IA no responde o devuelve un JSON inválido (2a):* el intérprete por reglas arma la especificación.
+
+*Se pide un campo inexistente (teléfono, edad) (3a):* el sistema avisa y no lo inventa.
 
 #### UC49 Ajustar y exportar reporte
 
 **Actores:** Administrador y Encargado. **Paquete:** Reportes. **Requisitos:** R2, R3. **Pantallas:** Pantalla Reporte inteligente y Archivo PDF o Excel.
 
-**Curso básico**
+**Curso básico:** El Administrador quita un criterio, quita una agrupación o invierte el orden en la Pantalla Reporte inteligente. El sistema vuelve a ejecutar la especificación editada sin pasar por la IA. El Administrador pide Excel o PDF. El sistema genera el Archivo PDF o Excel con encabezado, criterios, totales y la hoja de cómo se generó, y lo descarga.
 
-1. El Administrador quita un criterio, quita una agrupación o invierte el orden en la Pantalla Reporte inteligente.
-2. El sistema vuelve a ejecutar la especificación editada sin pasar por la IA.
-3. El Administrador pide Excel o PDF.
-4. El sistema genera el Archivo PDF o Excel con encabezado, criterios, totales y la hoja de cómo se generó, y lo descarga.
+**Cursos alternos:**
 
-**Cursos alternos**
+*La edición deja una especificación inválida (2a):* el sistema responde 400 y conserva el reporte anterior.
 
-- **4a.** En el móvil, el archivo se comparte con el menú del sistema operativo.
-- **2a.** La edición deja una especificación inválida: el sistema responde 400 y conserva el reporte anterior.
+*Exportación desde el móvil (4a):* el sistema entrega el archivo al menú de compartir del sistema operativo.
 
 #### UC50 Vender al crédito
 
 **Actores:** Cajero. **Paquete:** Ventas. **Requisitos:** R2, O8. **Pantallas:** Pantalla Punto de venta.
 
-**Curso básico**
+**Curso básico:** El Cajero arma el ticket, asocia una clienta y elige Crédito (30 días) en la Pantalla Punto de venta. El sistema descuenta el stock y registra la Venta como en UC07, pero no suma dinero al CajaTurno. El sistema crea la CuentaCobrar con monto, saldo y vencimiento a 30 días.
 
-1. El Cajero arma el ticket, asocia una clienta y elige Crédito (30 días) en la Pantalla Punto de venta.
-2. El sistema descuenta el stock y registra la Venta como en UC07, pero no suma dinero al CajaTurno.
-3. El sistema crea la CuentaCobrar con monto, saldo y vencimiento a 30 días.
+**Cursos alternos:**
 
-**Cursos alternos**
+*No hay clienta asociada (1a):* el sistema rechaza el crédito.
 
-- **1a.** No hay clienta asociada: el sistema rechaza el crédito.
-- **1b.** Sin red: el crédito no está disponible porque exige ver la deuda real.
+*Sin red (1b):* el crédito no está disponible porque exige ver la deuda real.
 
 #### UC51 Registrar abono de crédito
 
 **Actores:** Cajero. **Paquete:** Créditos. **Requisitos:** R2, O6. **Pantallas:** Pantalla Cuentas por cobrar.
 
-**Curso básico**
+**Curso básico:** El Cajero busca la CuentaCobrar de la clienta en la Pantalla Cuentas por cobrar. El Cajero ingresa monto y medio del abono. El sistema descuenta el saldo con una actualización condicional que nunca lo deja negativo. El sistema registra el AbonoCredito y suma el monto al CajaTurno abierto.
 
-1. El Cajero busca la CuentaCobrar de la clienta en la Pantalla Cuentas por cobrar.
-2. El Cajero ingresa monto y medio del abono.
-3. El sistema descuenta el saldo con una actualización condicional que nunca lo deja negativo.
-4. El sistema registra el AbonoCredito y suma el monto al CajaTurno abierto.
+**Cursos alternos:**
 
-**Cursos alternos**
+*El Cajero pulsa dos veces o se corta la red (2a):* la misma clave de idempotencia no cobra dos veces.
 
-- **3a.** El abono supera el saldo: el sistema lo rechaza e informa el saldo.
-- **2a.** El Cajero pulsa dos veces o se corta la red: la misma clave de idempotencia no cobra dos veces.
-- **3b.** Dos cajas abonan a la vez por el saldo total: una pasa y la otra recibe el rechazo.
+*El abono supera el saldo (3a):* el sistema lo rechaza e informa el saldo.
+
+*Dos cajas abonan a la vez por el saldo total (3b):* una pasa y la otra recibe el rechazo.
 
 ### Lote 4: Analítica con aprendizaje automático
 
@@ -1091,29 +899,21 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 
 **Actores:** Administrador. **Paquete:** Analítica. **Requisitos:** A1, A2, A3. **Pantallas:** Dashboard de analítica.
 
-**Curso básico**
+**Curso básico:** El Administrador abre el Dashboard de analítica. El sistema aplica el ModeloPredictivo, entrenado con datos sintéticos, a las ventas de 7 y 28 días de cada variante. El sistema muestra la demanda estimada de los próximos 7 días junto al stock disponible y el error del modelo.
 
-1. El Administrador abre el Dashboard de analítica.
-2. El sistema aplica el ModeloPredictivo, entrenado con datos sintéticos, a las ventas de 7 y 28 días de cada variante.
-3. El sistema muestra la demanda estimada de los próximos 7 días junto al stock disponible y el error del modelo.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** La tienda no tiene ventas en el período: el sistema muestra un estado vacío explicativo.
+*La tienda no tiene ventas en el período (2a):* el sistema muestra un estado vacío explicativo.
 
 #### UC53 Ver segmentación de clientas
 
 **Actores:** Administrador. **Paquete:** Analítica. **Requisitos:** A1, A2, A3. **Pantallas:** Dashboard de analítica.
 
-**Curso básico**
+**Curso básico:** El Administrador abre la segmentación en el Dashboard de analítica. El sistema asigna cada clienta con compras en los últimos 90 días a un grupo de k-medias según recencia, frecuencia y monto. El sistema muestra cada SegmentoCliente con su tamaño y su centro, sin exponer identidades.
 
-1. El Administrador abre la segmentación en el Dashboard de analítica.
-2. El sistema asigna cada clienta con compras en los últimos 90 días a un grupo de k-medias según recencia, frecuencia y monto.
-3. El sistema muestra cada SegmentoCliente con su tamaño y su centro, sin exponer identidades.
+**Cursos alternos:**
 
-**Cursos alternos**
-
-- **2a.** No hay clientas con compras identificadas: el sistema muestra los grupos vacíos.
+*No hay clientas con compras identificadas (2a):* el sistema muestra los grupos vacíos.
 
 ### Lote 5: Pagos para países hispanohablantes
 
@@ -1121,17 +921,13 @@ Cada caso se escribe con las reglas de ICONIX: voz activa, evento y respuesta, s
 
 **Actores:** Clienta y Pasarela de pago. **Paquete:** Pagos. **Requisitos:** P1, P2, P3, P4. **Pantallas:** Pantalla Pago y Interfaz pasarela.
 
-**Curso básico**
+**Curso básico:** La Clienta elige en la Pantalla Pago un método habilitado para el país de la tienda. El sistema valida el método contra el catálogo del país y registra la TransaccionPasarela pendiente con una clave de idempotencia. La Pasarela de pago, simulada, aprueba o rechaza el cobro. Con el pago aprobado, la Venta continúa su cobro (UC05).
 
-1. La Clienta elige en la Pantalla Pago un método habilitado para el país de la tienda.
-2. El sistema valida el método contra el catálogo del país y registra la TransaccionPasarela pendiente con una clave de idempotencia.
-3. La Pasarela de pago, simulada, aprueba o rechaza el cobro.
-4. Con el pago aprobado, la Venta continúa su cobro (UC05).
+**Cursos alternos:**
 
-**Cursos alternos**
+*La pasarela rechaza el cobro (3a):* la venta no se confirma y se liberan las unidades reservadas.
 
-- **3a.** La pasarela rechaza el cobro: la venta no se confirma y se liberan las unidades reservadas.
-- **3b.** La confirmación llega dos veces: el sistema la procesa una sola vez.
+*La confirmación llega dos veces (3b):* el sistema la procesa una sola vez.
 
 ## 9.1.7 Revisión de requisitos
 
