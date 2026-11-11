@@ -6,12 +6,12 @@ El código está en https://github.com/DSaav22/Examen-Si2-2026-2 (backend, front
 
 ## 14.2 URL de despliegue y código QR
 
-El sistema está desplegado en Microsoft Azure (región Brazil South), con la infraestructura definida en `infra/app.bicep`.
+La versión de la entrega está publicada en el dominio `examensi2.duckdns.org`. La aplicación web y la API comparten el dominio: la PWA llama a la API por la ruta relativa `/api`, de modo que no hay peticiones entre orígenes distintos. La infraestructura de Azure descrita en el diseño está definida en `infra/app.bicep`.
 
 | Componente | URL |
 |---|---|
-| Aplicación web (PWA) | https://ensayar-web-2xhvsljjqvilk.azurewebsites.net |
-| API REST | https://ensayar-api-2xhvsljjqvilk.azurewebsites.net/api |
+| Aplicación web (PWA) | https://examensi2.duckdns.org |
+| API REST | https://examensi2.duckdns.org/api |
 
 ![Figura 14.1: Código QR de acceso a la aplicación web](../imagenes/qr-web.png)
 

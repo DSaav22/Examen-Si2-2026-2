@@ -357,3 +357,8 @@ Se migró sin borrar la fuente la tienda que carecía de esquema en `ensayar_cop
 
 - **Formato.** En 9.1.6 cada caso tiene un curso básico en un solo párrafo de evento y respuesta y cursos alternos encabezados por su condición, con el código del paso entre paréntesis (por ejemplo, *Sin conexión (1a):*), según Rosenberg y Stephens (2007). No se usa tabla: la ficha tabular era el formato del PUDS del primer ciclo.
 - **Correcciones.** Los alternos se muestran ordenados por paso (17 casos estaban desordenados; el orden en `casos.py` se mantiene porque `generar_ea.py` usa su posición). Seis alternos sin condición se reescribieron (UC19, UC34, UC37, UC41, UC45, UC49); las guardas de UC34 y UC41 ahora son "Venta no cobrada (1a)" y "Usuario sin rol de superadministrador (1a)". Se corrigieron plurales de clases del dominio ("los Productos", "las Reservas"). Modelo EA regenerado (169 diagramas) y PDF de 383 páginas.
+
+## [2026-11-11] update | URL de entrega en el anexo 14.2
+
+- **Anexo.** La web queda en https://examensi2.duckdns.org y la API en https://examensi2.duckdns.org/api (mismo dominio; el frontend usa la ruta relativa `/api`). QR regenerado en `imagenes/qr-web.png`. Ya no quedan URL de azurewebsites en el informe. PDF de 383 páginas.
+- **Pendiente.** A las 7:20 el dominio resolvía a 192.223.107.245, pero los puertos 80 y 443 no respondían desde la máquina de documentación.
