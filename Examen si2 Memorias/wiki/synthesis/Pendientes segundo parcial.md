@@ -34,10 +34,13 @@ Fuente: [[decisiones-arquitectura-2026-11-09]].
 
 ## 2. Multitenancy y suscripciones
 
+El plan detallado para completar las conexiones, autenticación, migración y pruebas está en [[Pendientes conexiones por esquema]].
+
+- [x] Clasificar los modelos globales y locales y documentar las relaciones y el alta futura en `docs/DOMINIO_MULTITENANT.md`; verificar el contrato contra Prisma. La separación física y las conexiones siguen pendientes.
 - [ ] Implementar y probar las reglas de planes y baja documentadas en [[Planes y suscripciones retail]]; todos los planes deben permitir ventas e inventario.
 - [ ] Definir qué representa cada tenant (tienda, empresa u otra unidad), su ciclo de vida y administración.
 - [ ] Diseñar el aislamiento por esquema y documentar la comparación con el modelo de tablas compartidas actualmente implementado.
-- [ ] Planificar y probar la migración futura de los datos existentes a un esquema por tienda, junto con aprovisionamiento, migraciones, aislamiento y restauración por tienda. No ejecutar la conversión todavía.
+- [ ] Preparar y probar la migración de los datos existentes a un esquema por tienda, junto con aprovisionamiento, migraciones, aislamiento y restauración por tienda. El usuario autorizó la migración; antes de sustituir la base se deben verificar el respaldo y la transición en una copia representativa.
 - [ ] Diseñar identificación y aislamiento por tenant en autenticación, consultas, archivos y operaciones web/móvil.
 - [ ] Diseñar planes de suscripción, estados, límites y acceso a funcionalidades; aclarar si el cobro será simulado.
 - [ ] Diseñar migración y compatibilidad con datos ya existentes sin pérdida ni exposición entre tiendas.

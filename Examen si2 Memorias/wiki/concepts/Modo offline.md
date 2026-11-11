@@ -1,11 +1,27 @@
 ---
 tipo: concept
 fuentes: 4
-actualizado: 2026-11-08
+actualizado: 2026-11-11
 tags: [offline, pos, nfr, segundo-parcial]
 ---
 
 # Modo offline
+
+## Avance web y PWA — 11 de noviembre
+
+Se completó y verificó la operación offline de la aplicación web / PWA de extremo a extremo:
+
+1. **Service Worker (v3):** Caching en CacheStorage de shell navegable, estáticos compilados y lecturas críticas de la API (`/api/tienda`, `/api/catalogo/productos`, `/api/catalogo/disponibilidad`, `/api/catalogo/sucursales`, `/api/catalogo/categorias`, `/api/pagos/metodos`, `/api/usuarios`, `/api/caja/turno-abierto`, `/api/sync/politica`).
+2. **Cola local persistente en IndexedDB (`ensayar-offline`):** Almacén `operaciones` con índice `tienda` e identificadores estables UUID v4. Sobrevive al cierre, reinicio y reapertura del navegador. Se verificó el aislamiento multitienda: cambiar de tienda filtra de inmediato las operaciones pendientes y no mezcla datos locales.
+3. **Restricción de operaciones en línea:** El POS bloquea medios de pago que requieren validación externa (QR, tarjeta, crédito) cuando no hay conexión, obligando al cobro en efectivo permitido por la política offline. En el carrito web, la compra en línea se deshabilita preventivamente si el navegador está sin red.
+4. **Tratamiento y resolución de conflictos:** Al detectar `STOCK_INSUFICIENTE` tras sincronizar, la operación queda visible como `conflicto` con detalle de unidades pedidas vs. disponibles; la interfaz ofrece «Vender lo disponible» (reintentando de forma atómica con un nuevo UUID y la cantidad remanente) o descartar.
+5. **Idempotencia y remap de fusión:** Envíos duplicados o repetidos devuelven estado `repetida` con el mismo recurso sin duplicar registros. Los clientes creados sin red cuyo correo ya existía se marcan como `fusionada` y las ventas asociadas actualizan su referencia al ID definitivo del servidor en una sola transacción IndexedDB.
+6. **Pruebas automatizadas en navegador real (Edge con CDP :9337):**
+   - `npm --prefix frontend run test:offline` ejecuta `run-edge-tests.mjs`:
+     - `verificar-cola-idb.mjs`: atomicidad, rollback, fusión, migración localStorage y persistencia IDB.
+     - `verificar-pwa-offline.mjs`: activación del SW y reapertura sin red (`offline: true`).
+     - `verificar-flujo-offline-completo.mjs`: registro sin red de venta, cliente y producto; recarga del navegador conservando la cola; aislamiento multitienda; conflicto de stock y reintento; y distinción entre operaciones pendientes y confirmadas.
+   - En el backend, `npm run verificar:offline` superó los 14 chequeos de extremo a extremo contra la base de datos `ensayar_copia`.
 
 Requisito del audio: si se cae internet, el [[Punto de venta]] **sigue vendiendo**. Luego sincroniza. El audio lo nombra como PWA + storage local. [[transcripcion-audio-clase-ecommerce]]
 

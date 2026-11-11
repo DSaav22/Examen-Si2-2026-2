@@ -7,6 +7,7 @@ export type ErrorOp = { codigo?: string; mensaje?: string; detalle?: Record<stri
 export type OperacionLocal = {
   id: string
   tienda: string
+  cuentaId?: string
   tipo: TipoOp
   creadaEn: string
   datos: Record<string, unknown>

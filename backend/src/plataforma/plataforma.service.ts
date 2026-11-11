@@ -16,23 +16,21 @@ import { CuentasService } from '../auth/cuentas.service';
 import { CuentaPayload } from '../auth/jwt-payload';
 import { TokenService } from '../auth/token.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { AprovisionadorEsquemaService } from '../tenancy/aprovisionador-esquema.service';
 import { PlanLimitesService } from '../tenancy/plan-limites.service';
 import { TenantContext } from '../tenancy/tenant-context';
 import { TiendasService } from '../tenancy/tiendas.service';
 import { PasarelaSuscripcion } from './pasarela-suscripcion';
 import { LoginCuentaDto, RegistroCuentaDto, RenovarDto, SuscribirDto } from './plataforma.dto';
 import { DESCUENTO, MESES, precioPeriodo, sumarMeses } from './precios';
-import { metodosSimuladosPorPais, monedaDePais } from '../pagos/metodos-pais';
+import { validarMetodoPais, monedaDePais } from '../pagos/metodos-pais';
+import { validarLogoTienda } from './logo-tienda';
 
 const SLUGS_RESERVADOS = new Set(['www', 'api', 'admin', 'plataforma', 'app', 'login', 'planes', 'soporte', 'ensayar']);
 
 const CATEGORIAS_BASE = ['Vestidos', 'Blusas', 'Pantalones', 'Faldas', 'Abrigos', 'Accesorios'];
-
-function validarMetodoPais(pais: string, metodo: string) {
-  if (!metodosSimuladosPorPais(pais).some((m) => m.codigo === metodo)) {
-    throw new BadRequestException({ codigo: 'METODO_NO_DISPONIBLE', message: 'El método de pago no está disponible para el país de la tienda.' });
-  }
-}
 
 function claveMes(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -50,7 +48,19 @@ export class PlataformaService {
     private readonly tiendas: TiendasService,
     private readonly limites: PlanLimitesService,
     private readonly pasarela: PasarelaSuscripcion,
+    private readonly esquemas: AprovisionadorEsquemaService,
+    private readonly config: ConfigService,
+    private readonly clientesEsquema: PrismaEsquemasService,
   ) {}
+
+  private usoTienda(tiendaId: string) {
+    const usarEsquemas = this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config.get<string>('TENANT_SCHEMAS_ALTA') === 'true';
+    return TenantContext.enTienda(tiendaId, () => this.limites.uso(
+      usarEsquemas
+        ? this.clientesEsquema.clienteTienda(tiendaId) as PrismaService
+        : this.prisma,
+    ));
+  }
 
   // ── Catálogo público ────────────────────────────────────────────────
 
@@ -137,6 +147,10 @@ export class PlataformaService {
   // ── Suscripción y alta automática de la tienda ──────────────────────
 
   async suscribir(cuentaId: string, dto: SuscribirDto) {
+    const logo = validarLogoTienda(dto.tienda.logo);
+    if (this.config.get<string>('TENANT_SCHEMAS_ALTA') === 'true' && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'false') {
+      throw new Error('ALTA_ESQUEMAS_REQUIERE_PERFILES');
+    }
     const cuenta = await this.prisma.cuenta.findUniqueOrThrow({ where: { id: cuentaId } });
     if (!cuenta.emailVerificado) throw new ForbiddenException({ codigo: 'EMAIL_NO_VERIFICADO' });
     const pais = dto.tienda.pais ?? 'BO';
@@ -155,6 +169,9 @@ export class PlataformaService {
       const metodoAnterior = previo.pasarela.split(':')[1] ?? 'tarjeta';
       if (previo.suscripcion.tienda.duenoCuentaId !== cuentaId ||
           previo.suscripcion.tienda.slug !== dto.tienda.slug.toLowerCase() ||
+          previo.suscripcion.tienda.pais !== pais ||
+          previo.suscripcion.tienda.nombre !== dto.tienda.nombre.trim() ||
+          (previo.suscripcion.tienda.logo ?? undefined) !== logo ||
           previo.suscripcion.planId !== dto.planId || previo.suscripcion.periodo !== dto.periodo ||
           metodoAnterior !== (dto.metodoPago ?? 'tarjeta')) {
         throw new ConflictException({ codigo: 'IDEMPOTENCIA_DATOS_DISTINTOS' });
@@ -184,6 +201,7 @@ export class PlataformaService {
               id: tiendaId,
               slug,
               nombre: dto.tienda.nombre.trim(),
+              logo,
               pais,
               moneda,
               duenoCuentaId: cuenta.id,
@@ -210,8 +228,12 @@ export class PlataformaService {
               },
             },
           });
-          await this.aprovisionar(tx, cuenta, dto.tienda.nombre.trim());
-        }),
+          if (this.config.get<string>('TENANT_SCHEMAS_ALTA') === 'true') {
+            await this.esquemas.crear(tx, tiendaId, cuenta, dto.tienda.nombre.trim());
+          } else {
+            await this.aprovisionar(tx, cuenta, dto.tienda.nombre.trim());
+          }
+        }, { timeout: 60000 }),
       );
     } catch (error) {
       // Compensación: si la base falla después de cobrar, se devuelve el dinero.
@@ -252,7 +274,7 @@ export class PlataformaService {
     });
     if (!tienda || tienda.duenoCuentaId !== cuentaId) throw new ForbiddenException({ codigo: 'SOLO_DUENO' });
     const info = await this.tiendas.porId(tiendaId);
-    const uso = await TenantContext.enTienda(tiendaId, () => this.limites.uso());
+    const uso = await this.usoTienda(tiendaId);
     return {
       id: tienda.id,
       slug: tienda.slug,
@@ -311,7 +333,7 @@ export class PlataformaService {
     const plan = await this.prisma.plan.findFirst({ where: { id: dto.planId, activo: true } });
     if (!plan) throw new NotFoundException({ codigo: 'PLAN_NO_EXISTE' });
     if (plan.maxProductos != null || plan.maxUsuarios || plan.maxSucursales) {
-      const uso = await TenantContext.enTienda(tiendaId, () => this.limites.uso());
+      const uso = await this.usoTienda(tiendaId);
       if (
         uso.usuarios > plan.maxUsuarios ||
         uso.sucursales > plan.maxSucursales ||
@@ -336,8 +358,11 @@ export class PlataformaService {
         });
         const mismoPlan = actual?.planId === plan.id;
         const inicio = mismoPlan && actual ? actual.venceEn : ahora;
-        if (actual && !mismoPlan) {
-          await tx.suscripcion.update({ where: { id: actual.id }, data: { estado: 'cancelada', venceEn: ahora } });
+        if (!mismoPlan) {
+          await tx.suscripcion.updateMany({
+            where: { tiendaId, estado: 'activa' },
+            data: { estado: 'cancelada', venceEn: ahora },
+          });
         }
         await tx.suscripcion.create({
           data: {

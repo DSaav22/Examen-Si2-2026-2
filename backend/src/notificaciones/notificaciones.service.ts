@@ -1,5 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
 import { CorreoService } from '../correo/correo.service';
 import { PushService } from '../push/push.service';
 import { numeroFactura, plantillaFacturaHtml } from './factura-html';
@@ -12,10 +15,20 @@ export class NotificacionesService {
     private readonly correo: CorreoService,
     private readonly gateway: NotificacionesGateway,
     private readonly push: PushService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
 
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
+
   listar(usuarioId: string, limit = 30) {
-    return this.prisma.notificacion.findMany({
+    return this.db().notificacion.findMany({
       where: { usuarioId },
       orderBy: { creadaEn: 'desc' },
       take: Math.min(50, Math.max(1, limit)),
@@ -23,20 +36,20 @@ export class NotificacionesService {
   }
 
   async noLeidas(usuarioId: string) {
-    return this.prisma.notificacion.count({ where: { usuarioId, leida: false } });
+    return this.db().notificacion.count({ where: { usuarioId, leida: false } });
   }
 
   async marcarLeida(usuarioId: string, id: string) {
-    const n = await this.prisma.notificacion.findFirst({ where: { id, usuarioId } });
+    const n = await this.db().notificacion.findFirst({ where: { id, usuarioId } });
     if (!n) throw new NotFoundException({ codigo: 'NOTIF_NO' });
-    const updated = await this.prisma.notificacion.update({ where: { id }, data: { leida: true } });
+    const updated = await this.db().notificacion.update({ where: { id }, data: { leida: true } });
     const count = await this.noLeidas(usuarioId);
     this.gateway.emitConteo(usuarioId, count);
     return updated;
   }
 
   async marcarTodas(usuarioId: string) {
-    await this.prisma.notificacion.updateMany({
+    await this.db().notificacion.updateMany({
       where: { usuarioId, leida: false },
       data: { leida: true },
     });
@@ -51,8 +64,10 @@ export class NotificacionesService {
     cuerpo: string;
     enlace?: string;
   }) {
-    const n = await this.prisma.notificacion.create({
+    const tiendaId = TenantContext.tiendaId();
+    const n = await this.db().notificacion.create({
       data: {
+        ...(tiendaId ? { tiendaId } : {}),
         usuarioId: data.usuarioId,
         tipo: data.tipo,
         titulo: data.titulo,
@@ -85,7 +100,7 @@ export class NotificacionesService {
   }
 
   async enviarFacturaVenta(ventaId: string, emailOverride?: string) {
-    const venta = await this.prisma.venta.findUnique({
+    const venta = await this.db().venta.findUnique({
       where: { id: ventaId },
       include: {
         clienta: { select: { id: true, nombre: true, email: true } },
@@ -109,7 +124,7 @@ export class NotificacionesService {
 
     let destinatario = venta.clienta;
     if (!destinatario || destinatario.email.toLowerCase() !== destino) {
-      destinatario = await this.prisma.usuario.findFirst({
+      destinatario = await this.db().usuario.findFirst({
         where: { email: { equals: destino, mode: 'insensitive' } },
         select: { id: true, nombre: true, email: true },
       });
@@ -161,7 +176,7 @@ export class NotificacionesService {
       });
     }
 
-    await this.prisma.auditoria.create({
+    await this.db().auditoria.create({
       data: {
         accion: 'factura_correo',
         recurso: venta.id,
@@ -175,7 +190,7 @@ export class NotificacionesService {
 
   /** Aviso in-app al cobrar en caja (sin correo). */
   async avisarVentaCobrada(ventaId: string) {
-    const venta = await this.prisma.venta.findUnique({
+    const venta = await this.db().venta.findUnique({
       where: { id: ventaId },
       include: {
         clienta: { select: { id: true, email: true, nombre: true } },

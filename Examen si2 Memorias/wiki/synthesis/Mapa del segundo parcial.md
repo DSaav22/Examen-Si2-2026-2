@@ -73,7 +73,7 @@ Códigos propios de la wiki (no del docente) para poder trazarlos.
 |----|-----------|
 | P1 | Pagos que funcionen al menos en todos los países de habla hispana. |
 | P2 | Estudio de costos: elegir lo que menos le cobre al cliente. |
-| P3 | Simulación con una pasarela real (sandbox), no un botón inventado. |
+| P3 | Simulación formal de pasarela sin requerir sandbox externo (aclaración confirmada por el docente): reglas por país, reservas temporales de stock, máquina de estados e idempotencia. |
 | P4 | Explicar límites locales: QR común en Bolivia, PayPal fácil para pagar pero difícil para cobrar. |
 
 ### Documento y defensa

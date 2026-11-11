@@ -58,19 +58,27 @@ export function alSincronizar(fn: (r: ResultadoServidor[]) => void) {
   }
 }
 
-export async function refrescar() {
-  fijar({ ops: await listarOps(tiendaActiva()) })
+let cuentaActiva: string | undefined
+
+export function fijarCuentaActiva(cuentaId?: string) {
+  cuentaActiva = cuentaId
+}
+
+export async function refrescar(cuentaId = cuentaActiva) {
+  fijar({ ops: await listarOps(tiendaActiva(), cuentaId) })
 }
 
 export async function encolar(
   tipo: TipoOp,
   datos: Record<string, unknown>,
   resumen: string,
-  opts: { id?: string; creadaEn?: string } = {},
+  opts: { id?: string; creadaEn?: string; cuentaId?: string } = {},
 ) {
+  const cuentaId = opts.cuentaId ?? cuentaActiva
   const op: OperacionLocal = {
     id: opts.id ?? uuid(),
     tienda: tiendaActiva(),
+    cuentaId,
     tipo,
     creadaEn: opts.creadaEn ?? new Date().toISOString(),
     datos,
@@ -78,7 +86,7 @@ export async function encolar(
     estado: 'pendiente',
   }
   await guardarOp(op)
-  await refrescar()
+  await refrescar(cuentaId)
   return op
 }
 
@@ -90,7 +98,7 @@ export async function descartar(id: string) {
 /** Reenvía con otro UUID (el anterior ya quedó registrado como rechazado) y conserva la fecha original. */
 export async function reintentar(op: OperacionLocal, cambios: Record<string, unknown>) {
   await quitarOp(op.id)
-  return encolar(op.tipo, { ...op.datos, ...cambios }, op.resumen, { creadaEn: op.creadaEn })
+  return encolar(op.tipo, { ...op.datos, ...cambios }, op.resumen, { creadaEn: op.creadaEn, cuentaId: op.cuentaId })
 }
 
 type Linea = { varianteId: string; cantidad: number }
@@ -138,9 +146,9 @@ async function aplicar(op: OperacionLocal, r: ResultadoServidor, cola: Operacion
   }
 }
 
-async function correr(token: string | null): Promise<ResultadoServidor[]> {
+async function correr(token: string | null, cuentaId = cuentaActiva): Promise<ResultadoServidor[]> {
   if (!token) return []
-  const cola = await listarOps(tiendaActiva())
+  const cola = await listarOps(tiendaActiva(), cuentaId)
   const pendientes = cola.filter(o => o.estado === 'pendiente')
   if (!pendientes.length) {
     fijar({ ops: cola })
@@ -168,12 +176,18 @@ async function correr(token: string | null): Promise<ResultadoServidor[]> {
     }
     fijar({ online: true, ultimaSync: new Date().toISOString() })
   } catch (err) {
-    if (esFalloRed(err)) fijar({ online: false })
-    else if ((err as ApiError).status === 401) fijar({ ultimoError: 'Tu sesión venció: volvé a entrar para sincronizar.' })
-    else fijar({ ultimoError: err instanceof Error ? err.message : 'No se pudo sincronizar' })
+    if ((err as ApiError).codigo === 'SYNC_ESQUEMAS_NO_DISPONIBLE') {
+      fijar({ ultimoError: 'Sincronización en esquemas no disponible temporalmente. Tus operaciones siguen seguras en la base local.' })
+    } else if (esFalloRed(err)) {
+      fijar({ online: false })
+    } else if ((err as ApiError).status === 401) {
+      fijar({ ultimoError: 'Tu sesión venció: volvé a entrar para sincronizar.' })
+    } else {
+      fijar({ ultimoError: err instanceof Error ? err.message : 'No se pudo sincronizar' })
+    }
   } finally {
     fijar({ sincronizando: false })
-    await refrescar()
+    await refrescar(cuentaId)
   }
   if (todos.length) oyentes.forEach(fn => fn(todos))
   return todos
@@ -182,29 +196,30 @@ async function correr(token: string | null): Promise<ResultadoServidor[]> {
 let enVuelo: Promise<ResultadoServidor[]> | null = null
 
 /** Envía la cola a /sync/lote. Llamadas simultáneas comparten el mismo envío. */
-export function sincronizar(token: string | null) {
-  enVuelo ??= correr(token).finally(() => {
+export function sincronizar(token: string | null, cuentaId = cuentaActiva) {
+  enVuelo ??= correr(token, cuentaId).finally(() => {
     enVuelo = null
   })
   return enVuelo
 }
 
 /** Sigue la red con NetInfo: sincroniza al montar, al reconectar y cada 30 s mientras haya pendientes. */
-export function useAutoSync(token: string | null) {
+export function useAutoSync(token: string | null, cuentaId?: string) {
   useEffect(() => {
-    void refrescar().then(() => sincronizar(token))
+    if (cuentaId) fijarCuentaActiva(cuentaId)
+    void refrescar(cuentaId).then(() => sincronizar(token, cuentaId))
     const quitar = NetInfo.addEventListener(red => {
       const online = red.isConnected !== false && red.isInternetReachable !== false
       const antes = estado.online
       fijar({ online })
-      if (online && !antes) void sincronizar(token)
+      if (online && !antes) void sincronizar(token, cuentaId)
     })
     const intervalo = setInterval(() => {
-      if (estado.online && estado.ops.some(o => o.estado === 'pendiente')) void sincronizar(token)
+      if (estado.online && estado.ops.some(o => o.estado === 'pendiente')) void sincronizar(token, cuentaId)
     }, INTERVALO_MS)
     return () => {
       quitar()
       clearInterval(intervalo)
     }
-  }, [token])
+  }, [token, cuentaId])
 }

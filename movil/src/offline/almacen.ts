@@ -11,9 +11,9 @@ async function todas(): Promise<OperacionLocal[]> {
   return raw ? (JSON.parse(raw) as OperacionLocal[]) : []
 }
 
-export async function listarOps(tienda: string) {
+export async function listarOps(tienda: string, cuentaId?: string) {
   return (await todas())
-    .filter(o => o.tienda === tienda)
+    .filter(o => o.tienda === tienda && (!cuentaId || !o.cuentaId || o.cuentaId === cuentaId))
     .sort((a, b) => a.creadaEn.localeCompare(b.creadaEn))
 }
 
@@ -26,15 +26,23 @@ export async function quitarOp(id: string) {
   await AsyncStorage.setItem(CLAVE_OPS, JSON.stringify((await todas()).filter(o => o.id !== id)))
 }
 
-export async function leerCache<T>(clave: string): Promise<T | null> {
-  const raw = await AsyncStorage.getItem(`ensayar_cache:${clave}`)
+function normalizarClave(clave: string, tienda?: string) {
+  if (!tienda || clave.startsWith(`${tienda}:`)) return clave
+  return `${tienda}:${clave}`
+}
+
+export async function leerCache<T>(clave: string, tienda?: string): Promise<T | null> {
+  const k = normalizarClave(clave, tienda)
+  const raw = await AsyncStorage.getItem(`ensayar_cache:${k}`)
   return raw ? (JSON.parse(raw) as T) : null
 }
 
-export async function guardarCache(clave: string, valor: unknown) {
-  await AsyncStorage.setItem(`ensayar_cache:${clave}`, JSON.stringify(valor))
+export async function guardarCache(clave: string, valor: unknown, tienda?: string) {
+  const k = normalizarClave(clave, tienda)
+  await AsyncStorage.setItem(`ensayar_cache:${k}`, JSON.stringify(valor))
 }
 
-export async function borrarCache(clave: string) {
-  await AsyncStorage.removeItem(`ensayar_cache:${clave}`)
+export async function borrarCache(clave: string, tienda?: string) {
+  const k = normalizarClave(clave, tienda)
+  await AsyncStorage.removeItem(`ensayar_cache:${k}`)
 }

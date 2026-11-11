@@ -32,4 +32,7 @@ export function fijarTienda(slug: string) {
   if (slug === tiendaActiva()) return
   for (const k of DATOS_DE_TIENDA) localStorage.removeItem(k)
   localStorage.setItem(CLAVE, slug)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ensayar:tienda_cambiada', { detail: slug }))
+  }
 }

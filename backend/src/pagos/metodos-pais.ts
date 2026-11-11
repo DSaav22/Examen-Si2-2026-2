@@ -1,3 +1,5 @@
+import { BadRequestException } from '@nestjs/common';
+
 /** Catálogo académico de métodos simulados. No indica una integración real. */
 export type MetodoPais = { codigo: string; nombre: string; simulado: true };
 
@@ -58,4 +60,35 @@ export function metodosSimuladosPorPais(pais: string): MetodoPais[] {
   if (!base) return [];
   const ids = [...base, ...(paypalPaises.has(codigo) ? ['paypal'] : []), 'binance_pay'];
   return ids.map((id) => ({ codigo: id, nombre: metodos[id], simulado: true }));
+}
+
+/** Valida siempre contra el país persistido de la tienda, nunca uno enviado por el comprador. */
+export function validarMetodoPais(pais: string, metodo: string): void {
+  if (!metodosSimuladosPorPais(pais).some(m => m.codigo === metodo)) {
+    throw new BadRequestException({ codigo: 'METODO_NO_DISPONIBLE', message: 'El método de pago no está disponible para el país de la tienda.' });
+  }
+}
+
+export function metodoDeVenta(medio: string, metodo?: string): string | undefined {
+  if (medio === 'qr') return metodo ?? 'qr_bolivia';
+  if (medio === 'tarjeta' || medio === 'transferencia') return metodo ?? medio;
+  if (metodo) throw new BadRequestException({ codigo: 'METODO_INCOMPATIBLE' });
+  return undefined;
+}
+
+export function validarPagoVenta(pais: string, medio: string, metodo?: string): string | undefined {
+  const codigo = metodoDeVenta(medio, metodo);
+  if (codigo) {
+    validarMetodoPais(pais, codigo);
+    if ((medio === 'tarjeta' || medio === 'transferencia') && codigo !== medio ||
+        medio === 'qr' && ['tarjeta', 'transferencia'].includes(codigo)) {
+      throw new BadRequestException({ codigo: 'METODO_INCOMPATIBLE' });
+    }
+  }
+  // El pago mixto incluye tarjeta y transferencia; ambas deben estar habilitadas.
+  if (medio === 'mixto') {
+    validarMetodoPais(pais, 'tarjeta');
+    validarMetodoPais(pais, 'transferencia');
+  }
+  return codigo;
 }

@@ -21,6 +21,7 @@ import {
   type NavItem,
 } from '../roles'
 import { Asistente } from './Asistente'
+import { MarcaTienda } from '../shared/MarcaTienda'
 
 function Icon({
   name,
@@ -130,6 +131,7 @@ function OpsNavIcon({ item }: { item: NavItem }) {
     '/admin/moderacion': <><path d="M4 5.5h16v11H9l-5 3v-14Z" /><path d="m8 11 2.2 2.2L16 7.8" /></>,
     '/admin/bitacora': <><path d="M6 3.5h12v17H6z" /><path d="M9 8h6M9 12h6M9 16h3" /></>,
     '/reportes': <><path d="M4 20V4M4 20h17" /><path d="M8 16v-4M13 16V7M18 16v-7" /></>,
+    '/analitica': <><path d="M4 19V5M4 19h16"/><path d="m7 15 4-4 3 2 5-6"/><circle cx="19" cy="7" r="1"/></>,
     '/pos': <><path d="M4 7h16v12H4z" /><path d="M7 4h10M8 11h3M8 15h8M16 11h1" /></>,
     '/encargado': <><path d="M4 8.5 12 4l8 4.5v9L12 22l-8-4.5z" /><path d="M4 8.5 12 13l8-4.5M12 13v9" /></>,
     '/despacho': <><path d="M3 7h11v10H3zM14 10h3l3 3v4h-6z" /><circle cx="7" cy="19" r="1.5" /><circle cx="17" cy="19" r="1.5" /></>,
@@ -580,7 +582,7 @@ function OpsSidebar({
         <div className="ops-sidebar-top">
           <div className="ops-sidebar-brand">
             <Link to={home} className="ops-brand" onClick={onClose}>
-              <span className="ops-brand-mark">EnsayAR</span>
+              <span className="ops-brand-mark"><MarcaTienda /></span>
               <span className="ops-brand-sub">Operaciones</span>
             </Link>
             <button
@@ -680,7 +682,7 @@ function ClientShell({
             <Icon name="menu" />
           </button>
           <Link className="brand-mark" to={home} aria-label={`${marca}, inicio`}>
-            {marca.toUpperCase()}
+            <MarcaTienda />
           </Link>
           <nav className="desktop-shell-nav" aria-label="Navegación principal">
             <ShellLink end to="/inicio">
@@ -765,6 +767,7 @@ function ClientShell({
         className={fullBleed ? 'shell-full-bleed' : ''}
         tabIndex={-1}
       >
+        <BannerOffline />
         <Outlet />
       </main>
       <Asistente />

@@ -1,13 +1,23 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma, TipoMovimiento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
+import { crearPrismaTenant } from '../tenancy/prisma-tenant.extension';
 import { exigirDeLaTienda } from '../tenancy/pertenencia';
 
 type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class InventarioService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly esquemas: PrismaEsquemasService, private readonly config: ConfigService) {}
+
+  cliente(): PrismaService {
+    if (this.config.get<string>('TENANT_SCHEMAS_INVENTARIO') !== 'true') return this.prisma;
+    if (this.config.get<string>('TENANT_SCHEMAS_PERFILES') !== 'true' || this.config.get<string>('TENANT_SCHEMAS_CATALOGO_ESCRITURA') !== 'true') throw new Error('INVENTARIO_ESQUEMAS_REQUIERE_CATALOGO_Y_PERFILES');
+    return crearPrismaTenant(this.esquemas.clienteTienda(TenantContext.tiendaIdOrThrow())) as unknown as PrismaService;
+  }
 
   async registrar(
     tx: Tx,
@@ -20,10 +30,13 @@ export class InventarioService {
       ventaId?: string;
       reservaId?: string;
       usuarioId?: string;
+      tiendaId?: string;
     },
   ) {
+    const tiendaId = data.tiendaId ?? TenantContext.tiendaId();
     return tx.movimientoInventario.create({
       data: {
+        ...(tiendaId ? { tiendaId } : {}),
         tipo: data.tipo,
         varianteId: data.varianteId,
         almacenId: data.almacenId,
@@ -37,7 +50,7 @@ export class InventarioService {
   }
 
   listar(almacenId?: string) {
-    return this.prisma.movimientoInventario.findMany({
+    return this.cliente().movimientoInventario.findMany({
       where: almacenId ? { almacenId } : undefined,
       include: {
         variante: { include: { producto: true } },
@@ -56,16 +69,18 @@ export class InventarioService {
     usuarioId: string,
   ) {
     const qty = Math.max(0, cantidad);
-    await exigirDeLaTienda(this.prisma, { variante: varianteId, almacen: almacenId });
-    return this.prisma.$transaction(async (tx) => {
+    const prisma = this.cliente();
+    await exigirDeLaTienda(prisma, { variante: varianteId, almacen: almacenId });
+    return prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<{ cantidad: number; reservado: number }[]>`
         SELECT cantidad, reservado FROM stock_almacen
         WHERE variante_id = ${varianteId} AND almacen_id = ${almacenId}
         FOR UPDATE
       `;
       if (!rows[0]) {
+        const tiendaId = TenantContext.tiendaId();
         await tx.stockAlmacen.create({
-          data: { varianteId, almacenId, cantidad: qty, reservado: 0 },
+          data: { ...(tiendaId ? { tiendaId } : {}), varianteId, almacenId, cantidad: qty, reservado: 0 },
         });
       } else {
         if (qty < rows[0].reservado) {
@@ -101,16 +116,18 @@ export class InventarioService {
     usuarioId: string,
     nota = 'Ingreso proveedor',
   ) {
-    await exigirDeLaTienda(this.prisma, { variante: varianteId, almacen: almacenId });
-    return this.prisma.$transaction(async (tx) => {
+    const prisma = this.cliente();
+    await exigirDeLaTienda(prisma, { variante: varianteId, almacen: almacenId });
+    return prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<{ cantidad: number }[]>`
         SELECT cantidad FROM stock_almacen
         WHERE variante_id = ${varianteId} AND almacen_id = ${almacenId}
         FOR UPDATE
       `;
       if (!rows[0]) {
+        const tiendaId = TenantContext.tiendaId();
         await tx.stockAlmacen.create({
-          data: { varianteId, almacenId, cantidad, reservado: 0 },
+          data: { ...(tiendaId ? { tiendaId } : {}), varianteId, almacenId, cantidad, reservado: 0 },
         });
       } else {
         await tx.stockAlmacen.update({
@@ -145,9 +162,10 @@ export class InventarioService {
     if (cantidad < 1) {
       throw new ConflictException({ codigo: 'CANTIDAD_INVALIDA' });
     }
-    await exigirDeLaTienda(this.prisma, { variante: varianteId, almacen: origenId });
-    await exigirDeLaTienda(this.prisma, { almacen: destinoId });
-    return this.prisma.$transaction(async (tx) => {
+    const prisma = this.cliente();
+    await exigirDeLaTienda(prisma, { variante: varianteId, almacen: origenId });
+    await exigirDeLaTienda(prisma, { almacen: destinoId });
+    return prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         { cantidad: number; reservado: number }[]
       >`
@@ -164,9 +182,10 @@ export class InventarioService {
         where: { varianteId_almacenId: { varianteId, almacenId: origenId } },
         data: { cantidad: { decrement: cantidad } },
       });
+      const tiendaId = TenantContext.tiendaId();
       await tx.stockAlmacen.upsert({
         where: { varianteId_almacenId: { varianteId, almacenId: destinoId } },
-        create: { varianteId, almacenId: destinoId, cantidad, reservado: 0 },
+        create: { ...(tiendaId ? { tiendaId } : {}), varianteId, almacenId: destinoId, cantidad, reservado: 0 },
         update: { cantidad: { increment: cantidad } },
       });
       await this.registrar(tx, {

@@ -17,6 +17,8 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { Idempotente } from '../sync/idempotencia.interceptor';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
 import { TenantContext } from '../tenancy/tenant-context';
 
 const MEDIOS_ABONO = ['efectivo', 'qr', 'transferencia', 'tarjeta'] as const;
@@ -40,11 +42,23 @@ const DIA = 86_400_000;
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Rol.ADMIN, Rol.ENCARGADO, Rol.CAJERO, Rol.SUPERADMIN)
 export class CreditosController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
 
   @Get()
   async listar(@Query('estado') estado?: string, @Query('clientaId') clientaId?: string) {
-    const cuentas = await this.prisma.cuentaCobrar.findMany({
+    const cuentas = await this.db().cuentaCobrar.findMany({
       where: {
         ...(estado === 'pagados' ? { saldo: 0 } : estado === 'todos' ? {} : { saldo: { gt: 0 } }),
         ...(clientaId ? { clientaId } : {}),
@@ -77,7 +91,7 @@ export class CreditosController {
   @Idempotente()
   abonar(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: AbonoDto) {
     const tiendaId = TenantContext.tiendaIdOrThrow();
-    return this.prisma.$transaction(async (tx) => {
+    return this.db().$transaction(async (tx) => {
       if (dto.cajaTurnoId) {
         const turno = await tx.cajaTurno.findUnique({ where: { id: dto.cajaTurnoId } });
         if (!turno || turno.cerradoEn || (user.rol === Rol.CAJERO && turno.cajeroId !== user.sub)) {

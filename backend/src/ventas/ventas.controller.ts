@@ -7,6 +7,7 @@ import {
   Get,
   HttpCode,
   NotFoundException,
+  Optional,
   Param,
   Post,
   UseGuards,
@@ -20,6 +21,9 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
 import { Idempotente } from '../sync/idempotencia.interceptor';
 import { CrearVentaDto } from './dto/crear-venta.dto';
 import {
@@ -36,7 +40,17 @@ export class VentasController {
     private readonly ventas: VentasService,
     private readonly prisma: PrismaService,
     private readonly notificaciones: NotificacionesService,
+    @Optional() private readonly esquemas?: PrismaEsquemasService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
+
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && (this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas) {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
 
   @Get('historial')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -52,7 +66,7 @@ export class VentasController {
     if (user.rol === Rol.ADMIN || user.rol === Rol.SUPERADMIN) {
       return this.ventas.ventasDeSucursal(undefined);
     }
-    const u = await this.prisma.usuario.findUniqueOrThrow({
+    const u = await this.db().usuario.findUniqueOrThrow({
       where: { id: user.sub },
     });
     if (!u.sucursalId) return [];
@@ -67,7 +81,7 @@ export class VentasController {
     @Param('id') id: string,
     @Body() body?: { email?: string },
   ) {
-    const venta = await this.prisma.venta.findUnique({
+    const venta = await this.db().venta.findUnique({
       where: { id },
       select: { id: true, clientaId: true },
     });

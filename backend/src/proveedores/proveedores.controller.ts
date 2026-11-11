@@ -17,6 +17,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
 import { exigirDeLaTienda } from '../tenancy/pertenencia';
 import { PlanLimitesService } from '../tenancy/plan-limites.service';
 
@@ -66,16 +69,26 @@ export class ProveedoresController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly limites: PlanLimitesService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
+
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
 
   @Get('mis-productos')
   @Roles(Rol.PROVEEDOR)
   async misProductos(@CurrentUser() user: JwtPayload) {
-    const u = await this.prisma.usuario.findUniqueOrThrow({
+    const u = await this.db().usuario.findUniqueOrThrow({
       where: { id: user.sub },
     });
     if (!u.proveedorId) return [];
-    return this.prisma.producto.findMany({
+    return this.db().producto.findMany({
       where: { proveedorId: u.proveedorId },
       include: {
         variantes: { include: { stocks: true } },
@@ -91,7 +104,7 @@ export class ProveedoresController {
     @CurrentUser() user: JwtPayload,
     @Body() dto: ProductoProveedorDto,
   ) {
-    const u = await this.prisma.usuario.findUniqueOrThrow({
+    const u = await this.db().usuario.findUniqueOrThrow({
       where: { id: user.sub },
     });
     const talla = dto.talla?.trim() || 'M';
@@ -99,9 +112,9 @@ export class ProveedoresController {
     const skuBase =
       dto.sku?.trim() ||
       `${dto.nombre.slice(0, 3).toUpperCase()}-${color.slice(0, 3).toUpperCase()}-${talla}-${Date.now().toString(36).slice(-4)}`;
-    await this.limites.verificar('productos');
-    await exigirDeLaTienda(this.prisma, { temporada: dto.temporadaId, coleccion: dto.coleccionId });
-    return this.prisma.producto.create({
+    await this.limites.verificar('productos', this.db());
+    await exigirDeLaTienda(this.db(), { temporada: dto.temporadaId, coleccion: dto.coleccionId });
+    return this.db().producto.create({
       data: {
         nombre: dto.nombre,
         categoria: dto.categoria,
@@ -133,7 +146,7 @@ export class ProveedoresController {
     @Query('pagina') paginaRaw?: string,
     @Query('limite') limiteRaw?: string,
   ) {
-    const u = await this.prisma.usuario.findUniqueOrThrow({
+    const u = await this.db().usuario.findUniqueOrThrow({
       where: { id: user.sub },
       select: { proveedorId: true },
     });
@@ -145,9 +158,9 @@ export class ProveedoresController {
       tipo: TipoMovimiento.ingreso_proveedor,
       variante: { producto: { proveedorId: u.proveedorId } },
     };
-    const [total, movimientos] = await this.prisma.$transaction([
-      this.prisma.movimientoInventario.count({ where }),
-      this.prisma.movimientoInventario.findMany({
+    const [total, movimientos] = await this.db().$transaction([
+      this.db().movimientoInventario.count({ where }),
+      this.db().movimientoInventario.findMany({
         where,
         include: {
           variante: { include: { producto: { select: { nombre: true } } } },
@@ -160,7 +173,7 @@ export class ProveedoresController {
     ]);
     const actorIds = [...new Set(movimientos.map(item => item.usuarioId).filter(Boolean))] as string[];
     const actores = actorIds.length
-      ? await this.prisma.usuario.findMany({
+      ? await this.db().usuario.findMany({
           where: { id: { in: actorIds } },
           select: { id: true, nombre: true, email: true },
         })
@@ -180,7 +193,7 @@ export class ProveedoresController {
   @Get()
   @Roles(Rol.ADMIN, Rol.PROVEEDOR, Rol.SUPERADMIN)
   listar() {
-    return this.prisma.proveedor.findMany({
+    return this.db().proveedor.findMany({
       include: { productos: true },
       orderBy: { nombre: 'asc' },
     });
@@ -189,7 +202,7 @@ export class ProveedoresController {
   @Post()
   @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   crear(@Body() dto: ProveedorDto) {
-    return this.prisma.proveedor.create({
+    return this.db().proveedor.create({
       data: { nombre: dto.nombre, contacto: dto.contacto ?? '' },
     });
   }
@@ -197,7 +210,7 @@ export class ProveedoresController {
   @Patch(':id')
   @Roles(Rol.ADMIN, Rol.SUPERADMIN)
   actualizar(@Param('id') id: string, @Body() dto: ProveedorDto) {
-    return this.prisma.proveedor.update({
+    return this.db().proveedor.update({
       where: { id },
       data: { nombre: dto.nombre, contacto: dto.contacto ?? '' },
     });

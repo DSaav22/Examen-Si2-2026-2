@@ -7,6 +7,7 @@ import { CorreoService } from '../correo/correo.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContext } from '../tenancy/tenant-context';
 import { TiendasService } from '../tenancy/tiendas.service';
+import { nombreSchemaTienda } from '../tenancy/schema-nombre';
 
 const HORAS_VERIFICACION = 48;
 
@@ -127,12 +128,12 @@ export class CuentasService {
 
   /** Todas las tiendas donde la cuenta tiene un perfil activo. */
   async tiendasDe(cuentaId: string): Promise<TiendaDeCuenta[]> {
-    const perfiles = await TenantContext.sinFiltro(() =>
-      this.prisma.usuario.findMany({
-        where: { cuentaId, activo: true },
-        select: { tiendaId: true, rol: true },
-      }),
-    );
+    const usarEsquemas = this.config.get<string>('TENANT_SCHEMAS_PERFILES') !== 'false' || this.config.get<string>('TENANT_SCHEMAS_ALTA') === 'true';
+    const perfiles = usarEsquemas
+      ? await this.perfilesEnEsquemas(cuentaId)
+      : await TenantContext.sinFiltro(() => this.prisma.usuario.findMany({
+          where: { cuentaId, activo: true }, select: { tiendaId: true, rol: true },
+        }));
     const out: TiendaDeCuenta[] = [];
     for (const p of perfiles) {
       const t = await this.tiendas.porId(p.tiendaId);
@@ -149,5 +150,44 @@ export class CuentasService {
       });
     }
     return out.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }
+
+  /** Descubre solo perfiles activos en esquemas derivados de tiendas registradas con esquema existente, o tablas compartidas como respaldo. */
+  private async perfilesEnEsquemas(cuentaId: string): Promise<{ tiendaId: string; rol: string }[]> {
+    const tiendas = await this.prisma.tienda.findMany({ select: { id: true } });
+    if (!tiendas.length) return [];
+    const mapaEsquemas = new Map(tiendas.map(t => [nombreSchemaTienda(t.id), t.id]));
+    const nombres = [...mapaEsquemas.keys()];
+    const existentes = await this.prisma.$queryRaw<{ nspname: string }[]>`
+      SELECT nspname FROM pg_namespace WHERE nspname = ANY(${nombres}::text[])`;
+    const disponibles = new Set(existentes.map(e => e.nspname));
+    const esquemasActivos = nombres.filter(e => disponibles.has(e));
+
+    const perfiles: { tiendaId: string; rol: string }[] = [];
+    if (esquemasActivos.length > 0) {
+      // Todos los identificadores proceden de UUID validados de la plataforma; la cuenta se parametriza.
+      const sql = esquemasActivos.map((e) => {
+        const tiendaId = mapaEsquemas.get(e);
+        return `SELECT tienda_id AS "tiendaId", '${tiendaId}' AS "esquemaTiendaId", rol::text AS rol FROM "${e}".usuarios WHERE cuenta_id=$1 AND activo=true`;
+      }).join(' UNION ALL ');
+      const deEsquemas = await this.prisma.$queryRawUnsafe<{ tiendaId: string; esquemaTiendaId: string; rol: string }[]>(sql, cuentaId);
+      // Un esquema corrupto no puede anunciar una membresía de otra tienda.
+      const ids = new Set(tiendas.map(t => t.id));
+      if (deEsquemas.some(p => !ids.has(p.tiendaId) || p.tiendaId !== p.esquemaTiendaId)) throw new Error('PERFIL_TIENDA_INCONSISTENTE');
+      for (const p of deEsquemas) perfiles.push({ tiendaId: p.tiendaId, rol: p.rol });
+    }
+
+    const tiendasSinEsquema = tiendas.filter(t => !disponibles.has(nombreSchemaTienda(t.id))).map(t => t.id);
+    if (tiendasSinEsquema.length > 0) {
+      const dePublic = await TenantContext.sinFiltro(() =>
+        this.prisma.usuario.findMany({
+          where: { cuentaId, activo: true, tiendaId: { in: tiendasSinEsquema } },
+          select: { tiendaId: true, rol: true },
+        }),
+      );
+      for (const p of dePublic) perfiles.push({ tiendaId: p.tiendaId, rol: p.rol });
+    }
+
+    return perfiles;
   }
 }

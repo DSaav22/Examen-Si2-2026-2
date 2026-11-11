@@ -1,7 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ModeloClient } from '../ia/modelo.client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
 import { TenantContext } from '../tenancy/tenant-context';
 import { compilarPregunta, validarSelect } from './sql-seguro';
 
@@ -14,18 +16,28 @@ export class ReportesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly modelo: ModeloClient,
+    @Optional() private readonly esquemas?: PrismaEsquemasService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
 
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' && this.esquemas) {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
+
   /**
-   * SQL crudo de reportes: la extensión de Prisma no lo ve, así que la tienda se fija en la
-   * sesión de Postgres (set_config local a la transacción). La vista v_reporte_ventas y los
-   * filtros `tienda_id = current_setting('app.tienda_id', true)` dependen de ese valor.
+   * SQL crudo de reportes: en la arquitectura de esquemas corre en la conexión del esquema
+   * de la tienda activa con su propia vista v_reporte_ventas y tablas locales.
    */
   private async consultar<T = Record<string, unknown>>(sql: string): Promise<T[]> {
     const tiendaId = TenantContext.tiendaIdOrThrow();
-    const [, filas] = await this.prisma.$transaction([
-      this.prisma.$queryRaw`SELECT set_config('app.tienda_id', ${tiendaId}, true)`,
-      this.prisma.$queryRawUnsafe<T[]>(sql),
+    const cliente = this.db();
+    const [, filas] = await cliente.$transaction([
+      cliente.$queryRaw`SELECT set_config('app.tienda_id', ${tiendaId}, true)`,
+      cliente.$queryRawUnsafe<T[]>(sql),
     ]);
     return filas;
   }
@@ -35,14 +47,14 @@ export class ReportesService {
     inicio.setHours(0, 0, 0, 0);
     const modeloOk = this.modelo.configurado();
     const [ventas, reportesHoy, stockLineas, recientes] = await Promise.all([
-      this.prisma.venta.aggregate({
+      this.db().venta.aggregate({
         where: { creadaEn: { gte: inicio }, estado: 'cobrada' },
         _sum: { total: true },
         _count: true,
       }),
-      this.prisma.reporteEjecucion.count({ where: { creadaEn: { gte: inicio } } }),
-      this.prisma.stockAlmacen.count({ where: { cantidad: { gt: 0 } } }),
-      this.prisma.reporteEjecucion.findMany({
+      this.db().reporteEjecucion.count({ where: { creadaEn: { gte: inicio } } }),
+      this.db().stockAlmacen.count({ where: { cantidad: { gt: 0 } } }),
+      this.db().reporteEjecucion.findMany({
         orderBy: { creadaEn: 'desc' },
         take: 8,
         select: { id: true, pregunta: true, filas: true, creadaEn: true },
@@ -82,7 +94,7 @@ export class ReportesService {
           { id: 'stock_bajo', label: 'Stock crítico', desc: 'Variantes con poca existencia' },
         ],
       },
-      sucursales: await this.prisma.sucursal.findMany({
+      sucursales: await this.db().sucursal.findMany({
         select: { id: true, nombre: true, ciudad: true },
         orderBy: { nombre: 'asc' },
       }),
@@ -132,7 +144,7 @@ export class ReportesService {
         ? await this.queryStockBajo()
         : await this.queryNegocio(tipo, p, sucursal);
 
-    await this.prisma.reporteEjecucion.create({
+    await this.db().reporteEjecucion.create({
       data: {
         pregunta: result.titulo,
         sql: result.sqlInterno,
@@ -343,7 +355,7 @@ export class ReportesService {
     );
     const sql =
       'SELECT stock por sucursal/almacén (vista operativa inventario) LIMIT 200';
-    await this.prisma.reporteEjecucion.create({
+    await this.db().reporteEjecucion.create({
       data: {
         pregunta: 'Inventario global',
         sql,
@@ -381,7 +393,7 @@ export class ReportesService {
     };
     const sql = validarSelect(compilado.sql);
     const filas = await this.consultar(sql);
-    await this.prisma.reporteEjecucion.create({
+    await this.db().reporteEjecucion.create({
       data: {
         pregunta: compilado.titulo,
         sql,
@@ -424,7 +436,7 @@ export class ReportesService {
       compilado.fuente,
     );
 
-    await this.prisma.reporteEjecucion.create({
+    await this.db().reporteEjecucion.create({
       data: {
         pregunta,
         sql,

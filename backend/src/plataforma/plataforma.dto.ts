@@ -54,6 +54,11 @@ export class TarjetaDto {
 }
 
 export class DatosTiendaDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(400000)
+  logo?: string;
+
   @IsString()
   @MinLength(2)
   @MaxLength(60)

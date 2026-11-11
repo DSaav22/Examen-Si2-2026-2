@@ -5,6 +5,9 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { TenantContext } from '../tenancy/tenant-context';
+import { ConfigService } from '@nestjs/config';
 import { exigirDeLaTienda } from '../tenancy/pertenencia';
 import { PlanLimitesService } from '../tenancy/plan-limites.service';
 import { ActualizarProductoDto, CrearProductoDto } from './dto/producto.dto';
@@ -27,7 +30,29 @@ export class CatalogoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly limites: PlanLimitesService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
+
+  /** Piloto de lecturas públicas: las escrituras continúan en el modelo anterior. */
+  private lecturaPublica() {
+    return this.config.get<string>('TENANT_SCHEMAS_CATALOGO') === 'true'
+      ? this.esquemas.clienteTienda(TenantContext.tiendaIdOrThrow())
+      : this.prisma;
+  }
+
+  private escrituraCatalogo(): PrismaService {
+    if (this.config.get<string>('TENANT_SCHEMAS_CATALOGO_ESCRITURA') !== 'true') return this.prisma;
+    if (this.config.get<string>('TENANT_SCHEMAS_CATALOGO') !== 'true' || this.config.get<string>('TENANT_SCHEMAS_PERFILES') !== 'true') {
+      throw new Error('CATALOGO_ESQUEMAS_REQUIERE_LECTURA_Y_PERFILES');
+    }
+    return this.esquemas.clienteTienda(TenantContext.tiendaIdOrThrow()) as PrismaService;
+  }
+
+  private tiendaEnEscritura() {
+    return this.config.get<string>('TENANT_SCHEMAS_CATALOGO_ESCRITURA') === 'true'
+      ? { tiendaId: TenantContext.tiendaIdOrThrow() } : {};
+  }
 
   private productoPublico(producto: ProductoCatalogo) {
     return {
@@ -173,9 +198,10 @@ export class CatalogoService {
               : filtros.ordenar === 'novedades'
                 ? { creadoEn: 'desc' }
                 : { nombre: 'asc' };
-    const [total, items] = await this.prisma.$transaction([
-      this.prisma.producto.count({ where }),
-      this.prisma.producto.findMany({
+    const lectura = this.lecturaPublica();
+    const [total, items] = await lectura.$transaction([
+      lectura.producto.count({ where }),
+      lectura.producto.findMany({
         where,
         include: {
           temporada: true,
@@ -203,7 +229,7 @@ export class CatalogoService {
   }
 
   async obtenerProducto(id: string, interno = false) {
-    const producto = await this.prisma.producto.findUnique({
+    const producto = await (interno ? this.escrituraCatalogo() : this.lecturaPublica()).producto.findUnique({
       where: { id },
       include: {
         temporada: true,
@@ -223,13 +249,14 @@ export class CatalogoService {
   }
 
   async disponibilidad(sucursalId: string) {
-    const sucursal = await this.prisma.sucursal.findUnique({
+    const prisma = this.escrituraCatalogo();
+    const sucursal = await prisma.sucursal.findUnique({
       where: { id: sucursalId },
       include: { almacenes: true },
     });
     if (!sucursal) throw new NotFoundException({ codigo: 'SUCURSAL_NO' });
     const almacenIds = sucursal.almacenes.map((a) => a.id);
-    const stocks = await this.prisma.stockAlmacen.findMany({
+    const stocks = await prisma.stockAlmacen.findMany({
       where: { almacenId: { in: almacenIds } },
       include: {
         variante: { include: { producto: true } },
@@ -257,14 +284,16 @@ export class CatalogoService {
   }
 
   async crearProducto(dto: CrearProductoDto) {
-    await this.limites.verificar('productos');
-    await exigirDeLaTienda(this.prisma, {
+    const prisma = this.escrituraCatalogo();
+    await this.limites.verificar('productos', prisma);
+    await exigirDeLaTienda(prisma, {
       temporada: dto.temporadaId,
       coleccion: dto.coleccionId,
       proveedor: dto.proveedorId,
     });
-    return this.prisma.producto.create({
+    return prisma.producto.create({
       data: {
+        ...this.tiendaEnEscritura(),
         nombre: dto.nombre,
         descripcion: dto.descripcion ?? '',
         categoria: dto.categoria,
@@ -281,13 +310,14 @@ export class CatalogoService {
   }
 
   async actualizarProducto(id: string, dto: ActualizarProductoDto) {
-    await this.obtenerProducto(id);
-    await exigirDeLaTienda(this.prisma, {
+    const prisma = this.escrituraCatalogo();
+    await this.obtenerProducto(id, true);
+    await exigirDeLaTienda(prisma, {
       temporada: dto.temporadaId,
       coleccion: dto.coleccionId,
       proveedor: dto.proveedorId,
     });
-    return this.prisma.producto.update({
+    return prisma.producto.update({
       where: { id },
       data: {
         ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
@@ -320,9 +350,11 @@ export class CatalogoService {
   }
 
   async crearVariante(productoId: string, dto: CrearVarianteDto) {
-    await this.obtenerProducto(productoId);
-    return this.prisma.variante.create({
+    const prisma = this.escrituraCatalogo();
+    await this.obtenerProducto(productoId, true);
+    return prisma.variante.create({
       data: {
+        ...this.tiendaEnEscritura(),
         productoId,
         talla: dto.talla,
         color: dto.color,
@@ -335,7 +367,7 @@ export class CatalogoService {
   }
 
   async overlay(id: string) {
-    const variante = await this.prisma.variante.findUnique({
+    const variante = await this.lecturaPublica().variante.findUnique({
       where: { id },
       include: { producto: true },
     });
@@ -354,16 +386,17 @@ export class CatalogoService {
   }
 
   actualizarVariante(id: string, dto: ActualizarVarianteDto) {
-    return this.prisma.variante.update({
+    return this.escrituraCatalogo().variante.update({
       where: { id },
       data: dto,
     });
   }
 
   async upsertStock(dto: UpsertStockDto) {
+    const prisma = this.escrituraCatalogo();
     const qty = Math.max(0, dto.cantidad);
-    await exigirDeLaTienda(this.prisma, { variante: dto.varianteId, almacen: dto.almacenId });
-    return this.prisma.$transaction(async (tx) => {
+    await exigirDeLaTienda(prisma, { variante: dto.varianteId, almacen: dto.almacenId });
+    return prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         { cantidad: number; reservado: number }[]
       >`
@@ -381,6 +414,7 @@ export class CatalogoService {
       if (!rows[0]) {
         return tx.stockAlmacen.create({
           data: {
+            ...this.tiendaEnEscritura(),
             varianteId: dto.varianteId,
             almacenId: dto.almacenId,
             cantidad: qty,
@@ -401,14 +435,14 @@ export class CatalogoService {
   }
 
   listarStock(almacenId?: string) {
-    return this.prisma.stockAlmacen.findMany({
+    return this.escrituraCatalogo().stockAlmacen.findMany({
       where: almacenId ? { almacenId } : undefined,
       include: { variante: { include: { producto: true } }, almacen: true },
     });
   }
 
   sucursales() {
-    return this.prisma.sucursal.findMany({
+    return this.escrituraCatalogo().sucursal.findMany({
       include: { almacenes: true },
       orderBy: { nombre: 'asc' },
     });

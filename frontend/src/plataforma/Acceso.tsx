@@ -20,11 +20,11 @@ function EnlaceDemo({ v }: { v: Verificacion | null }) {
   if (!v?.url) return null
   const url = new URL(v.url)
   return (
-    <div className="pf-demo-box">
+    <div className="pf-demo-box pf-verify-demo">
       <p>
-        <b>Modo demo:</b> no hay servidor de correo configurado, así que el enlace se muestra acá en vez de enviarse.
+        <b>Modo demostración:</b> el envío de correo está simulado.
       </p>
-      <Link className="pf-btn" to={`${url.pathname}${url.search}`}>Abrir enlace de verificación</Link>
+      <Link className="pf-btn pf-btn--ghost" to={`${url.pathname}${url.search}`}>Abrir enlace de verificación de prueba</Link>
     </div>
   )
 }
@@ -35,10 +35,24 @@ export function Empezar() {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmacion, setConfirmacion] = useState('')
+  const [mostrarClave, setMostrarClave] = useState(false)
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false)
   const [error, setError] = useState('')
   const [enUso, setEnUso] = useState(false)
   const [enviado, setEnviado] = useState<{ email: string; verificacion: Verificacion } | null>(null)
   const [cargando, setCargando] = useState(false)
+  const [mensajeReenvio, setMensajeReenvio] = useState('')
+  const [reenviando, setReenviando] = useState(false)
+  const correoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  const reglas = [
+    { texto: 'Al menos 8 caracteres', cumple: password.length >= 8 },
+    { texto: 'Una letra mayúscula', cumple: /[A-ZÁÉÍÓÚÑ]/.test(password) },
+    { texto: 'Una letra minúscula', cumple: /[a-záéíóúñ]/.test(password) },
+    { texto: 'Un número', cumple: /[0-9]/.test(password) },
+  ]
+  const claveValida = reglas.every(r => r.cumple)
+  const coinciden = Boolean(confirmacion) && confirmacion === password
 
   useEffect(() => {
     const plan = params.get('plan')
@@ -49,13 +63,17 @@ export function Empezar() {
 
   async function enviar(e: FormEvent) {
     e.preventDefault()
+    if (!correoValido || !claveValida || !coinciden) {
+      setError('Revisá el correo y los requisitos de la contraseña.')
+      return
+    }
     setError('')
     setEnUso(false)
     setCargando(true)
     try {
       const r = await apiCuenta<{ email: string; verificacion: Verificacion }>('/plataforma/registro', {
         method: 'POST',
-        body: JSON.stringify({ nombre, email, password }),
+        body: JSON.stringify({ nombre: nombre.trim(), email: email.trim(), password }),
       })
       setEnviado(r)
     } catch (err) {
@@ -67,44 +85,66 @@ export function Empezar() {
     }
   }
 
+  async function reenviarCorreo() {
+    if (!enviado || reenviando) return
+    setMensajeReenvio('')
+    setReenviando(true)
+    try {
+      const r = await apiCuenta<{ verificacion?: Verificacion }>('/plataforma/reenviar-verificacion', {
+        method: 'POST', body: JSON.stringify({ email: enviado.email }),
+      })
+      if (r.verificacion) setEnviado({ ...enviado, verificacion: r.verificacion })
+      setMensajeReenvio('Si la cuenta sigue sin verificar, se volvió a generar el envío.')
+    } catch (err) {
+      setMensajeReenvio((err as Error).message || 'No se pudo reenviar el correo.')
+    } finally { setReenviando(false) }
+  }
+
   if (enviado) {
     return (
-      <section className="pf-card pf-narrow">
-        <p className="pf-eyebrow">Paso 1 de 3</p>
+      <section className="pf-card pf-narrow pf-account-card pf-verify-card">
+        <svg className="pf-mail-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><rect x="4" y="9" width="40" height="30" rx="3"/><path d="m5 11 19 15 19-15M5 37l13-12m25 12L30 25"/></svg>
         <h1>Revisá tu correo</h1>
-        <p>
-          Te enviamos un enlace a <b>{enviado.email}</b> para confirmar que es tuyo. Al abrirlo seguís con la elección
-          del plan y el pago.
-        </p>
+        <p className="pf-muted">{enviado.verificacion?.modo === 'simulado' ? 'El enlace de verificación de prueba corresponde a:' : 'Enviamos un enlace de verificación a:'}<br /><b className="pf-email-value">{enviado.email}</b><br />Abrí el enlace para confirmar tu cuenta.</p>
+        <Link className="pf-btn pf-btn--block" to="/plataforma/login">Ya confirmé mi correo</Link>
+        <p className="pf-muted pf-verify-links">¿No llegó el mensaje? <button type="button" onClick={() => void reenviarCorreo()} disabled={reenviando}>{reenviando ? 'Reenviando…' : 'Reenviar correo'}</button></p>
+        <p className="pf-muted pf-verify-links">¿Te equivocaste? <button type="button" onClick={() => { setEnviado(null); setMensajeReenvio('') }}>Cambiar correo</button></p>
+        {mensajeReenvio && <p className="pf-muted" role="status">{mensajeReenvio}</p>}
         <EnlaceDemo v={enviado.verificacion} />
       </section>
     )
   }
 
   return (
-    <section className="pf-card pf-narrow">
-      <p className="pf-eyebrow">Paso 1 de 3</p>
+    <section className="pf-card pf-narrow pf-account-card">
+      <div className="pf-account-brand">EnsayAR</div>
       <h1>Creá tu cuenta</h1>
-      <p className="pf-muted">Con esta cuenta administrás tus tiendas y entrás a todas con un solo login.</p>
+      <p className="pf-muted pf-account-subtitle">Una cuenta para administrar tus tiendas.</p>
       <form className="pf-form" onSubmit={enviar}>
         <label>
-          Tu nombre
+          Nombre completo
           <input value={nombre} onChange={e => setNombre(e.target.value)} required minLength={2} autoComplete="name" />
         </label>
         <label>
-          Correo
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
+          Correo electrónico
+          <input className={email ? correoValido ? 'is-valid' : 'is-invalid' : ''} type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" aria-describedby="cuenta-correo-ayuda" />
+          {email && <span id="cuenta-correo-ayuda" className={correoValido ? 'pf-validation-ok' : 'pf-validation-error'}>{correoValido ? '✓ Correo válido' : 'Ingresá un correo válido'}</span>}
         </label>
         <label>
-          Clave (mínimo 8 caracteres)
-          <input
-            type="password"
+          Contraseña
+          <span className="pf-password-field"><input
+            type={mostrarClave ? 'text' : 'password'}
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
             minLength={8}
             autoComplete="new-password"
-          />
+          /><button type="button" onClick={() => setMostrarClave(!mostrarClave)} aria-label={mostrarClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}><Ojo /></button></span>
+        </label>
+        <ul className="pf-password-rules" aria-label="Requisitos de contraseña">{reglas.map(r => <li key={r.texto} className={r.cumple ? 'is-met' : ''}><span aria-hidden="true">{r.cumple ? '✓' : '○'}</span> {r.texto}</li>)}</ul>
+        <label>Confirmar contraseña
+          <span className="pf-password-field"><input type={mostrarConfirmacion ? 'text' : 'password'} value={confirmacion} onChange={e => setConfirmacion(e.target.value)} className={confirmacion ? coinciden ? 'is-valid' : 'is-invalid' : ''} required autoComplete="new-password" aria-describedby="confirmacion-ayuda" /><button type="button" onClick={() => setMostrarConfirmacion(!mostrarConfirmacion)} aria-label={mostrarConfirmacion ? 'Ocultar confirmación' : 'Mostrar confirmación'}><Ojo /></button></span>
+          {confirmacion && !coinciden && <span id="confirmacion-ayuda" className="pf-validation-error">Las contraseñas no coinciden.</span>}
         </label>
         {error ? (
           <p className="pf-error" role="alert">
@@ -116,10 +156,14 @@ export function Empezar() {
         </button>
       </form>
       <p className="pf-muted">
-        ¿Ya tenés cuenta? <Link to="/plataforma/login">Entrar</Link>
+        ¿Ya tenés cuenta? <Link to="/plataforma/login">Iniciar sesión</Link>
       </p>
     </section>
   )
+}
+
+function Ojo() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
 }
 
 export function Verificar() {
@@ -161,6 +205,7 @@ export function PlataformaLogin() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [mostrar, setMostrar] = useState(false)
   const [error, setError] = useState('')
   const [sinVerificar, setSinVerificar] = useState(false)
   const [reenvio, setReenvio] = useState<Verificacion | null>(null)
@@ -190,31 +235,33 @@ export function PlataformaLogin() {
   }
 
   async function reenviar() {
-    const r = await apiCuenta<{ verificacion?: Verificacion }>('/plataforma/reenviar-verificacion', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    })
-    setReenvio(r.verificacion ?? { modo: 'smtp' })
+    try {
+      const r = await apiCuenta<{ verificacion?: Verificacion }>('/plataforma/reenviar-verificacion', {
+        method: 'POST', body: JSON.stringify({ email }),
+      })
+      setReenvio(r.verificacion ?? { modo: 'smtp' })
+    } catch (err) { setError((err as Error).message || 'No se pudo reenviar el correo.') }
   }
 
   return (
-    <section className="pf-card pf-narrow">
-      <h1>Entrar a la plataforma</h1>
-      <p className="pf-muted">Para dueñas de tiendas y para el equipo de EnsayAR.</p>
+    <section className="pf-card pf-narrow pf-account-card">
+      <div className="pf-account-brand">EnsayAR</div>
+      <h1>Iniciá sesión</h1>
+      <p className="pf-muted pf-account-subtitle">Administrá tus tiendas desde una sola cuenta.</p>
       <form className="pf-form" onSubmit={enviar}>
         <label>
-          Correo
+          Correo electrónico
           <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
         </label>
         <label>
-          Clave
-          <input
-            type="password"
+          Contraseña
+          <span className="pf-password-field"><input
+            type={mostrar ? 'text' : 'password'}
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-          />
+          /><button type="button" onClick={() => setMostrar(!mostrar)} aria-label={mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña'}><Ojo /></button></span>
         </label>
         {error ? <p className="pf-error" role="alert">{error}</p> : null}
         {sinVerificar ? (
@@ -225,15 +272,11 @@ export function PlataformaLogin() {
         {reenvio && !reenvio.url ? <p className="pf-ok">Te reenviamos el enlace.</p> : null}
         <EnlaceDemo v={reenvio} />
         <button className="pf-btn pf-btn--block" disabled={cargando}>
-          {cargando ? 'Entrando…' : 'Entrar'}
+          {cargando ? 'Entrando…' : 'Iniciar sesión'}
         </button>
       </form>
       <p className="pf-muted">
         ¿No tenés cuenta? <Link to="/empezar">Creá tu tienda</Link>
-      </p>
-      <p className="pf-hint">
-        Demo: dueña <code>duena@aurora.demo</code> · equipo EnsayAR <code>superadmin@ensayar.bo</code> · clave{' '}
-        <code>diego</code>
       </p>
     </section>
   )

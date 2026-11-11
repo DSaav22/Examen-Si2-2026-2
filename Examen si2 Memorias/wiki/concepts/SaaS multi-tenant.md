@@ -15,6 +15,18 @@ Andrés eligió **una base PostgreSQL con un esquema por tienda**, con tablas de
 
 **Distinción:** el código integrado al 8 de noviembre sigue usando tablas compartidas con `tienda_id`. La sección de implementación más abajo describe ese estado histórico, no que la nueva decisión ya esté aplicada. No se han aplicado migraciones para convertirlo a esquemas por tienda.
 
+**Avance del diseño:** se definió un contrato de seis modelos globales y 39 locales a la tienda, contrastado con el schema Prisma, y se documentó la relación entre cuenta global y perfil local en `docs/DOMINIO_MULTITENANT.md`. No crea esquemas ni cambia todavía las conexiones. El usuario autorizó continuar con la migración; las pruebas en copia y el respaldo siguen siendo necesarios antes de sustituir los datos actuales.
+
+**Avance de conexiones:** existe `PrismaEsquemasService`, probado en el laboratorio con un cliente de plataforma y dos tiendas. Hay pilotos opcionales para categorías y perfiles; la autorización completa y la adaptación general siguen pendientes. Detalles en `docs/MIGRACION_ESQUEMAS_TIENDA.md`.
+
+**Avance de enums:** se verificaron tipos, etiquetas y valores por defecto en plataforma y dos tiendas del laboratorio. Los clientes explícitos rechazan el acceso directo a modelos del ámbito equivocado; los enums se consultan y escriben con el cliente correspondiente. La creación automática de esos tipos para tiendas nuevas, el SQL crudo y las relaciones incluidas siguen pendientes. Hay un ensayo de transacciones mixtas, todavía sin integrar al alta real.
+
+**Piloto de enrutamiento:** `GET /catalogo/categorias` puede consultar el esquema de la tienda con la opción experimental `TENANT_SCHEMAS_CATEGORIAS=true`, desactivada por defecto. Se probaron dos tiendas en una API conectada al laboratorio y solicitudes concurrentes. Fuera de los pilotos de categorías y perfiles, los endpoints siguen usando el modelo compartido; esto no certifica el aislamiento integral ni habilita aún la migración de la base. Ver `docs/MIGRACION_ESQUEMAS_TIENDA.md`.
+
+**Piloto de perfiles:** con `TENANT_SCHEMAS_PERFILES=true`, también desactivado por defecto, el guard comprueba la membresía en el esquema de la tienda del JWT y `GET /auth/me` lee ese esquema. Se probó con una API de laboratorio y se rechazaron diferencias de tienda, cuenta y rol. La búsqueda de tiendas, el login y los demás módulos aún requieren adaptación; no implica que toda la autenticación o la base estén migradas.
+
+**Piloto de catálogo:** `TENANT_SCHEMAS_CATALOGO=true` habilita lecturas de lista pública, ficha y overlay desde el esquema de la tienda. La opción está desactivada por defecto y las escrituras siguen en el modelo anterior. Se comprobaron dos tiendas con productos distintos y acceso cruzado 404 en el laboratorio; falta migrar y probar el resto del flujo.
+
 ## Qué pide el docente
 
 - El cliente no compra licencias ni infraestructura: paga por lo que usa.

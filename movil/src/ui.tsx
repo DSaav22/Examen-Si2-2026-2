@@ -10,7 +10,8 @@ import {
   Text,
   View,
 } from 'react-native'
-import { assetUrl } from './api'
+import { assetUrl, tiendaActiva } from './api'
+import { useSync } from './offline/sync'
 import { useSession } from './session'
 import { colors } from './theme'
 import { precioEfectivo, type Producto, type Variante } from './types'
@@ -158,24 +159,33 @@ function shortSucursal(nombre?: string | null) {
 
 export function Header() {
   const s = useSession()
+  const sync = useSync()
   const auth = s.screen.name === 'login' || s.screen.name === 'registro'
+  const brandName = s.tiendaActual?.nombre?.toUpperCase() || 'VESTA'
   return (
     <View style={styles.header}>
       {auth ? (
-        <Text style={styles.brand}>VESTA</Text>
+        <Text style={styles.brand}>{brandName}</Text>
       ) : (
         <>
           <Pressable onPress={() => s.setMenu(true)} hitSlop={8}>
             <Text style={styles.icon}>☰</Text>
           </Pressable>
           <Pressable onPress={() => s.goTab('inicio')}>
-            <Text style={styles.brandSm}>VESTA</Text>
+            <Text style={styles.brandSm}>{brandName.length > 12 ? `${brandName.slice(0, 11)}…` : brandName}</Text>
           </Pressable>
-          <Pressable style={styles.branch} onPress={() => s.setElegir(true)}>
-            <Text style={styles.branchText} numberOfLines={1}>
-              {shortSucursal(s.sucursal?.nombre)}
-            </Text>
-          </Pressable>
+          <View style={styles.headerRight}>
+            <View style={[styles.netBadge, sync.online ? styles.netOnline : styles.netOffline]}>
+              <Text style={[styles.netBadgeText, sync.online ? styles.netOnlineText : styles.netOfflineText]}>
+                {sync.online ? (sync.ops.length ? `● ${sync.ops.length}` : '● Red') : '○ Sin red'}
+              </Text>
+            </View>
+            <Pressable style={styles.branch} onPress={() => s.setElegir(true)}>
+              <Text style={styles.branchText} numberOfLines={1}>
+                {shortSucursal(s.sucursal?.nombre)}
+              </Text>
+            </Pressable>
+          </View>
         </>
       )}
     </View>
@@ -267,12 +277,12 @@ export function Capas() {
             <View style={styles.menuDrawerInner}>
             <View style={styles.menuHero}>
               <View style={styles.menuHeroTop}>
-                <Text style={styles.menuBrand}>VESTA</Text>
+                <Text style={styles.menuBrand}>{s.tiendaActual?.nombre?.toUpperCase() || 'VESTA'}</Text>
                 <Pressable onPress={() => s.setMenu(false)} hitSlop={10} style={styles.menuClose}>
                   <Text style={styles.menuCloseText}>✕</Text>
                 </Pressable>
               </View>
-              <Text style={styles.menuTag}>Edición boutique</Text>
+              <Text style={styles.menuTag}>{s.tiendaActual?.plan ? `Plan ${s.tiendaActual.plan}` : 'Edición boutique'}</Text>
               {s.user ? (
                 <View style={styles.menuUser}>
                   <View style={styles.menuAvatar}>
@@ -522,6 +532,13 @@ const styles = StyleSheet.create({
   brand: { color: colors.white, letterSpacing: 6, fontSize: 22, fontWeight: '700', textAlign: 'center', flex: 1 },
   brandSm: { color: colors.white, letterSpacing: 4, fontSize: 16, fontWeight: '700' },
   icon: { color: colors.white, fontSize: 22 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  netBadge: { paddingVertical: 4, paddingHorizontal: 7, borderWidth: 1, borderRadius: 2 },
+  netOnline: { borderColor: '#4e8760', backgroundColor: 'rgba(47,107,79,0.2)' },
+  netOffline: { borderColor: '#c4934e', backgroundColor: 'rgba(138,90,18,0.25)' },
+  netBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  netOnlineText: { color: '#74c48f' },
+  netOfflineText: { color: '#f0c878' },
   branch: { maxWidth: 120, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', paddingHorizontal: 8, paddingVertical: 6 },
   branchText: { color: colors.white, fontSize: 11 },
   nav: {

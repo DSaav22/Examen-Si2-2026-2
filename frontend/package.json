@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:offline": "node scripts/run-edge-tests.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "start": "serve -s dist -l tcp://0.0.0.0:$PORT"

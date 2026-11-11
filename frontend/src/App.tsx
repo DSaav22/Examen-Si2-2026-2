@@ -21,6 +21,7 @@ import { Probador } from './pages/Probador'
 import { ProveedorPortal } from './pages/ProveedorPortal'
 import { Registro } from './pages/Registro'
 import { Reportes } from './pages/Reportes'
+import { Analitica } from './pages/Analitica'
 import { Moderacion } from './pages/Moderacion'
 import { Bitacora } from './pages/Bitacora'
 import { Reservas } from './pages/Reservas'
@@ -213,6 +214,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/analitica" element={<ProtectedRoute roles={['ADMIN', 'SUPERADMIN']}><Analitica /></ProtectedRoute>} />
               <Route
                 path="/probar/:varianteId"
                 element={

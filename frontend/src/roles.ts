@@ -93,6 +93,7 @@ function navGestionAdmin(incluirBitacora: boolean): NavGrupo {
   }
 
   items.push({ to: '/reportes', label: 'Reportes' })
+  items.push({ to: '/analitica', label: 'Analítica' })
 
   return { id: 'gestion', titulo: 'Gestión', items }
 

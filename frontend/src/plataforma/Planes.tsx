@@ -6,7 +6,7 @@ import { MODULOS, PERIODOS, usd, usePlataforma, type Periodo, type PlanPublico }
 export function Planes() {
   const { sesion } = usePlataforma()
   const [planes, setPlanes] = useState<PlanPublico[]>([])
-  const [periodo, setPeriodo] = useState<Periodo>('ANUAL')
+  const [periodo, setPeriodo] = useState<Periodo>('MENSUAL')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -19,22 +19,27 @@ export function Planes() {
 
   return (
     <>
-      <section className="pf-hero">
-        <p className="pf-eyebrow">Software como servicio para tiendas de ropa</p>
-        <h1>Tu tienda de moda en línea y en caja, lista en 2 minutos</h1>
+      <section className="pf-hero" id="funcionalidades">
+        <div className="pf-hero-copy">
+        <h1>Tu tienda, tus ventas y tu inventario en un solo lugar.</h1>
         <p className="pf-lead">
-          Catálogo, punto de venta que sigue funcionando sin internet, inventario por sucursal, probador virtual y
-          reportes con IA. Elegís un plan, pagás y tu espacio de trabajo se crea solo, aislado de las demás tiendas.
+          Administrá tu catálogo, vendé en línea o en caja y controlá el inventario de tu negocio desde una misma plataforma.
         </p>
         <div className="pf-hero-cta">
           <Link className="pf-btn pf-btn--lg" to={sesion ? '/plataforma/nueva' : '/empezar'}>Crear mi tienda</Link>
-          <Link className="pf-btn pf-btn--ghost pf-btn--lg" to="/t/vesta">Ver una tienda de ejemplo</Link>
+          <a className="pf-btn pf-btn--ghost pf-btn--lg" href="#planes">Saber más</a>
+        </div>
+        </div>
+        <div className="pf-devices" aria-hidden="true">
+          <div className="pf-device-laptop"><div className="pf-device-screen"><div className="pf-device-bar">VESTA <span>CATÁLOGO　 NUEVA COLECCIÓN</span></div><div className="pf-device-photo"><span>Nueva<br />colección</span></div></div><div className="pf-device-base" /></div>
+          <div className="pf-device-dashboard"><div className="pf-device-sidebar">EnsayAR<br /><br />Resumen<br />Catálogo<br />Inventario</div><div className="pf-device-chart"><b>Resumen</b><small>Ventas de la tienda</small><svg viewBox="0 0 180 65" preserveAspectRatio="none"><path d="M0 53 L23 47 L46 51 L68 32 L89 38 L112 20 L135 28 L157 10 L180 19 L180 65 L0 65 Z" fill="#d5a6b4"/><path d="M0 53 L23 47 L46 51 L68 32 L89 38 L112 20 L135 28 L157 10 L180 19" fill="none" stroke="#782a42" strokeWidth="2"/></svg></div></div>
+          <div className="pf-device-phone"><div className="pf-phone-head">VESTA</div><img src="/catalogo/ropa/producto-001.jpg" alt="" /><div className="pf-phone-label">Nueva colección</div><div className="pf-phone-products"><img src="/catalogo/ropa/producto-002.jpg" alt=""/><img src="/catalogo/ropa/producto-003.jpg" alt=""/></div></div>
         </div>
       </section>
 
-      <section className="pf-section" aria-labelledby="pf-planes-titulo">
+      <section className="pf-section pf-pricing" id="planes" aria-labelledby="pf-planes-titulo">
         <div className="pf-section-head">
-          <h2 id="pf-planes-titulo">Planes</h2>
+          <h2 id="pf-planes-titulo">Nuestros planes</h2>
           <div className="pf-toggle" role="radiogroup" aria-label="Período de facturación">
             {PERIODOS.map(p => (
               <button
@@ -67,7 +72,7 @@ export function Planes() {
                 </p>
                 <p className="pf-price-note">
                   {periodo === 'MENSUAL'
-                    ? 'Facturado cada mes'
+                    ? 'Facturado mensualmente'
                     : `${usd(total)} cada ${meses} meses · ahorrás ${usd(plan.precios.MENSUAL * meses - total)}`}
                 </p>
                 <ul className="pf-limits">
@@ -107,14 +112,12 @@ export function Planes() {
         </div>
       </section>
 
-      <section className="pf-section pf-faq" aria-label="Preguntas frecuentes">
+      <section className="pf-section pf-faq" id="ayuda" aria-label="Preguntas frecuentes">
         <h2>Preguntas frecuentes</h2>
         <details>
           <summary>¿Otra tienda puede ver mis datos?</summary>
           <p>
-            No. Cada registro de negocio lleva el identificador de su tienda y el servidor filtra todas las consultas por
-            la tienda de tu sesión, incluidos los reportes. Un producto de otra tienda no existe para vos aunque conozcas
-            su código.
+            La plataforma está diseñada para separar la información de cada tienda. La migración y las pruebas de aislamiento siguen en curso.
           </p>
         </details>
         <details>

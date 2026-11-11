@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import { Prisma, PrismaClient } from '@prisma/client';
 import { TenantContext } from './tenant-context';
+import { MODELOS_PLATAFORMA } from './dominio-ambitos';
 
 /** Tablas de la plataforma: nunca se filtran por tienda. */
-const PLATAFORMA = new Set(['Cuenta', 'Tienda', 'Plan', 'Suscripcion', 'PagoSuscripcion', 'TokenRevocado']);
+const PLATAFORMA = new Set<string>(MODELOS_PLATAFORMA);
 
 const modelos = Prisma.dmmf.datamodel.models;
 

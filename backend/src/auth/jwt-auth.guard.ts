@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { TokenService } from './token.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
 import { TenantContext } from '../tenancy/tenant-context';
 import { TiendasService } from '../tenancy/tiendas.service';
 
@@ -18,6 +20,8 @@ export class JwtAuthGuard implements CanActivate {
     private readonly tokens: TokenService,
     private readonly prisma: PrismaService,
     private readonly tiendas: TiendasService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,11 +50,16 @@ export class JwtAuthGuard implements CanActivate {
     }
     TenantContext.fijar(payload.tiendaId);
 
-    const current = await this.prisma.usuario.findUnique({
+    // La membresía se comprueba dentro del esquema asociado al JWT verificado.
+    const usarEsquemas = this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config.get<string>('TENANT_SCHEMAS_ALTA') === 'true';
+    const cliente = usarEsquemas
+      ? this.esquemas.clienteTienda(payload.tiendaId)
+      : this.prisma;
+    const current = await cliente.usuario.findUnique({
       where: { id: payload.sub },
-      select: { id: true, rol: true, activo: true, cuentaId: true },
+      select: { id: true, rol: true, activo: true, cuentaId: true, tiendaId: true },
     });
-    if (!current || !current.activo || current.rol !== payload.rol || current.cuentaId !== payload.cuentaId) {
+    if (!current || !current.activo || current.rol !== payload.rol || current.cuentaId !== payload.cuentaId || current.tiendaId !== payload.tiendaId) {
       throw new UnauthorizedException({ codigo: 'SESION_INVALIDA' });
     }
     request.user = payload;

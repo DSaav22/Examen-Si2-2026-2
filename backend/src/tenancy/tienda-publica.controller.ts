@@ -17,6 +17,7 @@ export class TiendaPublicaController {
       id: t.id,
       slug: t.slug,
       nombre: t.nombre,
+      logo: t.logo ?? null,
       pais: t.pais,
       moneda: t.moneda,
       metodosPagoSimulados: metodosSimuladosPorPais(t.pais),

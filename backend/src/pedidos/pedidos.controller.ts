@@ -11,16 +11,31 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
 
 @Controller('pedidos')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PedidosController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly esquemas: PrismaEsquemasService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
 
   @Get('despacho')
   @Roles(Rol.ENCARGADO, Rol.ADMIN, Rol.SUPERADMIN)
   pendientes() {
-    return this.prisma.pedido.findMany({
+    return this.db().pedido.findMany({
       where: { estado: 'pendiente' },
       include: {
         usuario: { select: { nombre: true, email: true } },
@@ -53,7 +68,7 @@ export class PedidosController {
   @Post(':id/despachar')
   @Roles(Rol.ENCARGADO, Rol.ADMIN, Rol.SUPERADMIN)
   async despachar(@Param('id') id: string) {
-    const pedido = await this.prisma.pedido.findUnique({
+    const pedido = await this.db().pedido.findUnique({
       where: { id },
       include: { venta: true },
     });
@@ -71,7 +86,7 @@ export class PedidosController {
       throw new ConflictException({ codigo: 'SIN_DIRECCION' });
     }
     const seguimiento = `VESTA-${pedido.id.slice(0, 8).toUpperCase()}`;
-    return this.prisma.pedido.update({
+    return this.db().pedido.update({
       where: { id },
       data: { estado: 'enviado', seguimiento, enviadoEn: new Date() },
     });

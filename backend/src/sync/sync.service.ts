@@ -1,4 +1,5 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Canal, MedioPago, Prisma, Rol } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -7,6 +8,7 @@ import { CuentasService } from '../auth/cuentas.service';
 import { InventarioService } from '../inventario/inventario.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
 import { exigirDeLaTienda } from '../tenancy/pertenencia';
 import { PlanLimitesService } from '../tenancy/plan-limites.service';
 import { TenantContext } from '../tenancy/tenant-context';
@@ -96,10 +98,26 @@ export class SyncService {
     private readonly limites: PlanLimitesService,
     private readonly tiendas: TiendasService,
     private readonly notificaciones: NotificacionesService,
+    private readonly config: ConfigService,
+    private readonly esquemas: PrismaEsquemasService,
   ) {}
 
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true') {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
+
+  private dbPlataforma(): PrismaService {
+    return (this.config.get<string>('TENANT_SCHEMAS_PERFILES') === 'true'
+      ? this.esquemas.clientePlataforma()
+      : this.prisma) as unknown as PrismaService;
+  }
+
   async politica() {
-    const tienda = await this.prisma.tienda.findUniqueOrThrow({
+    const tienda = await this.dbPlataforma().tienda.findUniqueOrThrow({
       where: { id: TenantContext.tiendaIdOrThrow() },
       select: { ventanaOfflineDias: true },
     });
@@ -108,13 +126,13 @@ export class SyncService {
 
   async fijarVentana(dias: number) {
     const tiendaId = TenantContext.tiendaIdOrThrow();
-    await this.prisma.tienda.update({ where: { id: tiendaId }, data: { ventanaOfflineDias: dias } });
+    await this.dbPlataforma().tienda.update({ where: { id: tiendaId }, data: { ventanaOfflineDias: dias } });
     this.tiendas.invalidar(tiendaId);
     return this.politica();
   }
 
   operaciones(estado?: string) {
-    return this.prisma.operacionSync.findMany({
+    return this.db().operacionSync.findMany({
       where: { tipo: { not: 'http' }, ...(estado ? { estado } : {}) },
       orderBy: { creadoEn: 'desc' },
       take: 100,
@@ -123,12 +141,13 @@ export class SyncService {
 
   /** El administrador da por resuelto un conflicto (p. ej. tras contar el stock físico). */
   async descartar(id: string, actor: JwtPayload) {
-    const fila = await this.prisma.operacionSync.findFirst({ where: { id, estado: 'conflicto' } });
+    const tiendaId = TenantContext.tiendaIdOrThrow();
+    const fila = await this.db().operacionSync.findFirst({ where: { id, estado: 'conflicto' } });
     if (!fila) throw new HttpException({ codigo: 'OPERACION_NO_EN_CONFLICTO' }, 404);
-    await this.prisma.auditoria.create({
-      data: { accion: 'sync_conflicto_descartado', recurso: fila.operationId, usuarioId: actor.sub },
+    await this.db().auditoria.create({
+      data: { tiendaId, accion: 'sync_conflicto_descartado', recurso: fila.operationId, usuarioId: actor.sub },
     });
-    return this.prisma.operacionSync.update({ where: { id }, data: { estado: 'descartada' } });
+    return this.db().operacionSync.update({ where: { id }, data: { estado: 'descartada' } });
   }
 
   /**
@@ -137,7 +156,7 @@ export class SyncService {
    */
   async lote(dto: LoteSyncDto, actor: JwtPayload) {
     const tiendaId = TenantContext.tiendaIdOrThrow();
-    const tienda = await this.prisma.tienda.findUniqueOrThrow({
+    const tienda = await this.dbPlataforma().tienda.findUniqueOrThrow({
       where: { id: tiendaId },
       select: { ventanaOfflineDias: true },
     });
@@ -171,8 +190,9 @@ export class SyncService {
     ventanaDias: number,
     remap: Map<string, string>,
   ): Promise<Aplicacion> {
+    const tiendaId = TenantContext.tiendaIdOrThrow();
     const hash = huella({ tipo: op.tipo, creadaEn: op.creadaEn, datos: op.datos });
-    const previa = await this.prisma.operacionSync.findFirst({ where: { operationId: op.id } });
+    const previa = await this.db().operacionSync.findFirst({ where: { operationId: op.id } });
     if (previa) {
       if (previa.hash !== hash) {
         return {
@@ -201,9 +221,10 @@ export class SyncService {
     const hechaEn = new Date(Math.min(creadaEn.getTime(), ahora));
     const fila = previa
       ? previa
-      : await this.prisma.operacionSync
+      : await this.db().operacionSync
           .create({
             data: {
+              tiendaId,
               operationId: op.id,
               dispositivoId,
               usuarioId: actor.sub,
@@ -246,14 +267,14 @@ export class SyncService {
         if (!r) {
           // Error del servidor: se libera la operación para que el dispositivo la reintente.
           this.log.error(`Operación ${op.id} falló: ${String(error)}`);
-          await this.prisma.operacionSync.deleteMany({ where: { id: fila.id } });
+          await this.db().operacionSync.deleteMany({ where: { id: fila.id } });
           return { estado: 'error', codigo: 'ERROR_SERVIDOR', mensaje: 'Error temporal; se reintentará.' };
         }
         resultado = r;
       }
     }
 
-    await this.prisma.operacionSync.update({
+    await this.db().operacionSync.update({
       where: { id: fila.id },
       data: {
         estado: resultado.estado,
@@ -320,12 +341,12 @@ export class SyncService {
       canal: Canal.pos,
       uuid: op.id,
     });
-    await exigirDeLaTienda(this.prisma, {
+    await exigirDeLaTienda(this.db(), {
       almacen: dto.almacenId,
       cajaTurno: dto.cajaTurnoId,
       usuario: dto.clientaId,
     });
-    for (const l of dto.lineas) await exigirDeLaTienda(this.prisma, { variante: l.varianteId });
+    for (const l of dto.lineas) await exigirDeLaTienda(this.db(), { variante: l.varianteId });
 
     const venta = await this.ventas.cobrar(dto, { id: actor.sub, rol: actor.rol }, { hechaEn });
     return {
@@ -337,7 +358,7 @@ export class SyncService {
 
   /** Si el cliente local se fusionó en un lote anterior, devuelve el id del servidor. */
   private async clienteFusionado(idLocal: string) {
-    const op = await this.prisma.operacionSync.findFirst({
+    const op = await this.db().operacionSync.findFirst({
       where: { tipo: 'cliente', estado: 'fusionada', payload: { path: ['id'], equals: idLocal } },
       select: { resultado: true },
     });
@@ -347,10 +368,10 @@ export class SyncService {
   private async cliente(op: OperacionDto): Promise<Aplicacion> {
     const dto = await validar(ClienteOfflineDto, op.datos);
     const email = this.cuentas.normalizar(dto.email);
-    const mismo = await this.prisma.usuario.findUnique({ where: { id: dto.id }, select: { id: true } });
+    const mismo = await this.db().usuario.findUnique({ where: { id: dto.id }, select: { id: true } });
     if (mismo) return { estado: 'aplicada', recursoId: mismo.id };
 
-    const porCorreo = await this.prisma.usuario.findFirst({ where: { email }, select: { id: true, rol: true } });
+    const porCorreo = await this.db().usuario.findFirst({ where: { email }, select: { id: true, rol: true } });
     if (porCorreo) {
       return {
         estado: 'fusionada',
@@ -360,9 +381,10 @@ export class SyncService {
         detalle: { idLocal: dto.id },
       };
     }
+    const tiendaId = TenantContext.tiendaIdOrThrow();
     const { cuenta } = await this.cuentas.obtenerOCrear({ email, nombre: dto.nombre, exigirClave: false });
-    const usuario = await this.prisma.usuario.create({
-      data: { id: dto.id, cuentaId: cuenta.id, email, nombre: dto.nombre, rol: Rol.CLIENTA },
+    const usuario = await this.db().usuario.create({
+      data: { tiendaId, id: dto.id, cuentaId: cuenta.id, email, nombre: dto.nombre, rol: Rol.CLIENTA },
       select: { id: true },
     });
     return { estado: 'aplicada', recursoId: usuario.id };
@@ -373,12 +395,12 @@ export class SyncService {
       throw rechazo('PERMISO_DENEGADO', 'Solo un administrador puede registrar productos.');
     }
     const dto = await validar(ProductoOfflineDto, op.datos);
-    const existente = await this.prisma.producto.findUnique({ where: { id: dto.id }, select: { id: true } });
+    const existente = await this.db().producto.findUnique({ where: { id: dto.id }, select: { id: true } });
     if (existente) return { estado: 'aplicada', recursoId: existente.id };
 
     const skus = dto.variantes.map((v) => v.sku.trim());
     if (new Set(skus).size !== skus.length) throw rechazo('SKU_REPETIDO', 'Dos variantes tienen el mismo SKU.');
-    const usados = await this.prisma.variante.findMany({ where: { sku: { in: skus } }, select: { sku: true } });
+    const usados = await this.db().variante.findMany({ where: { sku: { in: skus } }, select: { sku: true } });
     if (usados.length) {
       throw conflicto('SKU_EN_USO', `El SKU ${usados[0].sku} ya existe en la tienda.`, {
         skus: usados.map((u) => u.sku),
@@ -386,12 +408,14 @@ export class SyncService {
     }
     const conStock = dto.variantes.some((v) => (v.stock ?? 0) > 0);
     if (conStock && !dto.almacenId) throw rechazo('ALMACEN_REQUERIDO', 'Indicá el almacén del stock inicial.');
-    await exigirDeLaTienda(this.prisma, { almacen: dto.almacenId });
-    await this.limites.verificar('productos');
+    await exigirDeLaTienda(this.db(), { almacen: dto.almacenId });
+    await this.limites.verificar('productos', this.db());
 
-    const producto = await this.prisma.$transaction(async (tx) => {
+    const tiendaId = TenantContext.tiendaIdOrThrow();
+    const producto = await this.db().$transaction(async (tx) => {
       const p = await tx.producto.create({
         data: {
+          tiendaId,
           id: dto.id,
           nombre: dto.nombre,
           descripcion: dto.descripcion ?? '',
@@ -399,14 +423,15 @@ export class SyncService {
           ocasion: dto.ocasion,
           precioBase: dto.precioBase,
           variantes: {
-            create: dto.variantes.map((v) => ({ id: v.id, talla: v.talla, color: v.color, sku: v.sku.trim() })),
+            create: dto.variantes.map((v) => ({ tiendaId, id: v.id, talla: v.talla, color: v.color, sku: v.sku.trim() })),
           },
         },
       });
       for (const v of dto.variantes) {
         if (!v.stock || !dto.almacenId) continue;
-        await tx.stockAlmacen.create({ data: { varianteId: v.id, almacenId: dto.almacenId, cantidad: v.stock } });
+        await tx.stockAlmacen.create({ data: { tiendaId, varianteId: v.id, almacenId: dto.almacenId, cantidad: v.stock } });
         await this.inventario.registrar(tx, {
+          tiendaId,
           tipo: 'ajuste',
           varianteId: v.id,
           almacenId: dto.almacenId,
@@ -421,10 +446,11 @@ export class SyncService {
   }
 
   private async registrarDispositivo(dto: LoteSyncDto) {
+    const tiendaId = TenantContext.tiendaIdOrThrow();
     try {
-      await this.prisma.dispositivo.upsert({
+      await this.db().dispositivo.upsert({
         where: { id: dto.dispositivoId },
-        create: { id: dto.dispositivoId, nombre: dto.nombreDispositivo ?? '' },
+        create: { tiendaId, id: dto.dispositivoId, nombre: dto.nombreDispositivo ?? '' },
         update: { ultimoUso: new Date(), ...(dto.nombreDispositivo ? { nombre: dto.nombreDispositivo } : {}) },
       });
     } catch (error) {
@@ -434,7 +460,7 @@ export class SyncService {
 
   private async avisarConflictos(cantidad: number, actor: JwtPayload) {
     try {
-      const responsables = await this.prisma.usuario.findMany({
+      const responsables = await this.db().usuario.findMany({
         where: { rol: { in: [Rol.ADMIN, Rol.ENCARGADO] }, activo: true },
         select: { id: true },
       });

@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, HttpException } from '@nestjs/common';
+jest.mock('@nestjs/config', () => ({ ConfigService: class ConfigService {} }));
 jest.mock('../auth/auth.service', () => ({ AuthService: class AuthService {} }));
 jest.mock('../auth/cuentas.service', () => ({ CuentasService: class CuentasService {} }));
 jest.mock('../auth/token.service', () => ({ TokenService: class TokenService {} }));
@@ -17,7 +18,7 @@ describe('Renovación de suscripciones: autorización e idempotencia', () => {
       pagoSuscripcion: { findUnique: jest.fn().mockResolvedValue(pago) },
     };
     pasarela = { cobrar: jest.fn() };
-    servicio = new PlataformaService(prisma, {} as any, {} as any, {} as any, {} as any, {} as any, pasarela);
+    servicio = new PlataformaService(prisma, {} as any, {} as any, {} as any, {} as any, {} as any, pasarela, {} as any, { get: () => undefined } as any, {} as any);
     jest.spyOn(servicio, 'detalleTienda').mockResolvedValue({ id: 'tienda-a' } as any);
   });
 
@@ -30,6 +31,25 @@ describe('Renovación de suscripciones: autorización e idempotencia', () => {
     await expect(servicio.renovar('dueno-a', 'tienda-a', { ...dto, metodoPago: 'pix' })).rejects.toBeInstanceOf(BadRequestException);
     expect(pasarela.cobrar).not.toHaveBeenCalled();
   });
+
+  it.each([['AR', 'yape'], ['AR', 'plin'], ['PE', 'pix'], ['BR', 'qr_bolivia']])(
+    'rechaza renovar %s con el metodo extranjero %s', async (pais, metodoPago) => {
+      prisma.tienda.findUnique.mockResolvedValue({ id: 'tienda-a', duenoCuentaId: 'dueno-a', pais });
+      await expect(servicio.renovar('dueno-a', 'tienda-a', { ...dto, metodoPago })).rejects.toBeInstanceOf(BadRequestException);
+      expect(pasarela.cobrar).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([['BO', 'pix'], ['AR', 'yape'], ['PE', 'pix']])(
+    'rechaza el alta %s con %s antes de cobrar o crear la tienda', async (pais, metodoPago) => {
+      prisma.cuenta = { findUniqueOrThrow: jest.fn().mockResolvedValue({ emailVerificado: true }) };
+      await expect(servicio.suscribir('dueno-a', {
+        ...dto, metodoPago, tienda: { nombre: 'Tienda demo', slug: 'tienda-demo', pais },
+      })).rejects.toBeInstanceOf(BadRequestException);
+      expect(pasarela.cobrar).not.toHaveBeenCalled();
+      expect(prisma.pagoSuscripcion.findUnique).not.toHaveBeenCalled();
+    },
+  );
 
   it('acepta el reintento idéntico sin volver a cobrar', async () => {
     await expect(servicio.renovar('dueno-a', 'tienda-a', dto)).resolves.toMatchObject({ repetido: true });

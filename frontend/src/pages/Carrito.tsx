@@ -1,3 +1,5 @@
+import { BotonesPago, medioDeMetodo, useMetodosPago } from '../shared/PagosSimulados'
+import { useEstadoSync } from '../offline/sync'
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api } from '../api'
@@ -41,7 +43,10 @@ export function Carrito() {
   const [direcciones, setDirecciones] = useState<Direccion[]>([])
   const [direccionId, setDireccionId] = useState('')
   const [almacenId, setAlmacenId] = useState('')
-  const [medio, setMedio] = useState<'contra_entrega' | 'qr'>('contra_entrega')
+  const [medio, setMedio] = useState<'contra_entrega' | 'qr' | 'tarjeta' | 'transferencia'>('contra_entrega')
+  const pagos = useMetodosPago()
+  const [metodo, setMetodo] = useState('')
+  const [procesandoPago, setProcesandoPago] = useState(false)
   const [msg, setMsg] = useState('')
   const [ticket, setTicket] = useState('')
   const [comprobante, setComprobante] = useState<TicketDatos | null>(null)
@@ -74,6 +79,7 @@ export function Carrito() {
     return <Navigate to={homePorRol(user.rol)} replace />
   }
 
+  const sync = useEstadoSync()
   const guest = !user
   const nextAuth = `/registro?next=${encodeURIComponent('/carrito')}`
   const loginAuth = `/login?next=${encodeURIComponent('/carrito')}`
@@ -83,12 +89,19 @@ export function Carrito() {
       setMsg('Para pagar necesitás una cuenta. Tu bolsa se guarda.')
       return
     }
+    if (!sync.online) {
+      setMsg('Sin conexión: la compra en línea requiere conexión a internet.')
+      return
+    }
+    if (pagoId || procesandoPago) return
+    if (medio !== 'contra_entrega' && !pagos.metodos.some(m => m.codigo === metodo)) { setMsg('Elegí un método disponible para la tienda.'); return }
     if (!almacenId || lineas.length === 0) return
     if (!direccionId) {
       setMsg('Agregá una dirección de envío en Mi cuenta antes de pedir.')
       return
     }
     setMsg('')
+    setProcesandoPago(true)
     try {
       const venta = await api<{
         id: string
@@ -100,6 +113,7 @@ export function Carrito() {
           uuid: crypto.randomUUID(),
           canal: 'online',
           medioPago: medio,
+          ...(medio !== 'contra_entrega' ? { metodoPasarela: metodo } : {}),
           almacenId,
           lineas: lineas.map(l => ({
             varianteId: l.varianteId,
@@ -115,7 +129,7 @@ export function Carrito() {
       setCuponCodigo('')
       setComprobante({
         id: venta.id,
-        medio: medio === 'qr' ? 'qr' : 'contra_entrega',
+        medio: medio,
         total: Number(venta.total),
         canal: 'online',
         fecha: new Date().toLocaleString('es-BO'),
@@ -146,11 +160,12 @@ export function Carrito() {
         NO_ES_TU_PAGO: 'Ese pago no es tuyo.',
       }
       setMsg(textos[codigo] ?? (codigo || 'No se pudo confirmar el pedido'))
-    }
+    } finally { setProcesandoPago(false) }
   }
 
   async function resolverQr(resultado: 'aprobado' | 'rechazado') {
-    if (!pagoId) return
+    if (!pagoId || procesandoPago) return
+    setProcesandoPago(true)
     try {
       await api(`/pagos/${pagoId}/simular`, {
         method: 'POST',
@@ -171,7 +186,7 @@ export function Carrito() {
         STOCK_INSUFICIENTE: 'No hay stock suficiente para confirmar el pago.',
       }
       setMsg(textos[codigo] ?? (codigo || 'No se pudo simular el pago'))
-    }
+    } finally { setProcesandoPago(false) }
   }
 
   const total = lineas.reduce((sum, line) => sum + line.precio * line.cantidad, 0)
@@ -349,23 +364,21 @@ export function Carrito() {
                 />
               </label>
 
-              <label>
-                Forma de pago
-                <select
-                  value={medio}
-                  onChange={e => setMedio(e.target.value as 'contra_entrega' | 'qr')}
-                >
-                  <option value="contra_entrega">Contra entrega</option>
-                  <option value="qr">QR (demo)</option>
-                </select>
-              </label>
+              <button type="button" className="ui-button ui-button--secondary" aria-pressed={medio === 'contra_entrega'} onClick={() => { setMedio('contra_entrega'); setMetodo('') }}>Contra entrega</button>
+              <BotonesPago disabled={procesandoPago || !!pagoId} pais={pagos.pais} metodos={pagos.metodos} valor={metodo} onChange={codigo => { setMetodo(codigo); setMedio(medioDeMetodo(codigo)) }} />
+              {pagos.error ? <p role="alert">{pagos.error}</p> : null}
 
+              {!sync.online ? (
+                <p className="error" role="status">
+                  Sin conexión: las compras y pagos en línea requieren conectividad a internet. Para ventas sin conexión, utilizá el Punto de Venta (POS) en efectivo.
+                </p>
+              ) : null}
               {msg ? <p className={esError ? 'error' : 'ok'}>{msg}</p> : null}
 
               <button
                 className="ui-button ui-button--primary bag-submit"
                 type="submit"
-                disabled={!checkoutListo}
+                disabled={!checkoutListo || procesandoPago || !!pagoId || !sync.online}
               >
                 Confirmar pedido
               </button>
@@ -387,16 +400,16 @@ export function Carrito() {
             <button
               type="button"
               className="ui-button ui-button--primary"
-              onClick={() => void resolverQr('aprobado')}
+              disabled={procesandoPago} onClick={() => void resolverQr('aprobado')}
             >
-              Aprobar QR
+              Aprobar pago
             </button>
             <button
               type="button"
               className="ui-button ui-button--secondary"
-              onClick={() => void resolverQr('rechazado')}
+              disabled={procesandoPago} onClick={() => void resolverQr('rechazado')}
             >
-              Rechazar QR
+              Rechazar pago
             </button>
           </div>
         </div>

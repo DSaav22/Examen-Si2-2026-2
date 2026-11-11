@@ -2,10 +2,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { EstadoReserva } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaEsquemasService } from '../prisma/prisma-esquemas.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContext } from '../tenancy/tenant-context';
 import { InventarioService } from '../inventario/inventario.service';
 
 const TRANSICIONES: Record<EstadoReserva, EstadoReserva[]> = {
@@ -21,10 +25,20 @@ export class ReservasService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventario: InventarioService,
+    @Optional() private readonly esquemas?: PrismaEsquemasService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
 
+  private db(): PrismaService {
+    const tiendaId = TenantContext.tiendaId();
+    if (tiendaId && (this.config?.get<string>('TENANT_SCHEMAS_PERFILES') === 'true' || this.config?.get<string>('TENANT_SCHEMAS_VENTAS') === 'true') && this.esquemas) {
+      return this.esquemas.clienteTienda(tiendaId) as unknown as PrismaService;
+    }
+    return this.prisma;
+  }
+
   misReservas(clientaId: string) {
-    return this.prisma.reserva.findMany({
+    return this.db().reserva.findMany({
       where: { clientaId },
       include: {
         sucursal: true,
@@ -35,7 +49,7 @@ export class ReservasService {
   }
 
   deSucursal(sucursalId: string) {
-    return this.prisma.reserva.findMany({
+    return this.db().reserva.findMany({
       where: {
         sucursalId,
         estado: { in: ['pendiente', 'preparada', 'en_atencion'] },
@@ -57,7 +71,7 @@ export class ReservasService {
       lineas: { varianteId: string; cantidad: number }[];
     },
   ) {
-    const sucursal = await this.prisma.sucursal.findUnique({
+    const sucursal = await this.db().sucursal.findUnique({
       where: { id: data.sucursalId },
       include: { almacenes: true },
     });
@@ -66,7 +80,7 @@ export class ReservasService {
     }
     const almacenId = sucursal.almacenes[0].id;
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.db().$transaction(async (tx) => {
       for (const linea of data.lineas) {
         const rows = await tx.$queryRaw<
           { cantidad: number; reservado: number }[]
@@ -94,8 +108,10 @@ export class ReservasService {
         });
       }
 
+      const tiendaId = TenantContext.tiendaId();
       const reserva = await tx.reserva.create({
         data: {
+          ...(tiendaId ? { tiendaId } : {}),
           clientaId,
           sucursalId: data.sucursalId,
           horario: new Date(data.horario),
@@ -103,6 +119,7 @@ export class ReservasService {
           estado: 'pendiente',
           lineas: {
             create: data.lineas.map((l) => ({
+              ...(tiendaId ? { tiendaId } : {}),
               varianteId: l.varianteId,
               cantidad: l.cantidad,
             })),
@@ -139,7 +156,7 @@ export class ReservasService {
       throw new ConflictException({ codigo: 'ENCARGADO_SIN_SUCURSAL' });
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.db().$transaction(async (tx) => {
       const locked = await tx.$queryRaw<{ id: string; estado: EstadoReserva; sucursal_id: string }[]>`
         SELECT id, estado, sucursal_id FROM reservas WHERE id = ${id} FOR UPDATE
       `;
@@ -246,8 +263,10 @@ export class ReservasService {
           (acc, l) => acc + l.precioUnitario * l.cantidad,
           0,
         );
+        const tiendaId = TenantContext.tiendaId();
         const venta = await tx.venta.create({
           data: {
+            ...(tiendaId ? { tiendaId } : {}),
             uuid: randomUUID(),
             canal: 'pos',
             estado: 'cobrada',
@@ -257,6 +276,7 @@ export class ReservasService {
             clientaId: reserva.clientaId,
             lineas: {
               create: lineasConPrecio.map((l) => ({
+                ...(tiendaId ? { tiendaId } : {}),
                 varianteId: l.varianteId,
                 cantidad: l.cantidad,
                 precioUnitario: l.precioUnitario,
@@ -290,7 +310,7 @@ export class ReservasService {
   }
 
   obtener(id: string) {
-    return this.prisma.reserva.findUnique({
+    return this.db().reserva.findUnique({
       where: { id },
       include: {
         sucursal: true,

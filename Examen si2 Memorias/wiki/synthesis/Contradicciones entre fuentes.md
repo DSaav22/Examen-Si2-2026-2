@@ -39,6 +39,6 @@ El propio audio dice que stack y documentos “se definen el lunes”. La clase 
 | Offline | Capacidad en el POS; PWA no obligatoria | **Web PWA + móvil SQLite**, obligatorio |
 | Reportes generativos | SQL acotado a una vista | Pedidos complejos, voz, PDF y Excel |
 | Analítica ML | No existía | Supervisados + no supervisados, datos sintéticos |
-| Pagos | QR simulado | Sandbox real, países hispanohablantes |
+| Pagos | QR simulado simple | **Simulación formal por país con reserva de stock e idempotencia** (aclaración confirmada: el docente acepta pagos simulados y no exige pasarela externa viva) |
 | Fecha | 23 sep | **11 nov, PDF hasta las 8:00** |
 | Arquitectura | "No microservicios" | Igual: **monolito modular** listo para separarse |
